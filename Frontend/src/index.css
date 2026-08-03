@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Design tokens Admin UI (MentorTaskFlow) — docs/design/MentorTaskFlow_Admin_UI.md.
+ *
+ * Семантические CSS-переменные, а не сырые hex по всему коду: `tailwind.config.js`
+ * ссылается на них через `var(--token)`. Здесь же в будущем подключится тёмная
+ * тема — переопределением значений внутри `:root[data-theme="dark"]` без единой
+ * правки в компонентах.
+ */
+:root {
+  --background: #f7f8fc;
+  --background-subtle: #f3f5fa;
+  --surface: #ffffff;
+  --surface-muted: #f8f9fc;
+  --surface-hover: #f3f4fa;
+
+  --text-primary: #171a2b;
+  --text-secondary: #475467;
+  --text-muted: #5f6a82;
+  --text-disabled: #a4abba;
+
+  --border: #e7eaf2;
+  --border-strong: #d8ddea;
+  --divider: #edf0f5;
+
+  --primary: #5b5ce2;
+  --primary-hover: #4c4dc9;
+  --primary-active: #4142b3;
+  --primary-soft: #eeefff;
+  --primary-soft-hover: #e5e7ff;
+
+  --secondary-blue: #3b82f6;
+  --secondary-violet: #7c5ce7;
+  --secondary-cyan: #22a7d6;
+
+  --success: #168a5b;
+  --success-soft: #ecf8f2;
+  --success-border: #cbebdd;
+
+  --warning: #c87812;
+  --warning-soft: #fff7e8;
+  --warning-border: #f7ddae;
+
+  --danger: #c94a4a;
+  --danger-soft: #fff1f1;
+  --danger-border: #f2cccc;
+
+  --info: #3478d4;
+  --info-soft: #eff6ff;
+  --info-border: #cfe2fa;
+
+  --focus-ring: rgba(91, 92, 226, 0.22);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-app text-ink antialiased;
+    font-family:
+      'Inter',
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif;
+  }
+}

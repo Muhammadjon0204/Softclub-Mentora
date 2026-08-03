@@ -1,0 +1,549 @@
+# ============================================================
+# Mentora — ASP.NET Core Backend + React/Vite Frontend
+# ============================================================
+
+# ------------------------------------------------------------
+# Windows / macOS / Linux
+# ------------------------------------------------------------
+
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.stackdump
+
+
+# ------------------------------------------------------------
+# Visual Studio / VS Code / Rider
+# ------------------------------------------------------------
+
+.vs/
+.idea/
+
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.csproj.user
+*.fsproj.user
+*.vbproj.user
+*.vcxproj.user
+*.DotSettings.user
+*.sln.iml
+*.code-workspace
+
+_ReSharper*/
+_ReSharper.Caches/
+*.resharper
+*.sln.cache
+
+.history/
+.project
+.classpath
+.settings/
+
+# VS Code local settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+!.vscode/launch.example.json
+!.vscode/tasks.example.json
+
+
+# ------------------------------------------------------------
+# Claude Code / Cursor / AI-agent local files
+# ------------------------------------------------------------
+
+.claude/settings.local.json
+.claude/cache/
+.claude/logs/
+.claude/tmp/
+
+.cursor/cache/
+.cursor/logs/
+
+.codex/
+.continue/
+.roo/
+.windsurf/
+.aider*
+.replit/
+
+
+# ------------------------------------------------------------
+# Environment files and secrets
+# ------------------------------------------------------------
+
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Keep safe examples
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+
+# Secret directories
+secrets/
+.secrets/
+**/secrets/
+**/.secrets/
+
+# Credentials
+credentials.json
+credentials.*.json
+service-account.json
+service-account*.json
+google-credentials*.json
+firebase-adminsdk*.json
+azureauth.json
+aws-credentials*
+gcp-credentials*
+
+*.secret
+*.secrets
+*.credentials
+*.credentials.json
+
+# Private keys and certificates
+*.pfx
+*.p12
+*.pem
+*.key
+*.ppk
+*.jks
+*.keystore
+*.kdbx
+*.ovpn
+
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+
+# Package registry credentials
+.npmrc.local
+.yarnrc.local
+.pnpmrc.local
+NuGet.Config.local
+.nuget/NuGet.Config.local
+
+
+# ------------------------------------------------------------
+# ASP.NET Core secret configuration
+# ------------------------------------------------------------
+
+appsettings.Local.json
+appsettings.local.json
+
+appsettings.*.Local.json
+appsettings.*.local.json
+
+appsettings.Secrets.json
+appsettings.secrets.json
+
+appsettings.*.Secrets.json
+appsettings.*.secrets.json
+
+launchSettings.local.json
+Properties/launchSettings.local.json
+
+Properties/PublishProfiles/*.pubxml.user
+*.publishsettings
+
+
+# ------------------------------------------------------------
+# .NET / ASP.NET Core build files
+# ------------------------------------------------------------
+
+**/bin/
+**/obj/
+**/artifacts/
+
+artifacts/
+Debug/
+Release/
+build/
+builds/
+bld/
+
+x64/
+x86/
+arm/
+arm64/
+
+*.dll
+*.exe
+*.pdb
+*.mdb
+*.cachefile
+*.generated.cs
+
+GeneratedMSBuildEditorConfig.editorconfig
+project.lock.json
+project.fragment.lock.json
+
+.nuget/
+packages/
+
+*.nupkg
+*.snupkg
+
+
+# ------------------------------------------------------------
+# .NET tests and coverage
+# ------------------------------------------------------------
+
+TestResults/
+test-results/
+
+coverage/
+coverage-*/
+coverage.json
+coverage.xml
+coverage.opencover.xml
+coverage.cobertura.xml
+
+*.coverage
+*.coveragexml
+*.trx
+*.testlog
+
+BenchmarkDotNet.Artifacts/
+
+*.dotCover
+*.ncrunch*
+_NCrunch_*
+TeamCity*
+
+
+# ------------------------------------------------------------
+# Node.js / React / Vite
+# ------------------------------------------------------------
+
+node_modules/
+**/node_modules/
+
+.pnp
+.pnp.js
+
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+
+# ------------------------------------------------------------
+# Frontend build output
+# ------------------------------------------------------------
+
+Frontend/dist/
+Frontend/build/
+Frontend/out/
+
+dist/
+build/
+out/
+
+Frontend/.vite/
+Frontend/.vite-inspect/
+Frontend/.turbo/
+Frontend/.parcel-cache/
+Frontend/.rollup.cache/
+Frontend/.cache/
+
+.vite/
+.vite-inspect/
+.turbo/
+.parcel-cache/
+.rollup.cache/
+
+Frontend/.next/
+Frontend/.nuxt/
+Frontend/.svelte-kit/
+Frontend/storybook-static/
+
+
+# ------------------------------------------------------------
+# TypeScript / ESLint / frontend cache
+# ------------------------------------------------------------
+
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+.eslintcache
+**/.eslintcache
+
+.stylelintcache
+**/.stylelintcache
+
+.tscache/
+**/.tscache/
+
+.swc/
+**/.swc/
+
+.babel-cache/
+**/.babel-cache/
+
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+
+# ------------------------------------------------------------
+# Frontend tests
+# ------------------------------------------------------------
+
+Frontend/coverage/
+Frontend/test-results/
+Frontend/playwright-report/
+Frontend/blob-report/
+Frontend/.playwright/
+Frontend/.nyc_output/
+
+playwright-report/
+blob-report/
+.nyc_output/
+
+Frontend/cypress/screenshots/
+Frontend/cypress/videos/
+Frontend/cypress/downloads/
+
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+
+
+# ------------------------------------------------------------
+# Logs
+# ------------------------------------------------------------
+
+*.log
+logs/
+log/
+
+diagnostics/
+crash-reports/
+
+vite-debug.log*
+debug.log
+error.log
+
+
+# ------------------------------------------------------------
+# Temporary files
+# ------------------------------------------------------------
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*.orig
+*.rej
+*.bak
+*.old
+*.cache
+*~
+
+.cache/
+.temp/
+tmp/
+temp/
+
+.local/
+.local-cache/
+
+
+# ------------------------------------------------------------
+# Docker local files and volumes
+# ------------------------------------------------------------
+
+docker-compose.override.yml
+docker-compose.*.override.yml
+
+compose.override.yml
+compose.*.override.yml
+
+.docker/
+**/.docker/
+
+docker-data/
+.docker-data/
+
+postgres-data/
+postgresql-data/
+pgdata/
+
+redis-data/
+minio-data/
+rabbitmq-data/
+elasticsearch-data/
+
+prometheus-data/
+grafana-data/
+
+volumes/
+.local-volumes/
+runtime-data/
+
+
+# ------------------------------------------------------------
+# Databases, dumps and backups
+# ------------------------------------------------------------
+
+*.db
+*.db-shm
+*.db-wal
+
+*.sqlite
+*.sqlite3
+
+*.dump
+*.backup
+*.sql.gz
+*.dump.gz
+*.bak.gz
+
+db-backups/
+database-backups/
+backups/
+restore-data/
+
+
+# ------------------------------------------------------------
+# Runtime uploads and generated files
+# ------------------------------------------------------------
+
+Backend/uploads/
+Backend/storage/
+Backend/App_Data/
+
+Backend/wwwroot/uploads/
+Backend/wwwroot/generated/
+
+uploads/
+storage/
+local-storage/
+object-storage/
+generated-files/
+signed-files/
+quarantine/
+
+
+# ------------------------------------------------------------
+# Email / Telegram local data
+# ------------------------------------------------------------
+
+mail-data/
+mailhog-data/
+mailpit-data/
+smtp-data/
+
+telegram-session/
+telegram-sessions/
+
+
+# ------------------------------------------------------------
+# Runtime process files
+# ------------------------------------------------------------
+
+*.pid
+*.pid.lock
+*.pidfile
+*.sock
+*.seed
+
+
+# ------------------------------------------------------------
+# Security scanner reports
+# ------------------------------------------------------------
+
+security-reports/
+dependency-reports/
+audit-reports/
+
+.sonar/
+.sonarqube/
+.scannerwork/
+
+.trivy/
+.grype/
+.snyk/
+.semgrep/
+
+sarif/
+*.sarif
+
+
+# ------------------------------------------------------------
+# Profiling and crash dumps
+# ------------------------------------------------------------
+
+*.dmp
+*.dumpstack
+
+*.etl
+*.etl.zip
+
+*.diagsession
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+perf-results/
+profile-results/
+
+
+# ------------------------------------------------------------
+# Local documentation backups
+# ------------------------------------------------------------
+
+docs/archive/
+docs/**/*.backup.md
+docs/**/*.backup.txt
+docs/**/*.backup.json
+
+
+# ------------------------------------------------------------
+# Package archives
+# ------------------------------------------------------------
+
+*.tgz
+
+
+# ============================================================
+# DO NOT IGNORE
+# ============================================================
+
+# EF Core migrations must remain in Git
+!Backend/**/Migrations/
+!Backend/**/Migrations/**
+
+# Environment examples must remain in Git
+!.env.example
+!.env.*.example
+!**/.env.example
+!**/.env.*.example
+
+# MSW development worker must remain in Git
+!Frontend/public/mockServiceWorker.js

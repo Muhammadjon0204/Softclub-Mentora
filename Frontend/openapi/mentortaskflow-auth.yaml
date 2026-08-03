@@ -1,0 +1,605 @@
+openapi: 3.1.0
+
+info:
+  title: MentorTaskFlow — Authentication & Session Management
+  version: 1.0.0
+  description: |
+    Контракт auth-модуля MentorTaskFlow.
+
+    Пока backend отсутствует, этот файл — единственный источник правды: из него
+    генерируются TypeScript-типы (`npm run api:generate`) и по нему написаны
+    MSW-хендлеры. Когда backend отдаст общий OpenAPI, меняется только источник
+    генерации — код приложения остаётся прежним.
+
+    Сессия:
+      * `accessToken` — короткоживущий, возвращается в теле, хранится только в памяти SPA;
+      * refresh-токен — HttpOnly-cookie `mtf_rt`, клиент её значение не читает никогда;
+      * `mtf_csrf` — НЕ HttpOnly, читается JS и дублируется в заголовок `X-CSRF-Token`
+        (double submit).
+
+    Окончательные атрибуты cookie:
+
+      mtf_rt:   HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; host-only
+      mtf_csrf: Secure; SameSite=Strict; Path=/; non-HttpOnly; host-only
+
+servers:
+  - url: https://api.mentortaskflow.example
+    description: Production
+  - url: ''
+    description: Same-origin (dev / MSW)
+
+tags:
+  - name: auth
+    description: Аутентификация и управление сессией
+
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Вход по email и паролю
+      description: |
+        Единый ответ `401 INVALID_CREDENTIALS` во всех случаях отказа: неверный email,
+        неверный пароль, отсутствующий `PasswordHash`, активный account lockout,
+        неактивный пользователь. Причина наружу не раскрывается.
+
+        Успешный ответ устанавливает cookie `mtf_rt` (HttpOnly, Secure, SameSite=Strict,
+        Path=/api/v1/auth, host-only, TTL 14 дней) и `mtf_csrf` (Secure, SameSite=Strict,
+        Path=/, host-only, доступна JS).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Pragma:
+              $ref: '#/components/headers/PragmaNoCache'
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/SetSessionCookies'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: 'Отказ во входе (код: INVALID_CREDENTIALS)'
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refresh
+      summary: Ротация refresh-токена и выпуск нового access-токена
+      description: |
+        Требует cookie `mtf_rt`, cookie `mtf_csrf` и заголовок `X-CSRF-Token`,
+        значение которого совпадает с `mtf_csrf`.
+
+        Старый refresh-токен помечается использованным и остаётся в хранилище —
+        предъявление его повторно означает компрометацию и приводит к отзыву
+        всей token family (`REFRESH_TOKEN_REUSE_DETECTED`) и инкременту `TokenVersion`.
+      security:
+        - refreshCookie: []
+          csrfToken: []
+      responses:
+        '200':
+          description: Новый access-токен, refresh-cookie ротирована
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            Pragma:
+              $ref: '#/components/headers/PragmaNoCache'
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/SetSessionCookies'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: 'REFRESH_TOKEN_INVALID или REFRESH_TOKEN_REUSE_DETECTED'
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '403':
+          $ref: '#/components/responses/CsrfValidationFailed'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Завершение текущей сессии
+      description: |
+        Идемпотентен: если refresh-сессия уже отсутствует, при корректном CSRF
+        всё равно возвращается 204. Обе cookie гасятся через `Set-Cookie` с `Max-Age=0`.
+      security:
+        - refreshCookie: []
+          csrfToken: []
+      responses:
+        '204':
+          description: Сессия завершена
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              description: Обе cookie гасятся с `Max-Age=0`.
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/CsrfValidationFailed'
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      operationId: getMe
+      summary: Профиль текущего пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профиль
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/change-password:
+    post:
+      tags: [auth]
+      operationId: changePassword
+      summary: Смена пароля аутентифицированным пользователем
+      description: |
+        После успеха `TokenVersion` инкрементируется, все прочие refresh-сессии
+        пользователя отзываются, текущей выдаётся новая пара токенов.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Пароль изменён, выдан новый access-токен
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/CacheControlNoStore'
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+            Set-Cookie:
+              $ref: '#/components/headers/SetSessionCookies'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangePasswordResponse'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '401':
+          description: 'Неверный текущий пароль (INVALID_CREDENTIALS) либо невалидный access-токен'
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+
+  /api/v1/auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: forgotPassword
+      summary: Запрос ссылки для сброса пароля
+      description: |
+        Ответ 202 абсолютно одинаков для существующего email, неизвестного email
+        и неактивного пользователя — существование учётной записи не раскрывается.
+        Лимит: 5 запросов в час на IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '202':
+          description: Запрос принят
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordResponse'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/auth/reset-password:
+    post:
+      tags: [auth]
+      operationId: resetPassword
+      summary: Установка нового пароля по одноразовой ссылке
+      description: |
+        Токен: TTL 30 минут, одноразовый, Purpose = ResetPassword.
+        После успеха `TokenVersion` инкрементируется и все refresh-сессии отзываются.
+        Auto-login не выполняется. Тело успешного ответа пустое.
+        Лимит: 10 запросов в час на IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Пароль установлен (тело пустое)
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+        '400':
+          description: 'SECURITY_TOKEN_INVALID или VALIDATION_FAILED'
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/v1/auth/set-password:
+    post:
+      tags: [auth]
+      operationId: setPassword
+      summary: Установка первого пароля по приглашению
+      description: |
+        Токен: TTL 24 часа, одноразовый, Purpose = SetPassword.
+        Отдельного эндпоинта для предварительной валидации токена НЕТ — страница
+        не должна раскрывать email или имя приглашённого до успешной отправки формы.
+        Тело успешного ответа пустое. Лимит: 10 запросов в час на IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPasswordRequest'
+      responses:
+        '200':
+          description: Пароль установлен (тело пустое)
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+        '400':
+          description: 'SECURITY_TOKEN_INVALID или VALIDATION_FAILED'
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access-токен из тела `/login` или `/refresh`. Хранится только в памяти SPA.
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: mtf_rt
+      description: HttpOnly-cookie. Клиентский код её не читает и не может прочитать.
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Значение cookie `mtf_csrf`, продублированное в заголовок (double submit).
+
+  headers:
+    CacheControlNoStore:
+      description: Ответ не кэшируется.
+      schema:
+        type: string
+        examples: ['no-store']
+    PragmaNoCache:
+      description: Совместимость с HTTP/1.0.
+      schema:
+        type: string
+        examples: ['no-cache']
+    CorrelationId:
+      description: |
+        Эхо заголовка запроса `X-Correlation-Id`; если клиент его не прислал —
+        сгенерированный сервером UUID. Совпадает с `traceId` в ProblemDetails.
+      schema:
+        type: string
+        format: uuid
+    RetryAfter:
+      description: Через сколько секунд можно повторить запрос.
+      schema:
+        type: integer
+        minimum: 1
+    SetSessionCookies:
+      description: |
+        Окончательные значения:
+
+        `mtf_rt=<opaque>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=1209600`
+        — host-only (без атрибута `Domain`).
+
+        `mtf_csrf=<opaque>; Secure; SameSite=Strict; Path=/`
+        — non-HttpOnly, host-only (без атрибута `Domain`).
+
+        Разные `Path` — не опечатка: `mtf_rt` нужна только эндпоинтам `/api/v1/auth`,
+        а `mtf_csrf` обязана быть доступна `document.cookie` на любой странице SPA,
+        иначе double-submit невозможен.
+      schema:
+        type: string
+
+  responses:
+    Unauthorized:
+      description: 'UNAUTHORIZED, TOKEN_EXPIRED или TOKEN_VERSION_MISMATCH'
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    ValidationFailed:
+      description: 'VALIDATION_FAILED — поле `errors` содержит ошибки по полям'
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    CsrfValidationFailed:
+      description: 'CSRF_VALIDATION_FAILED'
+      headers:
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    RateLimitExceeded:
+      description: 'RATE_LIMIT_EXCEEDED'
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-Correlation-Id:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+
+  schemas:
+    UserRole:
+      type: string
+      enum: [Admin, Lead, Mentor]
+
+    AdminScope:
+      type: string
+      description: |
+        Административный контур роли Admin (ТЗ 2.2, раздел 8.5). Присутствует
+        только при role=Admin. Organization Admin управляет всей Organization
+        и всеми её филиалами; Branch Admin — только своим Branch.
+      enum: [Organization, Branch]
+
+    OrganizationSummary:
+      type: object
+      description: Минимальный состав данных Organization, видимый любому аутентифицированному пользователю.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    BranchSummary:
+      type: object
+      description: |
+        Минимальный состав данных Branch. `null` только у Organization Admin,
+        не выбравшего конкретный филиал (режим «Все филиалы»).
+      required: [id, name, code, isHeadOffice]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        isHeadOffice:
+          type: boolean
+
+    AuthErrorCode:
+      type: string
+      description: Единственное поле, по которому frontend принимает решения.
+      enum:
+        - INVALID_CREDENTIALS
+        - RATE_LIMIT_EXCEEDED
+        - REFRESH_TOKEN_INVALID
+        - REFRESH_TOKEN_REUSE_DETECTED
+        - CSRF_VALIDATION_FAILED
+        - UNAUTHORIZED
+        - TOKEN_EXPIRED
+        - TOKEN_VERSION_MISMATCH
+        - VALIDATION_FAILED
+        - SECURITY_TOKEN_INVALID
+        - USER_DEACTIVATED
+
+    ProblemDetails:
+      type: object
+      required: [type, title, status, code, detail, instance, traceId, errors]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          $ref: '#/components/schemas/AuthErrorCode'
+        detail:
+          type: string
+        instance:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Заполняется только для VALIDATION_FAILED, иначе пустой объект.
+
+    AuthUser:
+      type: object
+      description: |
+        Профиль текущего пользователя (ТЗ 2.2, раздел 16.9). Состав
+        organization/branch/adminScope/categoryId зависит от типа пользователя —
+        см. таблицу AUTH-038: у Organization Admin `branch` всегда `null`,
+        у Lead/Mentor `adminScope` всегда `null`.
+      required: [id, fullName, email, role, adminScope, organization, branch, categoryId]
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+        adminScope:
+          oneOf:
+            - $ref: '#/components/schemas/AdminScope'
+            - type: 'null'
+        organization:
+          $ref: '#/components/schemas/OrganizationSummary'
+        branch:
+          oneOf:
+            - $ref: '#/components/schemas/BranchSummary'
+            - type: 'null'
+        categoryId:
+          type: ['string', 'null']
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [accessToken, user]
+      properties:
+        accessToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/AuthUser'
+
+    RefreshResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    ChangePasswordResponse:
+      type: object
+      required: [accessToken]
+      properties:
+        accessToken:
+          type: string
+
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ForgotPasswordResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
+
+    SetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+          maxLength: 128
