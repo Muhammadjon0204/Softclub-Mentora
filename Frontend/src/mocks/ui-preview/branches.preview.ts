@@ -23,8 +23,8 @@ export interface PreviewBranch {
 export const PREVIEW_BRANCHES: PreviewBranch[] = [
   {
     id: 'branch-hq',
-    name: 'Главный офис',
-    code: 'HQ-DUS',
+    name: 'Душанбе',
+    code: 'DUS-01',
     address: 'г. Душанбе, ул. Рудаки, 22',
     isHeadOffice: true,
     adminName: 'Фируз Алимов',
@@ -36,7 +36,7 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
   },
   {
     id: 'branch-khu',
-    name: 'Филиал Худжанд',
+    name: 'Худжанд',
     code: 'KHU-01',
     address: 'г. Худжанд, ул. Ленина, 5',
     isHeadOffice: false,
@@ -49,7 +49,7 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
   },
   {
     id: 'branch-bok',
-    name: 'Филиал Бохтар',
+    name: 'Бохтар',
     code: 'BOK-01',
     address: 'г. Бохтар, ул. Восеъ, 11',
     isHeadOffice: false,
@@ -64,7 +64,7 @@ export const PREVIEW_BRANCHES: PreviewBranch[] = [
 
 /** Для компактного «Распределение пользователей по филиалам» рядом с таблицей. */
 export const PREVIEW_BRANCH_USER_DISTRIBUTION: { label: string; count: number }[] = [
-  { label: 'Главный офис', count: 22 },
-  { label: 'Филиал Худжанд', count: 9 },
-  { label: 'Филиал Бохтар', count: 5 },
+  { label: 'Душанбе', count: 22 },
+  { label: 'Худжанд', count: 9 },
+  { label: 'Бохтар', count: 5 },
 ];

@@ -1,5 +1,7 @@
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
+import { useSearchParams } from 'react-router-dom';
 
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import {
@@ -25,10 +27,26 @@ const LEVEL_ICON: Record<'info' | 'warning' | 'error', JSX.Element> = {
   error: <AlertCircle className="h-3.5 w-3.5 text-danger" aria-hidden="true" />,
 };
 
+/** `postgres` (реальный домен Dashboard) ↔ `db` (этот превью-датасет) — единственное расхождение id сервисов. */
+function normalizeServiceKey(key: string | null): string | null {
+  return key === 'postgres' ? 'db' : key;
+}
+
 /** UI-прототип /admin/health — без тяжёлых DevOps-графиков (раздел 13 сессии превью). */
 export function HealthPage(): JSX.Element {
   const hasDegraded = PREVIEW_SERVICES.some((s) => s.status !== 'Operational');
   const availabilityData = PREVIEW_AVAILABILITY_24H.map((value, index) => ({ hour: index, value }));
+
+  // Минимальный deep-link из Dashboard-карточки «Здоровье системы» (?service=<id>) —
+  // подсвечиваем и прокручиваем к карточке сервиса, дизайн страницы не меняется.
+  const [searchParams] = useSearchParams();
+  const highlightService = normalizeServiceKey(searchParams.get('service'));
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    if (highlightService === null) return;
+    cardRefs.current.get(highlightService)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightService]);
 
   return (
     <div className="space-y-6">
@@ -48,7 +66,16 @@ export function HealthPage(): JSX.Element {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {PREVIEW_SERVICES.map((service) => (
-          <Card key={service.id} className="flex flex-col gap-2.5">
+          <div
+            key={service.id}
+            ref={(node) => {
+              if (node) cardRefs.current.set(service.id, node);
+              else cardRefs.current.delete(service.id);
+            }}
+          >
+          <Card
+            className={`flex flex-col gap-2.5 ${service.id === highlightService ? 'ring-2 ring-brand ring-offset-2 ring-offset-app' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-ink">{service.name}</p>
               <Badge tone={STATUS_TONE[service.status]}>{SERVICE_STATUS_LABEL[service.status]}</Badge>
@@ -69,6 +96,7 @@ export function HealthPage(): JSX.Element {
               </div>
             </div>
           </Card>
+          </div>
         ))}
       </div>
 

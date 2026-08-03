@@ -1,5 +1,6 @@
 import { Check, Copy, Eye, ScrollText, ShieldAlert, ShieldCheck, ShieldX } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PreviewDrawer } from '../../features/admin-preview/PreviewDrawer';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
@@ -67,7 +68,10 @@ function CopyCorrelationId({ id }: { id: string }): JSX.Element {
  * (как и в Assignments), таблица на всю ширину.
  */
 export function AuditPage(): JSX.Element {
-  const [search, setSearch] = useState('');
+  // Минимальный deep-link из Dashboard-карточки «Последняя активность» (?q=<имя>) —
+  // заполняет уже существующий поиск.
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [branch, setBranch] = useState('all');
   const [result, setResult] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);

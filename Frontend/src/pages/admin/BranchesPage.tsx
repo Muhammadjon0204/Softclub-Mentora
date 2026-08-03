@@ -1,14 +1,22 @@
 import { Building2, Pencil, Plus, Power, Users as UsersIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PreviewActionMenu } from '../../features/admin-preview/PreviewActionMenu';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
+import {
+  PreviewCellStack,
+  PreviewTable,
+  PreviewTableHead,
+  PreviewTd,
+  PreviewTh,
+  PreviewTr,
+} from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { PreviewToast, usePreviewToast } from '../../features/admin-preview/PreviewToast';
 import { PREVIEW_BRANCHES, PREVIEW_BRANCH_USER_DISTRIBUTION } from '../../mocks/ui-preview/branches.preview';
-import { Badge } from '../../shared/ui/Badge';
+import { StatusDot } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
 
@@ -25,10 +33,28 @@ const CITY_OPTIONS = [
   { value: 'Бохтар', label: 'Бохтар' },
 ];
 
-function healthTone(value: number): 'success' | 'warning' | 'danger' {
-  if (value >= 90) return 'success';
-  if (value >= 70) return 'warning';
-  return 'danger';
+function healthToneClasses(value: number): { text: string; bar: string } {
+  if (value >= 90) return { text: 'text-success', bar: 'bg-success' };
+  if (value >= 75) return { text: 'text-warning', bar: 'bg-warning' };
+  return { text: 'text-danger', bar: 'bg-danger' };
+}
+
+/** Убирает повторяющийся город из адреса — название филиала уже задаёт контекст. */
+function formatStreet(address: string): string {
+  return address.replace(/^г\.\s*[^,]+,\s*/, '');
+}
+
+/** Число + тонкая progress-line вместо тяжёлой цветной капсулы. */
+function HealthValue({ value }: { value: number }): JSX.Element {
+  const tone = healthToneClasses(value);
+  return (
+    <div>
+      <span className={`text-[13.5px] font-semibold tabular-nums ${tone.text}`}>{value}%</span>
+      <div className="mt-1 h-[3px] w-9 overflow-hidden rounded-full bg-surface-muted">
+        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -42,6 +68,17 @@ export function BranchesPage(): JSX.Element {
   const [status, setStatus] = useState('all');
   const [city, setCity] = useState('all');
   const [toastMessage, showToast] = usePreviewToast();
+
+  // Минимальный deep-link из Dashboard-карточки «Лучший филиал» (?branchId=<id>):
+  // подсвечиваем и прокручиваем к строке, ничего в дизайне страницы не меняя.
+  const [searchParams] = useSearchParams();
+  const highlightBranchId = searchParams.get('branchId');
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+
+  useEffect(() => {
+    if (highlightBranchId === null) return;
+    rowRefs.current.get(highlightBranchId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightBranchId]);
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -117,36 +154,49 @@ export function BranchesPage(): JSX.Element {
             </PreviewTableHead>
             <tbody>
               {rows.map((branch) => (
-                <PreviewTr key={branch.id}>
+                <PreviewTr
+                  key={branch.id}
+                  ref={(node) => {
+                    if (node) rowRefs.current.set(branch.id, node);
+                    else rowRefs.current.delete(branch.id);
+                  }}
+                  selected={branch.id === highlightBranchId}
+                >
                   <PreviewTd className="text-ink">
-                    <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="flex min-w-0 items-center gap-3">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand">
                         <Building2 className="h-4 w-4" aria-hidden="true" />
                       </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate font-medium text-ink" title={branch.name}>
-                            {branch.name}
-                          </span>
-                          {branch.isHeadOffice ? <Badge tone="brand">Главный офис</Badge> : null}
-                        </div>
-                        <p className="truncate text-xs text-ink-muted">
-                          {branch.code} · {branch.address}
-                        </p>
-                      </div>
+                      <PreviewCellStack
+                        primary={branch.name}
+                        secondary={`${branch.code} · ${formatStreet(branch.address)}`}
+                        tooltip={branch.name}
+                      />
                     </div>
                   </PreviewTd>
                   <PreviewTd>
-                    {branch.adminName ?? <Badge tone="warning">Не назначен</Badge>}
+                    {branch.adminName ?? (
+                      <span className="inline-flex items-center gap-1.5 text-[13px] text-warning">
+                        <StatusDot tone="warning" />
+                        Не назначен
+                      </span>
+                    )}
                   </PreviewTd>
                   <PreviewTd className="tabular-nums">{branch.categoriesCount}</PreviewTd>
                   <PreviewTd className="tabular-nums">{branch.mentorsCount}</PreviewTd>
                   <PreviewTd className="tabular-nums">{branch.activeAssignments}</PreviewTd>
                   <PreviewTd className="whitespace-nowrap">
-                    <Badge tone={branch.isActive ? 'success' : 'neutral'}>{branch.isActive ? 'Активен' : 'Неактивен'}</Badge>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${
+                        branch.isActive ? 'text-success' : 'text-ink-muted'
+                      }`}
+                    >
+                      <StatusDot tone={branch.isActive ? 'success' : 'neutral'} />
+                      {branch.isActive ? 'Активен' : 'Неактивен'}
+                    </span>
                   </PreviewTd>
                   <PreviewTd className="whitespace-nowrap">
-                    <Badge tone={healthTone(branch.healthPct)}>{branch.healthPct}%</Badge>
+                    <HealthValue value={branch.healthPct} />
                   </PreviewTd>
                   <PreviewTd className="text-right">
                     <PreviewActionMenu
@@ -176,18 +226,18 @@ export function BranchesPage(): JSX.Element {
         </Card>
 
         <SectionCard title="Распределение пользователей по филиалам" className="h-fit self-start" padded>
-          <ul className="space-y-3.5">
+          <ul className="space-y-4">
             {PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => {
               const total = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, e) => sum + e.count, 0);
               const pct = Math.round((entry.count / total) * 100);
               return (
                 <li key={entry.label}>
-                  <div className="mb-1 flex items-center justify-between text-[13px]">
-                    <span className="text-ink-secondary">{entry.label}</span>
-                    <span className="font-semibold tabular-nums text-ink">{entry.count}</span>
+                  <div className="mb-1.5 flex items-center justify-between text-xs">
+                    <span className="text-ink-muted">{entry.label}</span>
+                    <span className="font-medium tabular-nums text-ink-secondary">{entry.count}</span>
                   </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                    <div className="h-full rounded-full bg-brand/70" style={{ width: `${pct}%` }} />
                   </div>
                 </li>
               );

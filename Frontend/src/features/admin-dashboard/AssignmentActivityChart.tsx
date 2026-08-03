@@ -11,20 +11,21 @@ import {
 
 import type { ActivityPoint } from '../../api/admin/dashboard';
 
-interface ActivityChartProps {
+interface AssignmentActivityChartProps {
   data: ActivityPoint[];
 }
 
+/** Просрочено — приглушённый amber, не ярко-красный (раздел 8 промпта). */
 const SERIES = [
+  { key: 'approved', name: 'Одобрено', color: 'var(--success)' },
   { key: 'submitted', name: 'Отправлено', color: 'var(--primary)' },
-  { key: 'approved', name: 'Одобрено', color: 'var(--secondary-cyan)' },
   { key: 'overdue', name: 'Просрочено', color: 'var(--warning)' },
 ] as const;
 
-/** Тонкая сетка, спокойный tooltip, без 3D-эффектов и глянца (раздел 32 промпта). */
-export function ActivityChart({ data }: ActivityChartProps): JSX.Element {
+/** Тонкая горизонтальная сетка, без вертикальных линий, dot только на hover. */
+export function AssignmentActivityChart({ data }: AssignmentActivityChartProps): JSX.Element {
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={230}>
       <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid stroke="var(--divider)" vertical={false} />
         <XAxis
@@ -38,7 +39,7 @@ export function ActivityChart({ data }: ActivityChartProps): JSX.Element {
           tick={{ fill: 'var(--text-muted)', fontSize: 12 }}
           axisLine={false}
           tickLine={false}
-          width={40}
+          width={28}
         />
         <RechartsTooltip
           allowEscapeViewBox={{ x: false, y: false }}
@@ -52,10 +53,10 @@ export function ActivityChart({ data }: ActivityChartProps): JSX.Element {
         />
         <Legend
           verticalAlign="top"
-          height={32}
+          height={28}
           iconType="circle"
-          iconSize={8}
-          wrapperStyle={{ fontSize: 13, color: 'var(--text-secondary)' }}
+          iconSize={7}
+          wrapperStyle={{ fontSize: 12.5, color: 'var(--text-secondary)' }}
         />
         {SERIES.map((series) => (
           <Line

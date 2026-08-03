@@ -1,5 +1,6 @@
 import { Plus, Tags, TriangleAlert, UserCheck, Users as UsersIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { PreviewActionMenu } from '../../features/admin-preview/PreviewActionMenu';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
@@ -45,8 +46,12 @@ function healthTone(value: number): 'success' | 'warning' | 'danger' {
 
 /** UI-прототип /admin/categories — сетка карточек вместо плотной таблицы (раздел 8 сессии превью). */
 export function CategoriesPage(): JSX.Element {
-  const [search, setSearch] = useState('');
-  const [branch, setBranch] = useState('all');
+  // Минимальный deep-link из Dashboard-карточки «Лучшие команды»
+  // (?category=<name>&branch=<name>) — заполняет существующие поиск/фильтр,
+  // визуальный дизайн страницы не меняется.
+  const [searchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('category') ?? '');
+  const [branch, setBranch] = useState(() => searchParams.get('branch') ?? 'all');
   const [leadFilter, setLeadFilter] = useState('all');
   const [toastMessage, showToast] = usePreviewToast();
 
