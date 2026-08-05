@@ -2,7 +2,8 @@ import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock3, RotateC
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { PreviewDrawer } from '../../features/admin-preview/PreviewDrawer';
+import { AssignmentDetailsDrawer } from '../../features/admin-assignments/AssignmentDetailsDrawer';
+import { branchDisplayName as formatBranchDisplayName, enrichAssignment, formatActivity, formatDeadline, pluralizeRu } from '../../features/admin-assignments/assignmentPresentation';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
@@ -21,65 +22,9 @@ import { Card } from '../../shared/ui/Card';
  * отдельная карточка «Распределение по статусам» удалена (дублировала select
  * статуса и была пустой rounded-pill панелью) — вместо неё status navigation
  * встроена в единую AssignmentWorkspaceCard и одновременно работает как фильтр.
+ * Admin здесь только наблюдает (раздел 13 промпта этапа 3) — read-only, без
+ * mutation store.
  */
-
-/** Presentation-only переименование филиалов — согласовано с /admin/users и /admin/branches. */
-function formatBranchDisplayName(branchName: string): string {
-  switch (branchName) {
-    case 'Главный офис':
-      return 'Душанбе';
-    case 'Филиал Худжанд':
-      return 'Худжанд';
-    case 'Филиал Бохтар':
-      return 'Бохтар';
-    default:
-      return branchName;
-  }
-}
-
-function pluralizeRu(n: number, one: string, few: string, many: string): string {
-  const mod100 = n % 100;
-  const mod10 = n % 10;
-  if (mod100 >= 11 && mod100 <= 14) return many;
-  if (mod10 === 1) return one;
-  if (mod10 >= 2 && mod10 <= 4) return few;
-  return many;
-}
-
-/** «3» → «3 дня» — само число ВСЕГДА в результате, чтобы его нельзя было забыть на месте вызова. */
-function formatDaysRu(n: number): string {
-  return `${n} ${pluralizeRu(n, 'день', 'дня', 'дней')}`;
-}
-
-/**
- * `dueLabel` в mock-данных — уже относительная строка без реальной даты
- * («Сегодня + N дн.», «Через N дн.», «Просрочено на N дн.»), поэтому вместо
- * выдуманной календарной даты (которой у нас просто нет) формат приводится
- * к естественной русской фразе на тех же числах.
- */
-function formatDeadline(dueLabel: string): { primary: string; secondary?: string; overdue: boolean } {
-  const overdueMatch = /^Просрочено на (\d+) дн\.$/.exec(dueLabel);
-  if (overdueMatch) {
-    const n = Number(overdueMatch[1]);
-    return { primary: 'Просрочено', secondary: `на ${formatDaysRu(n)}`, overdue: true };
-  }
-  const todayPlusMatch = /^Сегодня \+ (\d+) дн\.$/.exec(dueLabel);
-  const throughMatch = /^Через (\d+) дн\.$/.exec(dueLabel);
-  const raw = todayPlusMatch?.[1] ?? throughMatch?.[1];
-  if (raw === undefined) return { primary: dueLabel, overdue: false };
-  const n = Number(raw);
-  if (n <= 0) return { primary: 'Сегодня', overdue: false };
-  if (n === 1) return { primary: 'Завтра', overdue: false };
-  return { primary: `Через ${formatDaysRu(n)}`, overdue: false };
-}
-
-/** «2 дн. назад» → «2 дня назад»; «Сегодня»/«Вчера» проходят как есть. */
-function formatActivity(label: string): string {
-  const match = /^(\d+) дн\. назад$/.exec(label);
-  if (!match) return label;
-  const n = Number(match[1]);
-  return `${formatDaysRu(n)} назад`;
-}
 
 function initialsOf(fullName: string): string {
   return fullName
@@ -334,15 +279,32 @@ function PaginationFooter({ page, totalPages, totalCount, pageSize, onPageChange
 export function AssignmentsPage(): JSX.Element {
   // Минимальный deep-link из Dashboard (?q=<название>, из «Предстоящих дедлайнов»
   // и ленты активности) — заполняет уже существующий поиск.
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [branch, setBranch] = useState('all');
   const [category, setCategory] = useState('all');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(12);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+
+  const assignmentId = searchParams.get('assignmentId');
+
+  function openRow(id: string): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('assignmentId', id);
+    setSearchParams(next);
+  }
+
+  function closeDrawer(): void {
+    const idToFocus = assignmentId;
+    const next = new URLSearchParams(searchParams);
+    next.delete('assignmentId');
+    setSearchParams(next);
+    window.requestAnimationFrame(() => {
+      if (idToFocus !== null) rowRefs.current.get(idToFocus)?.focus();
+    });
+  }
 
   const baseFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -388,19 +350,13 @@ export function AssignmentsPage(): JSX.Element {
 
   const totalLabel = `${PREVIEW_ASSIGNMENTS.length} ${pluralizeRu(PREVIEW_ASSIGNMENTS.length, 'запись', 'записи', 'записей')}`;
 
-  const selected: PreviewAssignment | null = rows.find((a) => a.id === selectedId) ?? null;
+  useEffect(() => {
+    if (assignmentId === null) return;
+    rowRefs.current.get(assignmentId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [assignmentId]);
 
-  const closeDrawer = (): void => {
-    const idToFocus = selectedId;
-    setSelectedId(null);
-    window.requestAnimationFrame(() => {
-      if (idToFocus !== null) rowRefs.current.get(idToFocus)?.focus();
-    });
-  };
-
-  const openRow = (id: string): void => {
-    setSelectedId(id);
-  };
+  const selectedRaw: PreviewAssignment | null = PREVIEW_ASSIGNMENTS.find((a) => a.id === assignmentId) ?? null;
+  const selected = useMemo(() => (selectedRaw !== null ? enrichAssignment(selectedRaw) : undefined), [selectedRaw]);
 
   return (
     <div className="space-y-6">
@@ -473,7 +429,7 @@ export function AssignmentsPage(): JSX.Element {
                   }
                 }}
                 className={`h-[60px] cursor-pointer border-b border-divider text-sm outline-none transition-colors duration-150 last:border-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
-                  assignment.id === selectedId ? 'bg-brand-soft' : 'hover:bg-surface-hover'
+                  assignment.id === assignmentId ? 'bg-brand-soft' : 'hover:bg-surface-hover'
                 }`}
               >
                 <PreviewTd>
@@ -509,74 +465,7 @@ export function AssignmentsPage(): JSX.Element {
         />
       </Card>
 
-      <PreviewDrawer
-        open={selected !== null}
-        onClose={closeDrawer}
-        width="detail"
-        title={selected?.title ?? ''}
-        description="Admin здесь только наблюдает — действий над заданием нет"
-      >
-        {selected !== null ? (
-          <div className="space-y-5">
-            <StatusCell status={selected.status} />
-            <dl className="space-y-2.5">
-              <DetailRow label="Ментор" value={selected.mentorName} />
-              <DetailRow label="Филиал" value={formatBranchDisplayName(selected.branchName)} />
-              <DetailRow label="Направление" value={selected.categoryName} />
-              <DetailRow label="Дедлайн" value={formatDeadlineInline(selected.dueLabel)} />
-              <DetailRow label="Источник" value={selected.source} />
-              <DetailRow label="Последняя активность" value={formatActivity(selected.lastActivityLabel)} />
-            </dl>
-
-            <div className="border-t border-divider pt-4">
-              <p className="mb-3 text-[13px] font-semibold text-ink">Хронология</p>
-              <ol className="space-y-4">
-                <TimelineStep label="Назначено" timeLabel="—" done />
-                <TimelineStep label="Отправлено на проверку" timeLabel={formatActivity(selected.lastActivityLabel)} done={selected.status !== 'Assigned'} />
-                <TimelineStep
-                  label="На проверке у Lead"
-                  timeLabel={selected.status === 'InReview' ? 'сейчас' : '—'}
-                  done={selected.status === 'InReview' || selected.status === 'Approved'}
-                />
-                <TimelineStep label="Решение" timeLabel={selected.status === 'Approved' ? formatDeadlineInline(selected.dueLabel) : '—'} done={selected.status === 'Approved'} />
-              </ol>
-            </div>
-          </div>
-        ) : null}
-      </PreviewDrawer>
+      <AssignmentDetailsDrawer assignment={selected} assignmentId={assignmentId} onClose={closeDrawer} />
     </div>
-  );
-}
-
-function formatDeadlineInline(dueLabel: string): string {
-  const deadline = formatDeadline(dueLabel);
-  return deadline.secondary !== undefined ? `${deadline.primary} — ${deadline.secondary}` : deadline.primary;
-}
-
-function DetailRow({ label, value }: { label: string; value: string }): JSX.Element {
-  return (
-    <div className="flex items-start justify-between gap-3 text-[13px]">
-      <dt className="shrink-0 text-ink-muted">{label}</dt>
-      <dd className="min-w-0 truncate text-right text-ink">{value}</dd>
-    </div>
-  );
-}
-
-function TimelineStep({ label, timeLabel, done }: { label: string; timeLabel: string; done: boolean }): JSX.Element {
-  return (
-    <li className="flex items-start gap-3">
-      <span
-        aria-hidden="true"
-        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-          done ? 'bg-brand text-white' : 'bg-surface-muted text-ink-disabled'
-        }`}
-      >
-        {done ? '✓' : ''}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className={`text-[13px] font-medium ${done ? 'text-ink' : 'text-ink-muted'}`}>{label}</p>
-        <p className="text-[12px] text-ink-muted">{timeLabel}</p>
-      </div>
-    </li>
   );
 }

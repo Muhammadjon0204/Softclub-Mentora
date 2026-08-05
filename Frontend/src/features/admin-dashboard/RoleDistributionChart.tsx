@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import type { PieSectorDataItem } from 'recharts/types/polar/Pie';
 
 import type { RoleDistribution } from '../../api/admin/dashboard';
+import { ChartTooltipPortal } from './ChartTooltipPortal';
+import type { FloatingTooltipPoint } from './floatingTooltipPosition';
 import { RoleChartTooltip } from './RoleChartTooltip';
 
 interface RoleDistributionChartProps {
@@ -18,72 +20,74 @@ const SEGMENTS = [
 
 interface ActiveTooltip {
   index: number;
-  /** Координаты уже в системе координат `outerRef` (карточка целиком), не donut-бокса. */
-  x: number;
-  y: number;
+  strategy: 'radial' | 'anchor';
+  anchor: FloatingTooltipPoint;
 }
 
-const TOOLTIP_HALF_HEIGHT = 40;
-
 /**
- * Компактный donut с общим числом в центре. Tooltip раньше был встроенным
- * Recharts `<Tooltip>`, который рендерился по центру диаграммы и перекрывал
- * «36 / всего» (раздел 8 полироли) — здесь вместо него полностью самодельный
- * overlay, позиционируемый относительно наведённого сегмента/legend-строки,
- * а центр donut остаётся статичным при любом hover.
+ * Компактный donut с общим числом в центре. Tooltip рендерится через
+ * `ChartTooltipPortal` (position:fixed + createPortal → document.body):
+ * раньше это был position:absolute внутри карточки, и его обрезал
+ * `overflow-hidden` на ChartCard при hover у левого/верхнего края (см.
+ * floatingTooltipPosition.ts — radial placement + flip + viewport clamp).
+ * Центр donut остаётся статичным при любом hover — anchor для сегмента и
+ * legend-строки считается в viewport-координатах, а не относительно карточки.
  */
 export function RoleDistributionChart({ data }: RoleDistributionChartProps): JSX.Element {
   const total = data.admins + data.leads + data.mentors;
   const chartData = SEGMENTS.map((segment) => ({ ...segment, value: data[segment.key] }));
-  const outerRef = useRef<HTMLDivElement | null>(null);
   const donutRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<ActiveTooltip | null>(null);
+  const lastActiveRef = useRef<ActiveTooltip | null>(null);
+  if (active !== null) {
+    lastActiveRef.current = active;
+  }
+  // При скрытии портал ещё ~70мс остаётся mounted для fade-out — рендерим последние
+  // известные данные/позицию, а не null, иначе tooltip «схлопывается» перед исчезновением.
+  const renderedActive = active ?? lastActiveRef.current;
 
-  const donutCenter = (): { x: number; y: number } | null => {
-    if (outerRef.current === null || donutRef.current === null) return null;
-    const outerRect = outerRef.current.getBoundingClientRect();
-    const donutRect = donutRef.current.getBoundingClientRect();
-    return {
-      x: donutRect.left - outerRect.left + donutRect.width / 2,
-      y: donutRect.top - outerRect.top + donutRect.height / 2,
-    };
+  const donutCenter = (): FloatingTooltipPoint | null => {
+    if (donutRef.current === null) return null;
+    const rect = donutRef.current.getBoundingClientRect();
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
   };
 
-  const handlePieMove = (_data: PieSectorDataItem, index: number, event: ReactMouseEvent<SVGGraphicsElement>): void => {
-    if (outerRef.current === null) return;
-    const outerRect = outerRef.current.getBoundingClientRect();
-    const outerHeight = outerRect.height;
-    const x = event.clientX - outerRect.left;
-    const y = Math.max(TOOLTIP_HALF_HEIGHT, Math.min(event.clientY - outerRect.top, outerHeight - TOOLTIP_HALF_HEIGHT));
-    setActive({ index, x, y });
-  };
+  const handlePieMove = useCallback((_data: PieSectorDataItem, index: number, event: ReactMouseEvent<SVGGraphicsElement>): void => {
+    setActive({ index, strategy: 'radial', anchor: { x: event.clientX, y: event.clientY } });
+  }, []);
 
-  const handleLegendActivate = (index: number) => (event: ReactMouseEvent<HTMLButtonElement> | { currentTarget: HTMLButtonElement }): void => {
-    if (outerRef.current === null) return;
-    const outerRect = outerRef.current.getBoundingClientRect();
-    const itemRect = event.currentTarget.getBoundingClientRect();
-    const x = itemRect.left - outerRect.left;
-    const y = Math.max(
-      TOOLTIP_HALF_HEIGHT,
-      Math.min(itemRect.top - outerRect.top + itemRect.height / 2, outerRect.height - TOOLTIP_HALF_HEIGHT),
-    );
-    setActive({ index, x, y });
-  };
+  const handleLegendActivate = useCallback(
+    (index: number) =>
+      (event: ReactMouseEvent<HTMLButtonElement> | { currentTarget: HTMLButtonElement }): void => {
+        const itemRect = event.currentTarget.getBoundingClientRect();
+        setActive({
+          index,
+          strategy: 'anchor',
+          anchor: { x: itemRect.right, y: itemRect.top + itemRect.height / 2 },
+        });
+      },
+    [],
+  );
 
-  const clearActive = (): void => {
+  const clearActive = useCallback((): void => {
     setActive(null);
-  };
+  }, []);
 
-  const center = active !== null ? donutCenter() : null;
-  const tooltipStyle =
-    active !== null && center !== null
-      ? active.x >= center.x
-        ? { left: active.x + 12, top: active.y, transform: 'translate(0, -50%)' }
-        : { left: active.x - 12, top: active.y, transform: 'translate(-100%, -50%)' }
-      : null;
+  const handleLegendKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
+      if (event.key === 'Escape') {
+        clearActive();
+        event.currentTarget.blur();
+      }
+    },
+    [clearActive],
+  );
+
+  // На основе renderedActive (не active), чтобы центр оставался корректным и во время fade-out.
+  const center = renderedActive?.strategy === 'radial' ? donutCenter() : null;
 
   return (
-    <div ref={outerRef} className="relative flex flex-wrap items-center justify-center gap-6 overflow-visible">
+    <div className="relative flex flex-wrap items-center justify-center gap-6">
       <div ref={donutRef} className="relative h-[168px] w-[168px] shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -127,6 +131,8 @@ export function RoleDistributionChart({ data }: RoleDistributionChartProps): JSX
               onFocus={handleLegendActivate(index)}
               onMouseLeave={clearActive}
               onBlur={clearActive}
+              onKeyDown={handleLegendKeyDown}
+              aria-label={`${entry.label}: ${entry.value}`}
               className="flex w-full items-center gap-2 rounded-[8px] px-1.5 py-[5px] text-left text-[13px] transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <span aria-hidden="true" className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
@@ -137,15 +143,23 @@ export function RoleDistributionChart({ data }: RoleDistributionChartProps): JSX
         ))}
       </ul>
 
-      {active !== null && tooltipStyle !== null ? (
-        <RoleChartTooltip
-          label={chartData[active.index].label}
-          color={chartData[active.index].color}
-          value={chartData[active.index].value}
-          percent={total === 0 ? 0 : (chartData[active.index].value / total) * 100}
-          style={tooltipStyle}
-        />
-      ) : null}
+      <ChartTooltipPortal
+        visible={active !== null}
+        anchor={renderedActive?.anchor ?? null}
+        strategy={renderedActive?.strategy ?? 'radial'}
+        centerAnchor={center}
+        preferredPlacement={renderedActive?.strategy === 'anchor' ? 'right' : undefined}
+        onDismiss={clearActive}
+      >
+        {renderedActive !== null ? (
+          <RoleChartTooltip
+            label={chartData[renderedActive.index].label}
+            color={chartData[renderedActive.index].color}
+            value={chartData[renderedActive.index].value}
+            percent={total === 0 ? 0 : (chartData[renderedActive.index].value / total) * 100}
+          />
+        ) : null}
+      </ChartTooltipPortal>
     </div>
   );
 }

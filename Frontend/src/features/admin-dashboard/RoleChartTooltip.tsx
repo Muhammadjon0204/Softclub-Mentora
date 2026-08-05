@@ -1,5 +1,3 @@
-import type { CSSProperties } from 'react';
-
 import { pluralizeRu } from './dashboardFormatters';
 
 interface RoleChartTooltipProps {
@@ -7,20 +5,18 @@ interface RoleChartTooltipProps {
   color: string;
   value: number;
   percent: number;
-  style: CSSProperties;
 }
 
 /**
- * Компактный tooltip donut-диаграммы (раздел 8–9 полироли) — чисто
- * презентационный, без своей логики позиционирования: координаты приходит
- * готовыми из `RoleDistributionChart`, здесь только вёрстка карточки.
+ * Компактный tooltip donut-диаграммы — чисто презентационный, без своей
+ * логики позиционирования: рендерится внутри `ChartTooltipPortal`, который
+ * отвечает за координаты (viewport-fixed, вне clipping-ancestor карточки).
  */
-export function RoleChartTooltip({ label, color, value, percent, style }: RoleChartTooltipProps): JSX.Element {
+export function RoleChartTooltip({ label, color, value, percent }: RoleChartTooltipProps): JSX.Element {
   return (
     <div
       role="status"
-      style={style}
-      className="pointer-events-none absolute z-50 min-w-[150px] max-w-[190px] rounded-[10px] border border-line bg-surface px-3 py-2.5 shadow-popover transition-opacity duration-100"
+      className="min-w-[165px] w-max max-w-[220px] rounded-[11px] border border-line bg-surface px-3 py-2.5 shadow-[0_10px_30px_rgba(25,35,60,0.10),0_2px_8px_rgba(25,35,60,0.06)]"
     >
       <div className="flex items-center gap-1.5">
         <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />

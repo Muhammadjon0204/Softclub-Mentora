@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider } from './auth/AuthProvider';
 import { AppRouter } from './routes/AppRouter';
+import { OverlayProvider, ToastProvider } from './shared/overlays';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -44,7 +45,11 @@ void enableMocking().then(() => {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <AuthProvider>
-            <AppRouter />
+            <OverlayProvider>
+              <ToastProvider>
+                <AppRouter />
+              </ToastProvider>
+            </OverlayProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

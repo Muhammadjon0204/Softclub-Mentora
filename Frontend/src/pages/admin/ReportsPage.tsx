@@ -11,10 +11,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useSearchParams } from 'react-router-dom';
 
+import { ExportReportModal } from '../../features/admin-reports/ExportReportModal';
+import { MetricDetailsDrawer } from '../../features/admin-reports/MetricDetailsDrawer';
+import type { MetricKey } from '../../features/admin-reports/reportPresentation';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
-import { PreviewToast, usePreviewToast } from '../../features/admin-preview/PreviewToast';
 import {
   PREVIEW_AI_SUMMARY,
   PREVIEW_BRANCH_COMPARISON,
@@ -24,6 +27,7 @@ import {
   PREVIEW_REPORT_KPIS,
   PREVIEW_REPORT_PERIOD_LABEL,
 } from '../../mocks/ui-preview/reports.preview';
+import { useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
@@ -43,11 +47,33 @@ const CATEGORY_OPTIONS = [
   { value: 'UI/UX Design', label: 'UI/UX Design' },
 ];
 
-/** UI-прототип /admin/reports — четыре визуальных блока + AI-резюме, без реального экспорта (раздел 10 сессии превью). */
+const METRIC_KEYS: MetricKey[] = ['completion', 'overdue', 'firstPass', 'reviewTime'];
+
+/** UI-прототип /admin/reports — этап 3: MetricDetailsDrawer + ExportReportModal поверх shared overlay system. */
 export function ReportsPage(): JSX.Element {
   const [branch, setBranch] = useState('all');
   const [category, setCategory] = useState('all');
-  const [toastMessage, showToast] = usePreviewToast();
+  const [exportOpen, setExportOpen] = useState(false);
+  const toast = useToast();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const metricParam = searchParams.get('metric');
+  const metricKey = metricParam !== null && (METRIC_KEYS as string[]).includes(metricParam) ? (metricParam as MetricKey) : null;
+
+  function openMetric(key: MetricKey): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('metric', key);
+    setSearchParams(next);
+  }
+
+  function closeMetric(): void {
+    const next = new URLSearchParams(searchParams);
+    next.delete('metric');
+    setSearchParams(next);
+  }
+
+  const branchLabel = BRANCH_OPTIONS.find((option) => option.value === branch)?.label ?? 'Все филиалы';
+  const categoryLabel = CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? 'Все категории';
 
   return (
     <div className="space-y-6">
@@ -60,13 +86,7 @@ export function ReportsPage(): JSX.Element {
               <CalendarDays className="h-4 w-4 text-ink-muted" aria-hidden="true" />
               {PREVIEW_REPORT_PERIOD_LABEL}
             </span>
-            <Button
-              variant="secondary"
-              leadingIcon={<Download className="h-4 w-4" aria-hidden="true" />}
-              onClick={() => {
-                showToast('Функция будет подключена позже');
-              }}
-            >
+            <Button variant="secondary" leadingIcon={<Download className="h-4 w-4" aria-hidden="true" />} onClick={() => { setExportOpen(true); }}>
               Экспортировать
             </Button>
           </>
@@ -80,7 +100,12 @@ export function ReportsPage(): JSX.Element {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {PREVIEW_REPORT_KPIS.map((kpi) => (
-          <Card key={kpi.key} className="flex flex-col gap-2">
+          <button
+            key={kpi.key}
+            type="button"
+            onClick={() => { openMetric(kpi.key as MetricKey); }}
+            className="flex flex-col gap-2 rounded-card border border-line bg-surface p-5 text-left shadow-surface transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:p-6"
+          >
             <p className="text-[13px] text-ink-muted">{kpi.label}</p>
             <p className="text-[26px] font-bold leading-8 tracking-tight text-ink tabular-nums">{kpi.value}</p>
             <span
@@ -91,7 +116,7 @@ export function ReportsPage(): JSX.Element {
               {kpi.deltaPct > 0 ? '+' : ''}
               {kpi.deltaPct}% за неделю
             </span>
-          </Card>
+          </button>
         ))}
       </div>
 
@@ -170,7 +195,7 @@ export function ReportsPage(): JSX.Element {
             variant="secondary"
             size="sm"
             onClick={() => {
-              showToast('Функция будет подключена позже');
+              toast.info('AI-провайдер не подключён в preview-режиме');
             }}
           >
             Обновить резюме
@@ -178,7 +203,8 @@ export function ReportsPage(): JSX.Element {
         </div>
       </Card>
 
-      <PreviewToast message={toastMessage} />
+      <MetricDetailsDrawer metricKey={metricKey} onClose={closeMetric} scopeLabel={`${branchLabel} · ${categoryLabel}`} />
+      <ExportReportModal open={exportOpen} onOpenChange={setExportOpen} branchLabel={branchLabel} categoryLabel={categoryLabel} />
     </div>
   );
 }

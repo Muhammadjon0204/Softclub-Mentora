@@ -64,7 +64,7 @@ export function TopTeamsCard({ categories, limit = 5 }: TopTeamsCardProps): JSX.
                 <DashboardRankingRow
                   rank={index + 1}
                   icon={
-                    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] ${COLOR_TILE[team.colorToken]}`} aria-hidden="true">
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${COLOR_TILE[team.colorToken]}`} aria-hidden="true">
                       <Tags className="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
                   }

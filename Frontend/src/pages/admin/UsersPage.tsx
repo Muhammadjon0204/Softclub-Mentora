@@ -1,40 +1,33 @@
-import {
-  BriefcaseBusiness,
-  Building2,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal,
-  Plus,
-  RotateCcw,
-  ShieldCheck,
-  UserCheck,
-  UserRound,
-  Users as UsersIcon,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import type { ComponentType, CSSProperties, SVGProps } from 'react';
+import { Plus, ShieldCheck, UserCheck, Users as UsersIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 
-import { PreviewDrawer, PreviewField, PreviewFieldSelect, PreviewTextInput } from '../../features/admin-preview/PreviewDrawer';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
-import { PreviewToast, usePreviewToast } from '../../features/admin-preview/PreviewToast';
-import {
-  PREVIEW_NEW_USERS_SERIES,
-  PREVIEW_USERS,
-  PREVIEW_USER_SUMMARY,
-  ROLE_LABEL,
-  STATUS_LABEL,
-  type PreviewUser,
-  type PreviewUserRole,
-  type PreviewUserStatus,
-} from '../../mocks/ui-preview/users.preview';
+import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
+import { BlockUserDialog } from '../../features/admin-users/BlockUserDialog';
+import { ChangeUserRoleDialog } from '../../features/admin-users/ChangeUserRoleDialog';
+import { DeactivateUserDialog } from '../../features/admin-users/DeactivateUserDialog';
+import { ResendInvitationDialog } from '../../features/admin-users/ResendInvitationDialog';
+import { SendPasswordResetDialog } from '../../features/admin-users/SendPasswordResetDialog';
+import { TransferUserDialog } from '../../features/admin-users/TransferUserDialog';
+import { UnblockUserDialog } from '../../features/admin-users/UnblockUserDialog';
+import { UserActionMenu } from '../../features/admin-users/UserActionMenu';
+import { UserDetailsDrawer } from '../../features/admin-users/UserDetailsDrawer';
+import { UserFormDrawer } from '../../features/admin-users/UserFormDrawer';
+import type { UserFormDrawerState } from '../../features/admin-users/UserFormDrawer';
+import { useUserPreviewActions } from '../../features/admin-users/useUserPreviewActions';
+import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../features/admin-users/userPresentation';
+import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
+import { useUsersPreview } from '../../features/admin-users/userPreviewStore';
+import { ROLE_LABEL, STATUS_LABEL, PREVIEW_NEW_USERS_SERIES } from '../../mocks/ui-preview/users.preview';
+import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
+import { useAuth } from '../../auth/useAuth';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
-import { MenuItem, Popover } from '../../shared/ui/Popover';
 
 const ROLE_OPTIONS = [
   { value: 'all', label: 'Все роли' },
@@ -44,18 +37,11 @@ const ROLE_OPTIONS = [
   { value: 'Mentor', label: ROLE_LABEL.Mentor },
 ];
 
-/**
- * Presentation-only переименование филиалов (раздел 3 промпта): короткие
- * названия городов вместо технических «Главный офис» / «Филиал N» — только
- * для отображения. `value` фильтров и `user.branchName` остаются прежними,
- * поэтому фильтрация и mock-данные не меняются.
- */
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Душанбе' },
-  { value: 'Филиал Худжанд', label: 'Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
+
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Все статусы' },
   { value: 'Active', label: STATUS_LABEL.Active },
@@ -66,55 +52,8 @@ const STATUS_OPTIONS = [
 
 const PAGE_SIZE_OPTIONS = [14, 20, 30];
 
-function formatBranchDisplayName(branchName: string): string {
-  switch (branchName) {
-    case 'Главный офис':
-      return 'Душанбе';
-    case 'Филиал Худжанд':
-      return 'Худжанд';
-    case 'Филиал Бохтар':
-      return 'Бохтар';
-    default:
-      return branchName;
-  }
-}
+const RU_MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
-/**
- * Строгая enterprise-версия роли: маленькая иконка в квадрате + текст, без цветных
- * pill-капсул (раздел 5 промпта). Для Lead нет готового «soft cyan»-токена в теме
- * (только success/warning/danger/info имеют -soft), поэтому фон считаем через
- * `color-mix()` от того же `--secondary-cyan`, что уже используют другие admin-
- * страницы — Tailwind не умеет генерировать opacity-модификатор для произвольных
- * `var()`-значений на этой версии (`bg-[var(--x)]/15` молча не создаёт правило).
- */
-const ROLE_META: Record<
-  PreviewUserRole,
-  { icon: ComponentType<SVGProps<SVGSVGElement>>; label: string; tone: string; toneStyle?: CSSProperties }
-> = {
-  OrgAdmin: { icon: ShieldCheck, label: 'Администратор организации', tone: 'bg-brand-soft text-brand' },
-  BranchAdmin: { icon: Building2, label: 'Администратор филиала', tone: 'bg-info-soft text-info' },
-  Lead: {
-    icon: BriefcaseBusiness,
-    label: 'Руководитель',
-    tone: 'text-[var(--secondary-cyan)]',
-    toneStyle: { backgroundColor: 'color-mix(in srgb, var(--secondary-cyan) 15%, transparent)' },
-  },
-  Mentor: { icon: UserRound, label: 'Ментор', tone: 'bg-surface-muted text-ink-secondary' },
-};
-
-const STATUS_META: Record<PreviewUserStatus, { dot: string; text: string }> = {
-  Active: { dot: 'bg-success', text: 'text-success' },
-  Invited: { dot: 'bg-info', text: 'text-info' },
-  Locked: { dot: 'bg-warning', text: 'text-warning' },
-  Deactivated: { dot: 'bg-ink-disabled', text: 'text-ink-muted' },
-};
-
-const RU_MONTHS = [
-  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
-];
-
-/** `12.05.2024, 11:44` → { primary: '12 мая 2024', secondary: '11:44' }; всё остальное (относительные подписи) не трогаем. */
 function formatLastLogin(label: string): { primary: string; secondary?: string } {
   const match = /^(\d{2})\.(\d{2})\.(\d{4}), (\d{2}:\d{2})$/.exec(label);
   if (match === null) return { primary: label };
@@ -123,61 +62,42 @@ function formatLastLogin(label: string): { primary: string; secondary?: string }
   return { primary: `${Number(day)} ${monthName} ${year}`, secondary: time };
 }
 
-/** Organization Admin не привязан к одному филиалу — область доступа не должна на него намекать (раздел 6 промпта). */
-function getAccessScope(user: PreviewUser): { primary: string; secondary?: string } {
-  if (user.role === 'OrgAdmin') {
-    return { primary: 'Вся организация', secondary: 'Все филиалы' };
-  }
-  if (user.role === 'BranchAdmin') {
-    return { primary: formatBranchDisplayName(user.branchName), secondary: 'Администрирование' };
-  }
-  return { primary: formatBranchDisplayName(user.branchName), secondary: user.categoryName ?? undefined };
-}
-
 function initialsOf(fullName: string): string {
-  return fullName
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .toUpperCase();
+  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
 }
 
-function UserCell({ user }: { user: PreviewUser }): JSX.Element {
+function getAccessScope(user: PreviewUserDetails): { primary: string; secondary?: string } {
+  if (user.role === 'OrgAdmin') return { primary: 'Вся организация', secondary: 'Все филиалы' };
+  if (user.role === 'BranchAdmin') return { primary: branchDisplayName(user.branchName), secondary: 'Администрирование' };
+  return { primary: branchDisplayName(user.branchName), secondary: user.categoryName ?? undefined };
+}
+
+function UserCell({ user }: { user: PreviewUserDetails }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-semibold text-brand">
-        {initialsOf(user.fullName)}
-      </span>
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-semibold text-brand">{initialsOf(user.fullName)}</span>
       <div className="min-w-0">
-        <p className="truncate text-[14px] font-semibold leading-5 text-ink" title={user.fullName}>
-          {user.fullName}
-        </p>
-        <p className="truncate text-[12px] leading-[17px] text-ink-muted" title={user.email}>
-          {user.email}
-        </p>
+        <p className="truncate text-[14px] font-semibold leading-5 text-ink" title={user.fullName}>{user.fullName}</p>
+        <p className="truncate text-[12px] leading-[17px] text-ink-muted" title={user.email}>{user.email}</p>
       </div>
     </div>
   );
 }
 
 function RoleCell({ role }: { role: PreviewUserRole }): JSX.Element {
-  const meta = ROLE_META[role];
-  const Icon = meta.icon;
+  const Icon = ROLE_ICON[role];
+  const tone = ROLE_TONE[role];
   return (
     <div className="flex min-w-0 items-center gap-2.5" title={ROLE_LABEL[role]}>
-      <span
-        className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] border border-line ${meta.tone}`}
-        style={meta.toneStyle}
-      >
+      <span className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[7px] border border-line ${tone.className}`} style={tone.style}>
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
-      <span className="truncate text-[12.5px] font-medium text-ink-secondary">{meta.label}</span>
+      <span className="truncate text-[12.5px] font-medium text-ink-secondary">{ROLE_LABEL[role]}</span>
     </div>
   );
 }
 
-function ScopeCell({ user }: { user: PreviewUser }): JSX.Element {
+function ScopeCell({ user }: { user: PreviewUserDetails }): JSX.Element {
   const scope = getAccessScope(user);
   return (
     <div className="min-w-0">
@@ -207,77 +127,6 @@ function LastLoginCell({ label }: { label: string }): JSX.Element {
   );
 }
 
-/** Локальное overflow-меню строки: та же форма, что и общий `PreviewActionMenu`, но с разделителем перед destructive-пунктом (раздел 9 промпта). */
-function UserRowActions({ user, onAction }: { user: PreviewUser; onAction: () => void }): JSX.Element {
-  return (
-    <Popover
-      align="right"
-      panelClassName="w-56 rounded-dropdown p-1.5 shadow-popover"
-      trigger={({ onClick, ref, isOpen }) => (
-        <button
-          type="button"
-          ref={ref}
-          onClick={(event) => {
-            event.stopPropagation();
-            onClick();
-          }}
-          aria-haspopup="true"
-          aria-expanded={isOpen}
-          aria-label={`Действия: ${user.fullName}`}
-          className="flex h-8 w-8 items-center justify-center rounded-control-sm text-ink-muted transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-        </button>
-      )}
-    >
-      {(close) => (
-        <div className="flex flex-col gap-0.5">
-          <MenuItem
-            onClick={() => {
-              close();
-              onAction();
-            }}
-          >
-            Открыть профиль
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              close();
-              onAction();
-            }}
-          >
-            Сменить роль
-          </MenuItem>
-          <div className="my-1 border-t border-divider" />
-          <MenuItem
-            destructive
-            onClick={() => {
-              close();
-              onAction();
-            }}
-          >
-            Деактивировать
-          </MenuItem>
-        </div>
-      )}
-    </Popover>
-  );
-}
-
-function ResetFiltersButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-surface disabled:hover:text-ink-secondary"
-    >
-      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-      Сбросить
-    </button>
-  );
-}
-
 interface UsersPaginationProps {
   page: number;
   totalPages: number;
@@ -287,7 +136,6 @@ interface UsersPaginationProps {
   onPageSizeChange: (size: number) => void;
 }
 
-/** Компактный footer-пагинатор (раздел 14 промпта): всегда хотя бы одна страница видна, Prev/Next дизейблятся только на границах. */
 function UsersPagination({ page, totalPages, totalCount, pageSize, onPageChange, onPageSizeChange }: UsersPaginationProps): JSX.Element {
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalCount);
@@ -295,64 +143,30 @@ function UsersPagination({ page, totalPages, totalCount, pageSize, onPageChange,
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
-      <span>
-        Показано {start}–{end} из {totalCount}
-      </span>
+      <span>Показано {start}–{end} из {totalCount}</span>
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
           На странице
           <select
             aria-label="Пользователей на странице"
             value={pageSize}
-            onChange={(event) => {
-              onPageSizeChange(Number(event.target.value));
-            }}
+            onChange={(event) => { onPageSizeChange(Number(event.target.value)); }}
             className="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
+            {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
         </label>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => {
-              onPageChange(page - 1);
-            }}
-            aria-label="Предыдущая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          <button type="button" disabled={page <= 1} onClick={() => { onPageChange(page - 1); }} aria-label="Предыдущая страница" className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent">
+            ‹
           </button>
           {pageNumbers.map((number) => (
-            <button
-              key={number}
-              type="button"
-              onClick={() => {
-                onPageChange(number);
-              }}
-              aria-current={number === page ? 'page' : undefined}
-              className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${
-                number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'
-              }`}
-            >
+            <button key={number} type="button" onClick={() => { onPageChange(number); }} aria-current={number === page ? 'page' : undefined} className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'}`}>
               {number}
             </button>
           ))}
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => {
-              onPageChange(page + 1);
-            }}
-            aria-label="Следующая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          <button type="button" disabled={page >= totalPages} onClick={() => { onPageChange(page + 1); }} aria-label="Следующая страница" className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent">
+            ›
           </button>
         </div>
       </div>
@@ -360,42 +174,71 @@ function UsersPagination({ page, totalPages, totalCount, pageSize, onPageChange,
   );
 }
 
+type ActionDialogState =
+  | { type: 'changeRole'; user: PreviewUserDetails }
+  | { type: 'transfer'; user: PreviewUserDetails }
+  | { type: 'resendInvitation'; user: PreviewUserDetails }
+  | { type: 'passwordReset'; user: PreviewUserDetails }
+  | { type: 'block'; user: PreviewUserDetails }
+  | { type: 'unblock'; user: PreviewUserDetails }
+  | { type: 'deactivate'; user: PreviewUserDetails };
+
 /**
- * UI-прототип /admin/users — strict enterprise / ultra minimal polish:
- * роль и статус больше не rounded-full pill badges, Scope переименован в
- * «Область доступа» с корректной семантикой Organization Admin, названия
- * филиалов сокращены до городов (presentation-only), график и пагинация
- * компактнее.
+ * /admin/users — этап 2: реальные Drawer/Dialog поверх shared overlay system
+ * (раздел 45 промпта). Branch Admin видит и создаёт пользователей только
+ * своего филиала (раздел 24 acceptance criteria — branch isolation).
  */
 export function UsersPage(): JSX.Element {
-  // Минимальный deep-link из Dashboard-карточки «Топ 5 менторов» (?q=<имя>) —
-  // заполняет уже существующий поиск, визуальный дизайн страницы не меняется.
-  const [searchParams] = useSearchParams();
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentBranchRawName = authUser?.branch?.name ?? null;
+
+  const allUsers = useUsersPreview();
+  const scopedUsers = useMemo(
+    () => (isOrgAdmin ? allUsers : allUsers.filter((candidate) => candidate.branchName === currentBranchRawName)),
+    [allUsers, isOrgAdmin, currentBranchRawName],
+  );
+
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [role, setRole] = useState('all');
   const [branch, setBranch] = useState('all');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(14);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [draftRole, setDraftRole] = useState('Mentor');
-  const [draftBranch, setDraftBranch] = useState('Главный офис');
-  const [draftName, setDraftName] = useState('');
-  const [draftEmail, setDraftEmail] = useState('');
-  const [toastMessage, showToast] = usePreviewToast();
+  const [formDrawer, setFormDrawer] = useState<UserFormDrawerState | null>(null);
+  const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
+
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+  const userId = searchParams.get('userId');
+
+  useEffect(() => {
+    if (userId === null) return;
+    rowRefs.current.get(userId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [userId]);
+
+  function openUserDetails(id: string): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('userId', id);
+    setSearchParams(next);
+  }
+
+  function closeUserDetails(): void {
+    const next = new URLSearchParams(searchParams);
+    next.delete('userId');
+    setSearchParams(next);
+  }
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return PREVIEW_USERS.filter((user) => {
-      if (query.length > 0 && !user.fullName.toLowerCase().includes(query) && !user.email.toLowerCase().includes(query)) {
-        return false;
-      }
-      if (role !== 'all' && user.role !== role) return false;
-      if (branch !== 'all' && user.branchName !== branch) return false;
-      if (status !== 'all' && user.status !== status) return false;
+    return scopedUsers.filter((candidate) => {
+      if (query.length > 0 && !candidate.fullName.toLowerCase().includes(query) && !candidate.email.toLowerCase().includes(query)) return false;
+      if (role !== 'all' && candidate.role !== role) return false;
+      if (branch !== 'all' && candidate.branchName !== branch) return false;
+      if (status !== 'all' && candidate.status !== status) return false;
       return true;
     });
-  }, [search, role, branch, status]);
+  }, [scopedUsers, search, role, branch, status]);
 
   useEffect(() => {
     setPage(1);
@@ -407,31 +250,37 @@ export function UsersPage(): JSX.Element {
   const filtersActive = search.trim().length > 0 || role !== 'all' || branch !== 'all' || status !== 'all';
   const newThisWeek = PREVIEW_NEW_USERS_SERIES[PREVIEW_NEW_USERS_SERIES.length - 1]?.value ?? 0;
 
+  const summary = useMemo(
+    () => ({
+      total: scopedUsers.length,
+      admins: scopedUsers.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
+      leads: scopedUsers.filter((candidate) => candidate.role === 'Lead').length,
+      mentors: scopedUsers.filter((candidate) => candidate.role === 'Mentor').length,
+    }),
+    [scopedUsers],
+  );
+
+  const actions = useUserPreviewActions();
+
   return (
     <div className="space-y-6">
       <PreviewPageHeader
         title="Пользователи"
         subtitle="Управление доступом, ролями и участниками организации"
         action={
-          <Button
-            variant="primary"
-            leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
-            onClick={() => {
-              setDrawerOpen(true);
-            }}
-          >
+          <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
             Добавить пользователя
           </Button>
         }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Всего" value={String(PREVIEW_USER_SUMMARY.total)} />
-        <PreviewMetricCard icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />} label="Администраторы" value={String(PREVIEW_USER_SUMMARY.admins)} />
+        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Всего" value={String(summary.total)} />
+        <PreviewMetricCard icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />} label="Администраторы" value={String(summary.admins)} />
         <div className="h-full" title="Руководители направлений">
-          <PreviewMetricCard icon={<UserCheck className="h-5 w-5" aria-hidden="true" />} label="Руководители" value={String(PREVIEW_USER_SUMMARY.leads)} />
+          <PreviewMetricCard icon={<UserCheck className="h-5 w-5" aria-hidden="true" />} label="Руководители" value={String(summary.leads)} />
         </div>
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Менторы" value={String(PREVIEW_USER_SUMMARY.mentors)} />
+        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Менторы" value={String(summary.mentors)} />
       </div>
 
       <Card padded={false} className="min-w-0">
@@ -449,26 +298,9 @@ export function UsersPage(): JSX.Element {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={PREVIEW_NEW_USERS_SERIES} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--divider)" />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <RechartsTooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 12 }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="var(--primary)"
-                strokeWidth={2}
-                fill="var(--primary)"
-                fillOpacity={0.05}
-                dot={false}
-                activeDot={{ r: 3 }}
-                isAnimationActive={false}
-              />
+              <XAxis dataKey="label" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 12 }} />
+              <Area type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} fill="var(--primary)" fillOpacity={0.05} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -477,24 +309,18 @@ export function UsersPage(): JSX.Element {
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>
           <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-ink-secondary">{rows.length} пользователей</span>
-          <PreviewSearchInput
-            placeholder="Поиск по имени или email"
-            value={search}
-            onChange={setSearch}
-            className="!min-w-[300px]"
-          />
-          <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[124px]" />
+          <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} className="!min-w-[300px]" />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[124px]" /> : null}
           <PreviewSelect label="Роль" value={role} onChange={setRole} options={ROLE_OPTIONS} className="w-[124px]" />
           <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} className="w-[124px]" />
-          <ResetFiltersButton
+          <button
+            type="button"
             disabled={!filtersActive}
-            onClick={() => {
-              setSearch('');
-              setRole('all');
-              setBranch('all');
-              setStatus('all');
-            }}
-          />
+            onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('all'); }}
+            className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            Сбросить
+          </button>
         </PreviewToolbar>
 
         <PreviewTable>
@@ -507,29 +333,49 @@ export function UsersPage(): JSX.Element {
             <PreviewTh className="w-11" />
           </PreviewTableHead>
           <tbody>
-            {pageRows.map((user) => (
-              <tr key={user.id} className="h-[60px] border-b border-divider text-sm outline-none transition-colors duration-150 last:border-0 hover:bg-surface-hover">
-                <PreviewTd>
-                  <UserCell user={user} />
-                </PreviewTd>
-                <PreviewTd>
-                  <RoleCell role={user.role} />
-                </PreviewTd>
-                <PreviewTd>
-                  <ScopeCell user={user} />
-                </PreviewTd>
-                <PreviewTd>
-                  <StatusCell status={user.status} />
-                </PreviewTd>
-                <PreviewTd className="hidden xl:table-cell">
-                  <LastLoginCell label={user.lastLoginLabel} />
-                </PreviewTd>
-                <PreviewTd className="text-center">
-                  <UserRowActions
-                    user={user}
-                    onAction={() => {
-                      showToast('Функция будет подключена позже');
-                    }}
+            {pageRows.map((rowUser) => (
+              <tr
+                key={rowUser.id}
+                ref={(node) => {
+                  if (node) rowRefs.current.set(rowUser.id, node);
+                  else rowRefs.current.delete(rowUser.id);
+                }}
+                tabIndex={0}
+                onClick={() => { openUserDetails(rowUser.id); }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openUserDetails(rowUser.id);
+                  }
+                }}
+                className={`h-[60px] cursor-pointer border-b border-divider text-sm outline-none transition-colors duration-150 last:border-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ${
+                  rowUser.id === userId ? 'bg-brand-soft' : 'hover:bg-surface-hover'
+                }`}
+              >
+                <PreviewTd><UserCell user={rowUser} /></PreviewTd>
+                <PreviewTd><RoleCell role={rowUser.role} /></PreviewTd>
+                <PreviewTd><ScopeCell user={rowUser} /></PreviewTd>
+                <PreviewTd><StatusCell status={rowUser.status} /></PreviewTd>
+                <PreviewTd className="hidden xl:table-cell"><LastLoginCell label={rowUser.lastLoginLabel} /></PreviewTd>
+                <PreviewTd
+                  className="text-center"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <UserActionMenu
+                    user={rowUser}
+                    context="row"
+                    isOrgAdmin={isOrgAdmin}
+                    onOpenProfile={() => { openUserDetails(rowUser.id); }}
+                    onEdit={() => { setFormDrawer({ mode: 'edit', userId: rowUser.id }); }}
+                    onChangeRole={() => { setActionDialog({ type: 'changeRole', user: rowUser }); }}
+                    onTransfer={() => { setActionDialog({ type: 'transfer', user: rowUser }); }}
+                    onResendInvitation={() => { setActionDialog({ type: 'resendInvitation', user: rowUser }); }}
+                    onRequestPasswordReset={() => { setActionDialog({ type: 'passwordReset', user: rowUser }); }}
+                    onBlock={() => { setActionDialog({ type: 'block', user: rowUser }); }}
+                    onUnblock={() => { setActionDialog({ type: 'unblock', user: rowUser }); }}
+                    onDeactivate={() => { setActionDialog({ type: 'deactivate', user: rowUser }); }}
                   />
                 </PreviewTd>
               </tr>
@@ -537,74 +383,96 @@ export function UsersPage(): JSX.Element {
           </tbody>
         </PreviewTable>
 
-        <UsersPagination
-          page={currentPage}
-          totalPages={totalPages}
-          totalCount={rows.length}
-          pageSize={pageSize}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+        <UsersPagination page={currentPage} totalPages={totalPages} totalCount={rows.length} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </Card>
 
-      <PreviewDrawer
-        open={drawerOpen}
-        onClose={() => {
-          setDrawerOpen(false);
-        }}
-        title="Добавить пользователя"
-        description="Это визуальный прототип формы — сохранение пока не подключено"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" onClick={() => { setDrawerOpen(false); }}>
-              Отмена
-            </Button>
-            <Button variant="primary" disabled title="Функция будет подключена позже">
-              Создать
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <PreviewField label="Полное имя">
-            <PreviewTextInput placeholder="Имя Фамилия" value={draftName} onChange={setDraftName} />
-          </PreviewField>
-          <PreviewField label="Email">
-            <PreviewTextInput placeholder="name@softclub-academy.test" value={draftEmail} onChange={setDraftEmail} />
-          </PreviewField>
-          <PreviewField label="Роль">
-            <PreviewFieldSelect
-              value={draftRole}
-              onChange={setDraftRole}
-              options={[
-                { value: 'BranchAdmin', label: ROLE_LABEL.BranchAdmin },
-                { value: 'Lead', label: ROLE_LABEL.Lead },
-                { value: 'Mentor', label: ROLE_LABEL.Mentor },
-              ]}
-            />
-          </PreviewField>
-          <PreviewField label="Филиал">
-            <PreviewFieldSelect
-              value={draftBranch}
-              onChange={setDraftBranch}
-              options={BRANCH_OPTIONS.filter((option) => option.value !== 'all')}
-            />
-          </PreviewField>
-          <PreviewField label="Категория">
-            <PreviewFieldSelect
-              value="C#"
-              onChange={() => {}}
-              options={[
-                { value: 'C#', label: 'C#' },
-                { value: 'Frontend', label: 'Frontend' },
-                { value: 'Python', label: 'Python' },
-              ]}
-            />
-          </PreviewField>
-        </div>
-      </PreviewDrawer>
+      <UserDetailsDrawer
+        userId={userId}
+        onClose={closeUserDetails}
+        isOrgAdmin={isOrgAdmin}
+        onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}
+        onChangeRole={(target) => { setActionDialog({ type: 'changeRole', user: target }); }}
+        onTransfer={(target) => { setActionDialog({ type: 'transfer', user: target }); }}
+        onResendInvitation={(target) => { setActionDialog({ type: 'resendInvitation', user: target }); }}
+        onRequestPasswordReset={(target) => { setActionDialog({ type: 'passwordReset', user: target }); }}
+        onBlock={(target) => { setActionDialog({ type: 'block', user: target }); }}
+        onUnblock={(target) => { setActionDialog({ type: 'unblock', user: target }); }}
+        onDeactivate={(target) => { setActionDialog({ type: 'deactivate', user: target }); }}
+      />
 
-      <PreviewToast message={toastMessage} />
+      <UserFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} isOrgAdmin={isOrgAdmin} currentBranchRawName={currentBranchRawName} />
+
+      <ChangeUserRoleDialog
+        user={actionDialog?.type === 'changeRole' ? actionDialog.user : null}
+        open={actionDialog?.type === 'changeRole'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isOrgAdmin={isOrgAdmin}
+        currentBranchRawName={currentBranchRawName}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async (input) => {
+          if (actionDialog?.type === 'changeRole') await actions.changeRole(actionDialog.user.id, input);
+        }}
+      />
+
+      <TransferUserDialog
+        user={actionDialog?.type === 'transfer' ? actionDialog.user : null}
+        open={actionDialog?.type === 'transfer'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async (input) => {
+          if (actionDialog?.type === 'transfer') await actions.transferUser(actionDialog.user.id, input);
+        }}
+      />
+
+      <ResendInvitationDialog
+        user={actionDialog?.type === 'resendInvitation' ? actionDialog.user : null}
+        open={actionDialog?.type === 'resendInvitation'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async () => {
+          if (actionDialog?.type === 'resendInvitation') await actions.resendInvitation(actionDialog.user.id);
+        }}
+      />
+
+      <SendPasswordResetDialog
+        user={actionDialog?.type === 'passwordReset' ? actionDialog.user : null}
+        open={actionDialog?.type === 'passwordReset'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async () => {
+          if (actionDialog?.type === 'passwordReset') await actions.requestPasswordReset(actionDialog.user.id);
+        }}
+      />
+
+      <BlockUserDialog
+        user={actionDialog?.type === 'block' ? actionDialog.user : null}
+        open={actionDialog?.type === 'block'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async (input) => {
+          if (actionDialog?.type === 'block') await actions.blockUser(actionDialog.user.id, input);
+        }}
+      />
+
+      <UnblockUserDialog
+        user={actionDialog?.type === 'unblock' ? actionDialog.user : null}
+        open={actionDialog?.type === 'unblock'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async () => {
+          if (actionDialog?.type === 'unblock') await actions.unblockUser(actionDialog.user.id);
+        }}
+      />
+
+      <DeactivateUserDialog
+        user={actionDialog?.type === 'deactivate' ? actionDialog.user : null}
+        open={actionDialog?.type === 'deactivate'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async () => {
+          if (actionDialog?.type === 'deactivate') await actions.deactivateUser(actionDialog.user.id);
+        }}
+      />
     </div>
   );
 }

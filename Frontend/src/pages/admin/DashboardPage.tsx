@@ -1,6 +1,5 @@
 import { AssignmentActivityChart } from '../../features/admin-dashboard/AssignmentActivityChart';
 import { BestBranchCard } from '../../features/admin-dashboard/BestBranchCard';
-import { CompactSystemHealthCard } from '../../features/admin-dashboard/CompactSystemHealthCard';
 import { DashboardHeader } from '../../features/admin-dashboard/DashboardHeader';
 import { DashboardKpiCardSkeleton } from '../../features/admin-dashboard/DashboardKpiCard';
 import { DashboardKpiGrid } from '../../features/admin-dashboard/DashboardKpiGrid';
@@ -67,11 +66,12 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
         </ChartCard>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 items-stretch gap-4 auto-rows-fr sm:grid-cols-2 min-[1440px]:grid-cols-4">
+      <div className="mt-4 grid min-w-0 grid-cols-1 items-stretch gap-4 auto-rows-fr md:grid-cols-2 min-[1420px]:grid-cols-[minmax(260px,0.82fr)_minmax(320px,1.02fr)_minmax(420px,1.36fr)]">
         <BestBranchCard insight={data.bestBranchInsight} />
         <TopTeamsCard categories={data.categoryHealth} />
-        <TopMentorsCard mentors={data.topMentors} />
-        <CompactSystemHealthCard services={data.systemHealth.services} />
+        <div className="flex h-full min-w-0 flex-col md:col-span-2 min-[1420px]:col-span-1">
+          <TopMentorsCard mentors={data.topMentors} />
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
@@ -82,9 +82,9 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
   );
 }
 
-function InsightCardSkeleton(): JSX.Element {
+function InsightCardSkeleton({ className = '' }: { className?: string }): JSX.Element {
   return (
-    <Card padded={false} className="flex h-full min-h-[360px] flex-col gap-0" aria-hidden="true">
+    <Card padded={false} className={`flex h-full min-h-[410px] flex-col gap-0 ${className}`} aria-hidden="true">
       <div className="min-h-[74px] space-y-1.5 border-b border-divider px-4 py-3.5">
         <div className="h-3.5 w-28 animate-pulse rounded bg-surface-muted" />
         <div className="h-3 w-36 animate-pulse rounded bg-surface-muted" />
@@ -129,10 +129,10 @@ function DashboardSkeleton(): JSX.Element {
         <ChartCardSkeleton minHeight={230} />
         <ChartCardSkeleton minHeight={230} />
       </div>
-      <div className="mt-4 grid grid-cols-1 items-stretch gap-4 auto-rows-fr sm:grid-cols-2 min-[1440px]:grid-cols-4">
-        {Array.from({ length: 4 }, (_, i) => (
-          <InsightCardSkeleton key={i} />
-        ))}
+      <div className="mt-4 grid min-w-0 grid-cols-1 items-stretch gap-4 auto-rows-fr md:grid-cols-2 min-[1420px]:grid-cols-[minmax(260px,0.82fr)_minmax(320px,1.02fr)_minmax(420px,1.36fr)]">
+        <InsightCardSkeleton />
+        <InsightCardSkeleton />
+        <InsightCardSkeleton className="md:col-span-2 min-[1420px]:col-span-1" />
       </div>
       <div className="mt-4 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
         <BottomCardSkeleton />

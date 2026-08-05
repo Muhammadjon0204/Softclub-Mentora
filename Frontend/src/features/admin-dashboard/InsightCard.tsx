@@ -17,7 +17,7 @@ interface InsightCardProps {
  */
 export function InsightCard({ title, subtitle, children, footer }: InsightCardProps): JSX.Element {
   return (
-    <Card padded={false} className="flex h-full min-h-[360px] flex-col overflow-hidden">
+    <Card padded={false} className="flex h-full min-h-[410px] min-w-0 flex-col overflow-hidden">
       <div className="flex min-h-[74px] shrink-0 flex-col justify-center border-b border-divider px-4 py-3">
         <h3 className="text-[15px] font-semibold leading-5 text-ink">{title}</h3>
         <p className="mt-0.5 text-[12px] leading-[17px] text-ink-muted">{subtitle}</p>

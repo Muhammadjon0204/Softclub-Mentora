@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
-import { PreviewField, PreviewFieldSelect, PreviewTextInput } from '../../features/admin-preview/PreviewDrawer';
+import { DisconnectIntegrationDialog } from '../../features/admin-settings/DisconnectIntegrationDialog';
+import type { IntegrationKind } from '../../features/admin-settings/DisconnectIntegrationDialog';
+import { ResetSettingsDialog } from '../../features/admin-settings/ResetSettingsDialog';
+import { updateOrganizationNamePreview, useOrganizationPreview } from '../../features/admin-settings/organizationPreviewStore';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
-import { PreviewToast, usePreviewToast } from '../../features/admin-preview/PreviewToast';
+import { UnsavedChangesDialog, useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
+import { FormField, FormInput, FormSelect, ReadOnlyField } from '../../shared/ui/FormField';
 
 const TABS = [
   { key: 'organization', label: 'Организация' },
@@ -26,17 +30,7 @@ function ReadOnlyRow({ label, value }: { label: string; value: string }): JSX.El
   );
 }
 
-function ToggleRow({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}): JSX.Element {
+function ToggleRow({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (value: boolean) => void }): JSX.Element {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-divider py-3 last:border-0">
       <div>
@@ -47,59 +41,119 @@ function ToggleRow({
         type="button"
         role="switch"
         aria-checked={checked}
-        onClick={() => {
-          onChange(!checked);
-        }}
+        onClick={() => { onChange(!checked); }}
         className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-brand' : 'bg-surface-muted'}`}
       >
-        <span
-          aria-hidden="true"
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-        />
+        <span aria-hidden="true" className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
       </button>
     </div>
   );
 }
 
-function TabActions({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }): JSX.Element {
+function TabActions({ isDirty, isSubmitting, onSave, onReset }: { isDirty: boolean; isSubmitting: boolean; onSave: () => void; onReset: () => void }): JSX.Element {
   return (
     <div className="flex items-center justify-end gap-2">
-      <Button variant="secondary" onClick={onCancel}>
-        Отменить
+      <Button variant="secondary" disabled={!isDirty || isSubmitting} onClick={onReset}>
+        Сбросить
       </Button>
-      <Button variant="primary" onClick={onSave}>
+      <Button variant="primary" disabled={!isDirty} isLoading={isSubmitting} onClick={onSave}>
         Сохранить изменения
       </Button>
     </div>
   );
 }
 
-/** UI-прототип /admin/settings — кнопки визуальные, сохранение не подключено (раздел 14 сессии превью). */
+interface SettingsSnapshot {
+  orgName: string;
+  emailEnabled: boolean;
+  telegramEnabled: boolean;
+  reminders: boolean;
+  compactMode: boolean;
+  sidebarDefault: string;
+  uiLanguage: string;
+}
+
+/**
+ * UI-прототип /admin/settings — этап 3: реальный save только для полей,
+ * подтверждённых ТЗ (Organization.name — ORG-004). «Главный офис» показан
+ * read-only (реальное изменение — IsHeadOffice на /admin/branches, ADR-001
+ * не относит его к Settings); часовой пояс/контакты организации убраны —
+ * OrganizationSettings в Release 1.0 не существует (ORG-024).
+ */
 export function SettingsPage(): JSX.Element {
   const [tab, setTab] = useState('organization');
-  const [toastMessage, showToast] = usePreviewToast();
+  const toast = useToast();
 
-  const [orgName, setOrgName] = useState('SoftClub IT Academy');
-  const [orgSlug, setOrgSlug] = useState('softclub-academy');
-  const [mainOffice, setMainOffice] = useState('branch-hq');
-  const [timezone, setTimezone] = useState('Asia/Dushanbe');
-  const [dateFormat, setDateFormat] = useState('dd.MM.yyyy');
-  const [language, setLanguage] = useState('ru');
-  const [contactEmail, setContactEmail] = useState('office@softclub-academy.test');
-  const [contactPhone, setContactPhone] = useState('+992 37 221 00 00');
-  const [contactAddress, setContactAddress] = useState('г. Душанбе, ул. Рудаки, 22');
+  const organization = useOrganizationPreview();
+  const [orgNameDraft, setOrgNameDraft] = useState(organization.name);
+  const [orgNameError, setOrgNameError] = useState<string | null>(null);
 
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [telegramEnabled, setTelegramEnabled] = useState(true);
   const [reminders, setReminders] = useState(true);
 
+  const [emailConnected, setEmailConnected] = useState(true);
+  const [telegramConnected, setTelegramConnected] = useState(true);
+
   const [compactMode, setCompactMode] = useState(false);
   const [sidebarDefault, setSidebarDefault] = useState('expanded');
   const [uiLanguage, setUiLanguage] = useState('ru');
 
-  const handleSave = (): void => {
-    showToast('Функция будет подключена позже');
-  };
+  const savedRef = useRef<SettingsSnapshot>({ orgName: organization.name, emailEnabled, telegramEnabled, reminders, compactMode, sidebarDefault, uiLanguage });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [disconnectTarget, setDisconnectTarget] = useState<IntegrationKind | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const current: SettingsSnapshot = { orgName: orgNameDraft, emailEnabled, telegramEnabled, reminders, compactMode, sidebarDefault, uiLanguage };
+  const isDirty = Object.keys(current).some((key) => current[key as keyof SettingsSnapshot] !== savedRef.current[key as keyof SettingsSnapshot]);
+
+  function applySnapshot(snapshot: SettingsSnapshot): void {
+    setOrgNameDraft(snapshot.orgName);
+    setEmailEnabled(snapshot.emailEnabled);
+    setTelegramEnabled(snapshot.telegramEnabled);
+    setReminders(snapshot.reminders);
+    setCompactMode(snapshot.compactMode);
+    setSidebarDefault(snapshot.sidebarDefault);
+    setUiLanguage(snapshot.uiLanguage);
+    setOrgNameError(null);
+  }
+
+  function requestTabChange(nextTab: string): void {
+    if (isDirty) {
+      setPendingTab(nextTab);
+      setUnsavedOpen(true);
+      return;
+    }
+    setTab(nextTab);
+  }
+
+  async function handleSave(): Promise<void> {
+    if (tab === 'organization') {
+      const trimmed = orgNameDraft.trim();
+      if (trimmed.length < 2 || trimmed.length > 200) {
+        setOrgNameError('Название должно содержать от 2 до 200 символов');
+        return;
+      }
+      setOrgNameError(null);
+    }
+
+    setIsSubmitting(true);
+    try {
+      await new Promise((resolve) => { window.setTimeout(resolve, 350); });
+      if (tab === 'organization') updateOrganizationNamePreview(orgNameDraft);
+      savedRef.current = { ...current, orgName: tab === 'organization' ? orgNameDraft.trim() : savedRef.current.orgName };
+      toast.success('Изменения сохранены');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleResetConfirmed(): void {
+    applySnapshot(savedRef.current);
+  }
 
   let content: ReactNode = null;
   if (tab === 'organization') {
@@ -107,71 +161,15 @@ export function SettingsPage(): JSX.Element {
       <div className="space-y-4">
         <SectionCard title="Профиль организации">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <PreviewField label="Название">
-              <PreviewTextInput placeholder="Название организации" value={orgName} onChange={setOrgName} />
-            </PreviewField>
-            <PreviewField label="Slug">
-              <PreviewTextInput placeholder="slug" value={orgSlug} onChange={setOrgSlug} />
-            </PreviewField>
-            <PreviewField label="Главный офис">
-              <PreviewFieldSelect
-                value={mainOffice}
-                onChange={setMainOffice}
-                options={[
-                  { value: 'branch-hq', label: 'Главный офис' },
-                  { value: 'branch-khu', label: 'Филиал Худжанд' },
-                  { value: 'branch-bok', label: 'Филиал Бохтар' },
-                ]}
-              />
-            </PreviewField>
-            <PreviewField label="Часовой пояс по умолчанию">
-              <PreviewFieldSelect
-                value={timezone}
-                onChange={setTimezone}
-                options={[{ value: 'Asia/Dushanbe', label: 'Asia/Dushanbe (UTC+5)' }]}
-              />
-            </PreviewField>
+            <FormField label="Название" htmlFor="settings-org-name" required error={orgNameError ?? undefined}>
+              <FormInput id="settings-org-name" value={orgNameDraft} invalid={orgNameError !== null} onChange={(event) => { setOrgNameDraft(event.target.value); }} />
+            </FormField>
+            <ReadOnlyField label="Slug" value={organization.slug} hint="Неизменяем после создания" />
+            <ReadOnlyField label="Главный офис" value="Душанбе" hint="Изменяется на странице «Филиалы»" />
           </div>
         </SectionCard>
 
-        <SectionCard title="Региональные настройки">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <PreviewField label="Часовой пояс">
-              <PreviewFieldSelect value={timezone} onChange={setTimezone} options={[{ value: 'Asia/Dushanbe', label: 'Asia/Dushanbe' }]} />
-            </PreviewField>
-            <PreviewField label="Формат даты">
-              <PreviewFieldSelect
-                value={dateFormat}
-                onChange={setDateFormat}
-                options={[
-                  { value: 'dd.MM.yyyy', label: '31.12.2026' },
-                  { value: 'yyyy-MM-dd', label: '2026-12-31' },
-                ]}
-              />
-            </PreviewField>
-            <PreviewField label="Язык">
-              <PreviewFieldSelect value={language} onChange={setLanguage} options={[{ value: 'ru', label: 'Русский' }, { value: 'tg', label: 'Тоҷикӣ' }]} />
-            </PreviewField>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Контакты">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <PreviewField label="Email">
-              <PreviewTextInput placeholder="office@example.com" value={contactEmail} onChange={setContactEmail} />
-            </PreviewField>
-            <PreviewField label="Телефон">
-              <PreviewTextInput placeholder="+992 ..." value={contactPhone} onChange={setContactPhone} />
-            </PreviewField>
-            <div className="sm:col-span-2">
-              <PreviewField label="Адрес">
-                <PreviewTextInput placeholder="Адрес главного офиса" value={contactAddress} onChange={setContactAddress} />
-              </PreviewField>
-            </div>
-          </div>
-        </SectionCard>
-
-        <TabActions onSave={handleSave} onCancel={handleSave} />
+        <TabActions isDirty={isDirty} isSubmitting={isSubmitting} onSave={() => { void handleSave(); }} onReset={() => { setResetOpen(true); }} />
       </div>
     );
   } else if (tab === 'security') {
@@ -180,7 +178,7 @@ export function SettingsPage(): JSX.Element {
         <ReadOnlyRow label="Длительность сессии" value="30 дней (refresh-токен)" />
         <ReadOnlyRow label="Время жизни access-токена" value="15 минут" />
         <ReadOnlyRow label="Блокировка аккаунта" value="5 неудачных попыток входа" />
-        <ReadOnlyRow label="Политика паролей" value="Минимум 8 символов, запрет топ-10000 паролей" />
+        <ReadOnlyRow label="Политика паролей" value="Минимум 12 символов, заглавная буква, цифра" />
       </SectionCard>
     );
   } else if (tab === 'notifications') {
@@ -191,14 +189,14 @@ export function SettingsPage(): JSX.Element {
           <ToggleRow label="Telegram" description="Отправлять уведомления через Telegram-бота" checked={telegramEnabled} onChange={setTelegramEnabled} />
           <ToggleRow label="Напоминания о дедлайнах" description="Напоминать ментору за 24 часа до дедлайна" checked={reminders} onChange={setReminders} />
         </SectionCard>
-        <TabActions onSave={handleSave} onCancel={handleSave} />
+        <TabActions isDirty={isDirty} isSubmitting={isSubmitting} onSave={() => { void handleSave(); }} onReset={() => { setResetOpen(true); }} />
       </div>
     );
   } else if (tab === 'integrations') {
     content = (
-      <SectionCard title="Интеграции" description="Текущие подключения — управление появится на следующем этапе">
-        <IntegrationRow name="Email provider" detail="SMTP · mail.softclub-academy.test" connected />
-        <IntegrationRow name="Telegram bot" detail="@mentora_notify_bot" connected />
+      <SectionCard title="Интеграции" description="Текущие подключения">
+        <IntegrationRow name="Email provider" detail="SMTP · mail.softclub-academy.test" connected={emailConnected} onDisconnect={emailConnected ? () => { setDisconnectTarget('email'); } : undefined} />
+        <IntegrationRow name="Telegram bot" detail="@mentora_notify_bot" connected={telegramConnected} onDisconnect={telegramConnected ? () => { setDisconnectTarget('telegram'); } : undefined} />
         <IntegrationRow name="MinIO" detail="Хранилище файлов и вложений" connected />
         <IntegrationRow name="AI provider" detail="Для AI-резюме в разделе «Отчёты»" connected={false} />
       </SectionCard>
@@ -208,19 +206,18 @@ export function SettingsPage(): JSX.Element {
       <div className="space-y-4">
         <SectionCard title="Интерфейс">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <PreviewField label="Язык интерфейса">
-              <PreviewFieldSelect value={uiLanguage} onChange={setUiLanguage} options={[{ value: 'ru', label: 'Русский' }, { value: 'tg', label: 'Тоҷикӣ' }]} />
-            </PreviewField>
-            <PreviewField label="Sidebar по умолчанию">
-              <PreviewFieldSelect
-                value={sidebarDefault}
-                onChange={setSidebarDefault}
-                options={[
-                  { value: 'expanded', label: 'Развёрнут' },
-                  { value: 'collapsed', label: 'Свёрнут' },
-                ]}
-              />
-            </PreviewField>
+            <FormField label="Язык интерфейса" htmlFor="settings-ui-language">
+              <FormSelect id="settings-ui-language" value={uiLanguage} onChange={(event) => { setUiLanguage(event.target.value); }}>
+                <option value="ru">Русский</option>
+                <option value="tg">Тоҷикӣ</option>
+              </FormSelect>
+            </FormField>
+            <FormField label="Sidebar по умолчанию" htmlFor="settings-sidebar">
+              <FormSelect id="settings-sidebar" value={sidebarDefault} onChange={(event) => { setSidebarDefault(event.target.value); }}>
+                <option value="expanded">Развёрнут</option>
+                <option value="collapsed">Свёрнут</option>
+              </FormSelect>
+            </FormField>
           </div>
           <div className="mt-1">
             <ToggleRow label="Компактный режим" description="Плотнее строки таблиц и меньше отступы карточек" checked={compactMode} onChange={setCompactMode} />
@@ -240,7 +237,7 @@ export function SettingsPage(): JSX.Element {
           </div>
         </SectionCard>
 
-        <TabActions onSave={handleSave} onCancel={handleSave} />
+        <TabActions isDirty={isDirty} isSubmitting={isSubmitting} onSave={() => { void handleSave(); }} onReset={() => { setResetOpen(true); }} />
       </div>
     );
   }
@@ -251,24 +248,64 @@ export function SettingsPage(): JSX.Element {
 
       <Card padded={false}>
         <div className="px-5 pt-4 sm:px-6">
-          <PreviewTabs tabs={TABS} active={tab} onChange={setTab} />
+          <PreviewTabs tabs={TABS} active={tab} onChange={requestTabChange} />
         </div>
         <div className="p-5 sm:p-6">{content}</div>
       </Card>
 
-      <PreviewToast message={toastMessage} />
+      <ResetSettingsDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        onConfirm={handleResetConfirmed}
+      />
+
+      <UnsavedChangesDialog
+        open={unsavedOpen}
+        onStay={() => { setUnsavedOpen(false); }}
+        onDiscard={() => {
+          applySnapshot(savedRef.current);
+          setUnsavedOpen(false);
+          if (pendingTab !== null) setTab(pendingTab);
+          setPendingTab(null);
+        }}
+      />
+
+      <DisconnectIntegrationDialog
+        integration={disconnectTarget}
+        open={disconnectTarget !== null}
+        onOpenChange={(next) => { if (!next) setDisconnectTarget(null); }}
+        isSubmitting={isDisconnecting}
+        onConfirm={async () => {
+          setIsDisconnecting(true);
+          try {
+            await new Promise((resolve) => { window.setTimeout(resolve, 450); });
+            if (disconnectTarget === 'email') setEmailConnected(false);
+            if (disconnectTarget === 'telegram') setTelegramConnected(false);
+            toast.warning(`Интеграция «${disconnectTarget === 'email' ? 'Email' : 'Telegram'}» отключена`);
+          } finally {
+            setIsDisconnecting(false);
+          }
+        }}
+      />
     </div>
   );
 }
 
-function IntegrationRow({ name, detail, connected }: { name: string; detail: string; connected: boolean }): JSX.Element {
+function IntegrationRow({ name, detail, connected, onDisconnect }: { name: string; detail: string; connected: boolean; onDisconnect?: () => void }): JSX.Element {
   return (
-    <div className="flex items-center justify-between border-b border-divider py-3 last:border-0">
+    <div className="flex items-center justify-between gap-3 border-b border-divider py-3 last:border-0">
       <div>
         <p className="text-[13.5px] font-medium text-ink">{name}</p>
         <p className="text-[12px] text-ink-muted">{detail}</p>
       </div>
-      <Badge tone={connected ? 'success' : 'neutral'}>{connected ? 'Подключено' : 'Не настроено'}</Badge>
+      <div className="flex items-center gap-2.5">
+        <Badge tone={connected ? 'success' : 'neutral'}>{connected ? 'Подключено' : 'Не настроено'}</Badge>
+        {onDisconnect !== undefined ? (
+          <Button variant="secondary" size="sm" onClick={onDisconnect}>
+            Отключить
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }

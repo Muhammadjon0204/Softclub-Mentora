@@ -52,7 +52,7 @@ export function TopMentorsCard({ mentors }: TopMentorsCardProps): JSX.Element {
                   rank={index + 1}
                   avatar={
                     <span
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10.5px] font-semibold text-brand"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10.5px] font-semibold text-brand"
                       aria-hidden="true"
                     >
                       {initialsOf(mentor.mentorName)}

@@ -1,8 +1,11 @@
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 
+import { ServiceActionMenu } from '../../features/admin-health/ServiceActionMenu';
+import { ServiceDetailsDrawer } from '../../features/admin-health/ServiceDetailsDrawer';
+import { enrichService } from '../../features/admin-health/healthPresentation';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import {
   PREVIEW_AVAILABILITY_24H,
@@ -32,21 +35,34 @@ function normalizeServiceKey(key: string | null): string | null {
   return key === 'postgres' ? 'db' : key;
 }
 
-/** UI-прототип /admin/health — без тяжёлых DevOps-графиков (раздел 13 сессии превью). */
+/** UI-прототип /admin/health — этап 3: ServiceDetailsDrawer + IncidentHistoryModal поверх shared overlay system. */
 export function HealthPage(): JSX.Element {
-  const hasDegraded = PREVIEW_SERVICES.some((s) => s.status !== 'Operational');
+  const services = useMemo(() => PREVIEW_SERVICES.map(enrichService), []);
+  const hasDegraded = services.some((s) => s.status !== 'Operational');
   const availabilityData = PREVIEW_AVAILABILITY_24H.map((value, index) => ({ hour: index, value }));
 
-  // Минимальный deep-link из Dashboard-карточки «Здоровье системы» (?service=<id>) —
-  // подсвечиваем и прокручиваем к карточке сервиса, дизайн страницы не меняется.
-  const [searchParams] = useSearchParams();
-  const highlightService = normalizeServiceKey(searchParams.get('service'));
+  const [searchParams, setSearchParams] = useSearchParams();
+  const serviceKey = normalizeServiceKey(searchParams.get('service'));
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
 
   useEffect(() => {
-    if (highlightService === null) return;
-    cardRefs.current.get(highlightService)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [highlightService]);
+    if (serviceKey === null) return;
+    cardRefs.current.get(serviceKey)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [serviceKey]);
+
+  function openService(id: string): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('service', id);
+    setSearchParams(next);
+  }
+
+  function closeService(): void {
+    const next = new URLSearchParams(searchParams);
+    next.delete('service');
+    setSearchParams(next);
+  }
+
+  const selected = serviceKey !== null ? services.find((s) => s.id === serviceKey) : undefined;
 
   return (
     <div className="space-y-6">
@@ -65,37 +81,52 @@ export function HealthPage(): JSX.Element {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {PREVIEW_SERVICES.map((service) => (
+        {services.map((service) => (
           <div
             key={service.id}
             ref={(node) => {
               if (node) cardRefs.current.set(service.id, node);
               else cardRefs.current.delete(service.id);
             }}
+            tabIndex={0}
+            role="button"
+            aria-label={`Открыть сервис ${service.name}`}
+            onClick={() => { openService(service.id); }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                openService(service.id);
+              }
+            }}
           >
-          <Card
-            className={`flex flex-col gap-2.5 ${service.id === highlightService ? 'ring-2 ring-brand ring-offset-2 ring-offset-app' : ''}`}
-          >
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-ink">{service.name}</p>
-              <Badge tone={STATUS_TONE[service.status]}>{SERVICE_STATUS_LABEL[service.status]}</Badge>
-            </div>
-            <p className="text-[12.5px] leading-[18px] text-ink-muted">{service.description}</p>
-            <div className="mt-1 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                <p className="text-[14px] font-semibold tabular-nums text-ink">{service.latencyMs} мс</p>
-                <p className="text-[10.5px] text-ink-muted">Задержка</p>
+            <Card
+              className={`flex cursor-pointer flex-col gap-2.5 outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                service.id === serviceKey ? 'ring-2 ring-brand ring-offset-2 ring-offset-app' : ''
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-ink">{service.name}</p>
+                <div className="flex items-center gap-1.5" onClick={(event) => { event.stopPropagation(); }}>
+                  <Badge tone={STATUS_TONE[service.status]}>{SERVICE_STATUS_LABEL[service.status]}</Badge>
+                  <ServiceActionMenu service={service} context="card" onOpenDetails={() => { openService(service.id); }} onOpenIncidents={() => { openService(service.id); }} />
+                </div>
               </div>
-              <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                <p className="text-[14px] font-semibold tabular-nums text-ink">{service.uptimePct}%</p>
-                <p className="text-[10.5px] text-ink-muted">Uptime</p>
+              <p className="text-[12.5px] leading-[18px] text-ink-muted">{service.description}</p>
+              <div className="mt-1 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
+                  <p className="text-[14px] font-semibold tabular-nums text-ink">{service.latencyMs} мс</p>
+                  <p className="text-[10.5px] text-ink-muted">Задержка</p>
+                </div>
+                <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
+                  <p className="text-[14px] font-semibold tabular-nums text-ink">{service.uptimePct}%</p>
+                  <p className="text-[10.5px] text-ink-muted">Uptime</p>
+                </div>
+                <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
+                  <p className="text-[11px] font-medium text-ink">{service.lastCheckedLabel}</p>
+                  <p className="text-[10.5px] text-ink-muted">Проверка</p>
+                </div>
               </div>
-              <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                <p className="text-[11px] font-medium text-ink">{service.lastCheckedLabel}</p>
-                <p className="text-[10.5px] text-ink-muted">Проверка</p>
-              </div>
-            </div>
-          </Card>
+            </Card>
           </div>
         ))}
       </div>
@@ -129,6 +160,8 @@ export function HealthPage(): JSX.Element {
           </ul>
         </SectionCard>
       </div>
+
+      <ServiceDetailsDrawer serviceKey={serviceKey} service={selected} onClose={closeService} />
     </div>
   );
 }
