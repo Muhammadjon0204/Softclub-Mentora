@@ -21,6 +21,8 @@ export interface SelectProps {
   className?: string;
   panelClassName?: string;
   emptyMessage?: string;
+  /** См. `SelectTrigger` — `false` для compact filter-toolbar select'ов. */
+  fullWidth?: boolean;
 }
 
 function enabledIndices(options: SelectOption[]): number[] {
@@ -53,6 +55,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
     className = '',
     panelClassName = '',
     emptyMessage,
+    fullWidth = true,
   },
   forwardedRef,
 ) {
@@ -138,6 +141,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
           ariaLabel={ariaLabel}
           onClick={onClick}
           className={className}
+          fullWidth={fullWidth}
         />
       )}
     >

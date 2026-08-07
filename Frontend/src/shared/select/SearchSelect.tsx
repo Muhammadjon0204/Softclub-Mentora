@@ -23,6 +23,8 @@ export interface SearchSelectProps {
   size?: 'sm' | 'md';
   className?: string;
   panelClassName?: string;
+  /** См. `SelectTrigger` — `false` для compact filter-toolbar select'ов. */
+  fullWidth?: boolean;
 }
 
 function enabledIndices(options: SelectOption[]): number[] {
@@ -55,6 +57,7 @@ export const SearchSelect = forwardRef<HTMLButtonElement, SearchSelectProps>(fun
     size = 'md',
     className = '',
     panelClassName = '',
+    fullWidth = true,
   },
   forwardedRef,
 ) {
@@ -146,6 +149,7 @@ export const SearchSelect = forwardRef<HTMLButtonElement, SearchSelectProps>(fun
           ariaLabel={ariaLabel}
           onClick={onClick}
           className={className}
+          fullWidth={fullWidth}
         />
       )}
     >

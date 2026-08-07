@@ -15,6 +15,11 @@ export interface SelectTriggerProps {
   onClick: () => void;
   className?: string;
   leadingIcon?: ReactNode;
+  /** `true` (по умолчанию) — trigger заполняет контейнер (форма/drawer). `false` — ширина
+   *  целиком отдаётся `className` (filter toolbar): без этого `w-full` всегда выигрывал
+   *  бы каскад у любой `w-[…]`, переданной вызывающей стороной, — именно так узкие
+   *  filter-select'ы неожиданно растягивались на 100% и ломали toolbar на строки. */
+  fullWidth?: boolean;
 }
 
 const SIZE_CLASSES: Record<'sm' | 'md', string> = {
@@ -37,6 +42,7 @@ export function SelectTrigger({
   onClick,
   className = '',
   leadingIcon,
+  fullWidth = true,
 }: SelectTriggerProps): JSX.Element {
   return (
     <button
@@ -50,7 +56,7 @@ export function SelectTrigger({
       aria-expanded={isOpen}
       aria-label={ariaLabel}
       aria-invalid={invalid === true ? true : undefined}
-      className={`flex w-full shrink-0 items-center justify-between gap-2 rounded-control border bg-surface text-left text-ink outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-disabled disabled:hover:bg-surface-muted ${SIZE_CLASSES[size]} ${invalid === true ? 'border-danger' : 'border-line'} ${className}`}
+      className={`flex shrink-0 items-center justify-between gap-2 rounded-control border bg-surface text-left text-ink outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-disabled disabled:hover:bg-surface-muted ${fullWidth ? 'w-full' : ''} ${SIZE_CLASSES[size]} ${invalid === true ? 'border-danger' : 'border-line'} ${className}`}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {leadingIcon}

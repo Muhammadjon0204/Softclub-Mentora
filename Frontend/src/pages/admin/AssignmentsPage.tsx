@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock3, RotateCcw, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Clock3, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -6,8 +6,8 @@ import { AssignmentDetailsDrawer } from '../../features/admin-assignments/Assign
 import { branchDisplayName as formatBranchDisplayName, enrichAssignment, formatActivity, formatDeadline, pluralizeRu } from '../../features/admin-assignments/assignmentPresentation';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
-import { PreviewSearchInput, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
+import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   ASSIGNMENT_STATUS_LABEL,
@@ -17,7 +17,6 @@ import {
   type PreviewAssignmentStatus,
 } from '../../mocks/ui-preview/assignments.preview';
 import { useAuth } from '../../auth/useAuth';
-import { Select } from '../../shared/select';
 import { Card } from '../../shared/ui/Card';
 
 /**
@@ -139,20 +138,6 @@ function ActivityCell({ label }: { label: string }): JSX.Element {
   );
 }
 
-function ResetFiltersButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-surface disabled:hover:text-ink-secondary"
-    >
-      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-      Сбросить
-    </button>
-  );
-}
-
 interface StatusTabItem {
   value: 'all' | PreviewAssignmentStatus;
   label: string;
@@ -194,81 +179,6 @@ function StatusNavigation({
             </button>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-interface PaginationProps {
-  page: number;
-  totalPages: number;
-  totalCount: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-}
-
-function PaginationFooter({ page, totalPages, totalCount, pageSize, onPageChange, onPageSizeChange }: PaginationProps): JSX.Element {
-  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalCount);
-  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
-      <span>
-        Показано {start}–{end} из {totalCount}
-      </span>
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
-          На странице
-          <Select
-            ariaLabel="Заданий на странице"
-            size="sm"
-            value={String(pageSize)}
-            onValueChange={(next) => { onPageSizeChange(Number(next)); }}
-            options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
-            className="w-[68px]"
-          />
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => {
-              onPageChange(page - 1);
-            }}
-            aria-label="Предыдущая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          {pageNumbers.map((number) => (
-            <button
-              key={number}
-              type="button"
-              onClick={() => {
-                onPageChange(number);
-              }}
-              aria-current={number === page ? 'page' : undefined}
-              className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${
-                number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {number}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => {
-              onPageChange(page + 1);
-            }}
-            aria-label="Следующая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -407,13 +317,11 @@ export function AssignmentsPage(): JSX.Element {
 
         <StatusNavigation items={statusTabItems} active={status} onChange={setStatus} />
 
-        <div
-          className={`flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6 xl:grid ${isOrgAdmin ? 'xl:grid-cols-[minmax(280px,1fr)_170px_180px_auto]' : 'xl:grid-cols-[minmax(280px,1fr)_180px_auto]'}`}
-        >
+        <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по названию или ментору" value={search} onChange={setSearch} className="!min-w-[280px]" />
-          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[170px]" /> : null}
-          <PreviewSelect label="Направление" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} className="w-[180px]" />
-          <ResetFiltersButton
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Направление" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} width="lg" />
+          <PreviewResetButton
             disabled={!filtersActive}
             onClick={() => {
               setSearch('');
@@ -422,7 +330,7 @@ export function AssignmentsPage(): JSX.Element {
               setStatus('all');
             }}
           />
-        </div>
+        </PreviewToolbar>
 
         <PreviewTable>
           <PreviewTableHead>
@@ -480,11 +388,12 @@ export function AssignmentsPage(): JSX.Element {
           </tbody>
         </PreviewTable>
 
-        <PaginationFooter
+        <PreviewPagination
           page={currentPage}
           totalPages={totalPages}
           totalCount={rows.length}
           pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
         />

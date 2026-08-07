@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { PreviewDrawer } from '../../features/admin-preview/PreviewDrawer';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
+import { PreviewActionCell, PreviewActionTh, PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
@@ -145,8 +145,8 @@ export function AuditPage(): JSX.Element {
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по пользователю, действию, объекту…" value={search} onChange={setSearch} />
-          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} /> : null}
-          <PreviewSelect label="Результат" value={result} onChange={setResult} options={RESULT_OPTIONS} />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Результат" value={result} onChange={setResult} options={RESULT_OPTIONS} width="sm" />
           <PreviewResetButton
             onClick={() => {
               setSearch('');
@@ -165,7 +165,7 @@ export function AuditPage(): JSX.Element {
             <PreviewTh>Объект</PreviewTh>
             <PreviewTh className="w-[105px]">Результат</PreviewTh>
             <PreviewTh className="w-[130px]">Correlation ID</PreviewTh>
-            <PreviewTh className="w-11" />
+            <PreviewActionTh />
           </PreviewTableHead>
           <tbody>
             {rows.map((entry) => (
@@ -197,7 +197,7 @@ export function AuditPage(): JSX.Element {
                 <PreviewTd className="whitespace-nowrap">
                   <CopyCorrelationId id={entry.correlationId} />
                 </PreviewTd>
-                <PreviewTd className="text-right">
+                <PreviewActionCell>
                   <IconButton
                     label="Открыть детали"
                     size="sm"
@@ -208,7 +208,7 @@ export function AuditPage(): JSX.Element {
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
                   </IconButton>
-                </PreviewTd>
+                </PreviewActionCell>
               </PreviewTr>
             ))}
           </tbody>

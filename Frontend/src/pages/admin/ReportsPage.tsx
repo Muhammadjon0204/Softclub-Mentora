@@ -17,7 +17,7 @@ import { ExportReportModal } from '../../features/admin-reports/ExportReportModa
 import { MetricDetailsDrawer } from '../../features/admin-reports/MetricDetailsDrawer';
 import type { MetricKey } from '../../features/admin-reports/reportPresentation';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewResetButton, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
 import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   PREVIEW_AI_SUMMARY,
@@ -80,6 +80,7 @@ export function ReportsPage(): JSX.Element {
 
   const branchLabel = isOrgAdmin ? (BRANCH_OPTIONS.find((option) => option.value === branch)?.label ?? 'Все филиалы') : (authUser?.branch?.name ?? '—');
   const categoryLabel = CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? 'Все категории';
+  const filtersActive = (isOrgAdmin && branch !== 'all') || category !== 'all';
 
   return (
     <div className="space-y-6">
@@ -100,8 +101,15 @@ export function ReportsPage(): JSX.Element {
       />
 
       <Card className="flex flex-wrap items-center gap-2.5">
-        {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} /> : null}
-        <PreviewSelect label="Категория" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+        <PreviewSelect label="Категория" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} width="lg" />
+        <PreviewResetButton
+          disabled={!filtersActive}
+          onClick={() => {
+            setBranch('all');
+            setCategory('all');
+          }}
+        />
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

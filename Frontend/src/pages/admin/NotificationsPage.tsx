@@ -10,7 +10,7 @@ import type { PreviewNotificationDetails } from '../../features/admin-notificati
 import { retryNotificationPreview, useNotificationsPreview } from '../../features/admin-notifications/notificationPreviewStore';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
+import { PreviewActionCell, PreviewActionTh, PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
 import { BRANCH_DIRECTORY, branchDisplayName } from '../../features/admin-preview/branchDirectory';
@@ -182,8 +182,8 @@ export function NotificationsPage(): JSX.Element {
         </div>
         <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по событию или получателю…" value={search} onChange={setSearch} />
-          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} /> : null}
-          <PreviewSelect label="Канал" value={channel} onChange={setChannel} options={CHANNEL_OPTIONS} />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Канал" value={channel} onChange={setChannel} options={CHANNEL_OPTIONS} width="sm" />
           <PreviewResetButton
             onClick={() => {
               setSearch('');
@@ -202,7 +202,7 @@ export function NotificationsPage(): JSX.Element {
             <PreviewTh className="w-[125px]">Статус</PreviewTh>
             <PreviewTh className="w-[75px]">Попытки</PreviewTh>
             <PreviewTh className="w-[125px]">Создано</PreviewTh>
-            <PreviewTh className="w-11" />
+            <PreviewActionTh />
           </PreviewTableHead>
           <tbody>
             {rows.slice(0, 16).map((n) => {
@@ -241,7 +241,7 @@ export function NotificationsPage(): JSX.Element {
                   <PreviewTd>
                     <PreviewCellStack primary={n.createdLabel} secondary={showNextRetry ? `Повтор: ${n.nextRetryLabel}` : undefined} />
                   </PreviewTd>
-                  <PreviewTd className="text-right" onClick={(event) => { event.stopPropagation(); }}>
+                  <PreviewActionCell onClick={(event) => { event.stopPropagation(); }}>
                     <NotificationActionMenu
                       notification={n}
                       context="row"
@@ -249,7 +249,7 @@ export function NotificationsPage(): JSX.Element {
                       onRetry={() => { setRetryTarget(n); }}
                       onCopyCorrelationId={() => { void navigator.clipboard.writeText(n.correlationId); }}
                     />
-                  </PreviewTd>
+                  </PreviewActionCell>
                 </tr>
               );
             })}

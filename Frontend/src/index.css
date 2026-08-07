@@ -74,3 +74,30 @@
       sans-serif;
   }
 }
+
+/*
+ * Recharts (v3, accessibilityLayer: true по умолчанию) делает корневой <svg>
+ * каждого графика фокусируемым (tabindex=0) — браузер рисует поверх него свой
+ * сырой default focus outline (жирный, часто чёрный/тёмный) при любом клике
+ * или Tab. Здесь он полностью убирается и заменяется мягким brand-кольцом на
+ * --focus-ring — тем же токеном, что уже объявлен для ringColor в
+ * tailwind.config.js, но раньше нигде не использовался.
+ * accessibilityLayer/tabindex не трогаем — клавиатурная навигация остаётся.
+ *
+ * Вне `@layer base`, а не внутри: класс `.recharts-surface` не встречается
+ * буквально ни в одном отсканированном `content`-файле (он приходит из
+ * node_modules/recharts во время рендера), поэтому Tailwind's JIT purge
+ * молча выбрасывает любое class-правило внутри `@layer` без совпадения по
+ * содержимому — сохраняется только сам комментарий. Обычный (unlayered) CSS
+ * этой чистке не подвергается.
+ */
+.recharts-surface {
+  outline: none;
+}
+
+.recharts-surface:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-radius: 12px;
+}
+
