@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 
 import { ROLE_LABEL } from '../../mocks/ui-preview/users.preview';
 import { ConfirmDialog } from '../../shared/overlays';
-import { FormField, FormSelect } from '../../shared/ui/FormField';
+import { SearchSelect } from '../../shared/select';
+import { FormField } from '../../shared/ui/FormField';
 import { branchDisplayName } from '../admin-users/userPresentation';
 import { useUsersPreview } from '../admin-users/userPreviewStore';
 import type { PreviewCategoryDetails } from './categoryPresentation';
@@ -51,12 +52,14 @@ export function AssignCategoryLeadDialog({ category, open, onOpenChange, isSubmi
       details={
         <div className="space-y-4">
           <FormField label="Пользователь" htmlFor="assign-lead-user">
-            <FormSelect id="assign-lead-user" value={selectedId} onChange={(event) => { setSelectedId(event.target.value); }}>
-              <option value="">Выберите пользователя</option>
-              {candidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email}</option>
-              ))}
-            </FormSelect>
+            <SearchSelect
+              id="assign-lead-user"
+              value={selectedId}
+              onValueChange={setSelectedId}
+              placeholder="Выберите пользователя"
+              searchPlaceholder="Поиск по имени или email…"
+              options={candidates.map((candidate) => ({ value: candidate.id, label: candidate.fullName, description: candidate.email }))}
+            />
           </FormField>
 
           {selected !== undefined ? (

@@ -1,5 +1,8 @@
-import type { ReactNode, ThHTMLAttributes, TdHTMLAttributes } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { MouseEvent, ReactNode, ThHTMLAttributes, TdHTMLAttributes } from 'react';
 import { forwardRef } from 'react';
+
+import { Select } from '../../shared/select';
 
 /**
  * Единая table-система preview-страниц (layout polish, раздел 3 сессии).
@@ -75,6 +78,35 @@ export function PreviewTd({ children, className = '', ...rest }: TdHTMLAttribute
   );
 }
 
+/** Заголовок финальной колонки с action-menu (`…`) — используется вместе с `PreviewActionCell`. */
+export function PreviewActionTh(): JSX.Element {
+  return <PreviewTh className="w-14" aria-label="Действия" />;
+}
+
+/**
+ * Финальная ячейка строки с action-menu trigger (`…`). `w-14` уже комфортно
+ * вмещает 32px IconButton, но правильная защита — не ширина колонки, а
+ * `flex justify-end` вместо `text-align`: при `table-layout: fixed` узкая
+ * фикс-колонка (`w-11`) даёт content-box уже самого триггера, и `text-center`/
+ * `text-right` в этом случае непредсказуемо прижимают кнопку вплотную к самому
+ * краю таблицы (0px отступа) — ровно баг «троеточие прилипло к краю».
+ * `justify-end` детерминированно держит кнопку у padding-края контейнера, а
+ * не у его border-края, весь overflow уходит влево, а не вправо.
+ */
+export function PreviewActionCell({
+  children,
+  onClick,
+}: {
+  children: ReactNode;
+  onClick?: (event: MouseEvent<HTMLTableCellElement>) => void;
+}): JSX.Element {
+  return (
+    <PreviewTd className="w-14" onClick={onClick}>
+      <div className="flex items-center justify-end">{children}</div>
+    </PreviewTd>
+  );
+}
+
 /**
  * Компактная двухстрочная ячейка: основной текст (truncate + tooltip) и
  * вторичный (text-xs, muted, truncate) — заменяет разбросанные по отдельным
@@ -95,6 +127,92 @@ export function PreviewCellStack({
       {secondary !== undefined && secondary !== null ? (
         <p className="truncate text-xs text-ink-muted">{secondary}</p>
       ) : null}
+    </div>
+  );
+}
+
+export interface PreviewPaginationProps {
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+  pageSizeOptions: number[];
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}
+
+/**
+ * Единый table-footer пагинации (Users, Assignments — раньше каждая страница
+ * верстала свою копию с разным baseline: то текстовые `‹ ›`, то Chevron-иконки).
+ * Живёт рядом с `PreviewTable`, потому что визуально это её footer, а не
+ * отдельный кусок UI — тот же `border-t border-divider`, тот же px/py, что и
+ * `PreviewToolbar` сверху таблицы.
+ */
+export function PreviewPagination({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  pageSizeOptions,
+  onPageChange,
+  onPageSizeChange,
+}: PreviewPaginationProps): JSX.Element {
+  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
+      <span>
+        Показано {start}–{end} из {totalCount}
+      </span>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
+          На странице
+          <Select
+            ariaLabel="Строк на странице"
+            size="sm"
+            value={String(pageSize)}
+            onValueChange={(next) => { onPageSizeChange(Number(next)); }}
+            options={pageSizeOptions.map((size) => ({ value: String(size), label: String(size) }))}
+            fullWidth={false}
+            className="w-[68px]"
+          />
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => { onPageChange(page - 1); }}
+            aria-label="Предыдущая страница"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+          {pageNumbers.map((number) => (
+            <button
+              key={number}
+              type="button"
+              onClick={() => { onPageChange(number); }}
+              aria-current={number === page ? 'page' : undefined}
+              className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${
+                number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'
+              }`}
+            >
+              {number}
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={page >= totalPages}
+            onClick={() => { onPageChange(page + 1); }}
+            aria-label="Следующая страница"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, ClipboardList, Clock3, RotateCcw, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Clock3, TriangleAlert } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -6,8 +6,9 @@ import { AssignmentDetailsDrawer } from '../../features/admin-assignments/Assign
 import { branchDisplayName as formatBranchDisplayName, enrichAssignment, formatActivity, formatDeadline, pluralizeRu } from '../../features/admin-assignments/assignmentPresentation';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
-import { PreviewSearchInput, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
+import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
+import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   ASSIGNMENT_STATUS_LABEL,
   PREVIEW_ASSIGNMENTS,
@@ -15,6 +16,7 @@ import {
   type PreviewAssignment,
   type PreviewAssignmentStatus,
 } from '../../mocks/ui-preview/assignments.preview';
+import { useAuth } from '../../auth/useAuth';
 import { Card } from '../../shared/ui/Card';
 
 /**
@@ -37,9 +39,7 @@ function initialsOf(fullName: string): string {
 
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Душанбе' },
-  { value: 'Филиал Худжанд', label: 'Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
 const CATEGORY_OPTIONS = [
   { value: 'all', label: 'Все направления' },
@@ -94,7 +94,10 @@ function MentorCell({ name }: { name: string }): JSX.Element {
   );
 }
 
-function ScopeCell({ branchName, categoryName }: { branchName: string; categoryName: string }): JSX.Element {
+function ScopeCell({ branchName, categoryName, showBranch }: { branchName: string; categoryName: string; showBranch: boolean }): JSX.Element {
+  if (!showBranch) {
+    return <p className="truncate text-[13px] font-medium text-ink-secondary">{categoryName}</p>;
+  }
   return (
     <div className="min-w-0">
       <p className="truncate text-[13px] font-semibold text-ink">{formatBranchDisplayName(branchName)}</p>
@@ -132,20 +135,6 @@ function ActivityCell({ label }: { label: string }): JSX.Element {
     <span className="whitespace-nowrap text-[12.5px] tabular-nums text-ink-muted" title={label}>
       {formatActivity(label)}
     </span>
-  );
-}
-
-function ResetFiltersButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="flex h-10 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-surface disabled:hover:text-ink-secondary"
-    >
-      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-      Сбросить
-    </button>
   );
 }
 
@@ -195,88 +184,16 @@ function StatusNavigation({
   );
 }
 
-interface PaginationProps {
-  page: number;
-  totalPages: number;
-  totalCount: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-}
-
-function PaginationFooter({ page, totalPages, totalCount, pageSize, onPageChange, onPageSizeChange }: PaginationProps): JSX.Element {
-  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalCount);
-  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
-      <span>
-        Показано {start}–{end} из {totalCount}
-      </span>
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
-          На странице
-          <select
-            aria-label="Заданий на странице"
-            value={pageSize}
-            onChange={(event) => {
-              onPageSizeChange(Number(event.target.value));
-            }}
-            className="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => {
-              onPageChange(page - 1);
-            }}
-            aria-label="Предыдущая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          {pageNumbers.map((number) => (
-            <button
-              key={number}
-              type="button"
-              onClick={() => {
-                onPageChange(number);
-              }}
-              aria-current={number === page ? 'page' : undefined}
-              className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${
-                number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'
-              }`}
-            >
-              {number}
-            </button>
-          ))}
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => {
-              onPageChange(page + 1);
-            }}
-            aria-label="Следующая страница"
-            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AssignmentsPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentBranchRawName = authUser?.branch?.name ?? null;
+
+  const scopedAssignments = useMemo(
+    () => (isOrgAdmin ? PREVIEW_ASSIGNMENTS : PREVIEW_ASSIGNMENTS.filter((a) => a.branchName === currentBranchRawName)),
+    [isOrgAdmin, currentBranchRawName],
+  );
+
   // Минимальный deep-link из Dashboard (?q=<название>, из «Предстоящих дедлайнов»
   // и ленты активности) — заполняет уже существующий поиск.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -308,13 +225,13 @@ export function AssignmentsPage(): JSX.Element {
 
   const baseFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return PREVIEW_ASSIGNMENTS.filter((a) => {
+    return scopedAssignments.filter((a) => {
       if (query.length > 0 && !a.title.toLowerCase().includes(query) && !a.mentorName.toLowerCase().includes(query)) return false;
-      if (branch !== 'all' && a.branchName !== branch) return false;
+      if (isOrgAdmin && branch !== 'all' && a.branchName !== branch) return false;
       if (category !== 'all' && a.categoryName !== category) return false;
       return true;
     });
-  }, [search, branch, category]);
+  }, [scopedAssignments, search, branch, category, isOrgAdmin]);
 
   const rows = useMemo(() => {
     if (status === 'all') return baseFiltered;
@@ -348,30 +265,46 @@ export function AssignmentsPage(): JSX.Element {
     ];
   }, [baseFiltered]);
 
-  const totalLabel = `${PREVIEW_ASSIGNMENTS.length} ${pluralizeRu(PREVIEW_ASSIGNMENTS.length, 'запись', 'записи', 'записей')}`;
+  const totalLabel = `${scopedAssignments.length} ${pluralizeRu(scopedAssignments.length, 'запись', 'записи', 'записей')}`;
 
   useEffect(() => {
     if (assignmentId === null) return;
     rowRefs.current.get(assignmentId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [assignmentId]);
 
-  const selectedRaw: PreviewAssignment | null = PREVIEW_ASSIGNMENTS.find((a) => a.id === assignmentId) ?? null;
+  // Поиск ведётся только по scopedAssignments — задание чужого филиала для Branch
+  // Admin неотличимо от несуществующего (тот же ErrorState в Drawer, раздел 9 ADR-001).
+  const selectedRaw: PreviewAssignment | null = scopedAssignments.find((a) => a.id === assignmentId) ?? null;
   const selected = useMemo(() => (selectedRaw !== null ? enrichAssignment(selectedRaw) : undefined), [selectedRaw]);
+
+  // Для Branch Admin фиксированные Organization-wide значения PREVIEW_ASSIGNMENT_SUMMARY
+  // показывали бы чужие данные — KPI пересчитываются из уже отфильтрованного scopedAssignments.
+  const summary = isOrgAdmin
+    ? PREVIEW_ASSIGNMENT_SUMMARY
+    : {
+        active: scopedAssignments.length,
+        pendingReview: scopedAssignments.filter((a) => a.status === 'Submitted' || a.status === 'InReview').length,
+        overdue: scopedAssignments.filter((a) => a.status === 'Overdue').length,
+        approvedThisPeriod: scopedAssignments.filter((a) => a.status === 'Approved').length,
+      };
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Задания" subtitle="Контроль состояния заданий по всем направлениям" />
+      <PreviewPageHeader
+        title="Задания"
+        subtitle={isOrgAdmin ? 'Контроль состояния заданий по всем направлениям' : 'Контроль состояния заданий по направлениям филиала'}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные" value={String(PREVIEW_ASSIGNMENT_SUMMARY.active)} />
-        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="Ожидают проверки" value={String(PREVIEW_ASSIGNMENT_SUMMARY.pendingReview)} />
+        <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные" value={String(summary.active)} />
+        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="Ожидают проверки" value={String(summary.pendingReview)} />
         <PreviewMetricCard
           icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />}
           label="Просрочены"
-          value={String(PREVIEW_ASSIGNMENT_SUMMARY.overdue)}
+          value={String(summary.overdue)}
           tone="warning"
         />
-        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Завершены за период" value={String(PREVIEW_ASSIGNMENT_SUMMARY.approvedThisPeriod)} />
+        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Завершены за период" value={String(summary.approvedThisPeriod)} />
       </div>
 
       <Card padded={false} className="min-w-0">
@@ -384,11 +317,11 @@ export function AssignmentsPage(): JSX.Element {
 
         <StatusNavigation items={statusTabItems} active={status} onChange={setStatus} />
 
-        <div className="flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6 xl:grid xl:grid-cols-[minmax(280px,1fr)_170px_180px_auto]">
+        <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по названию или ментору" value={search} onChange={setSearch} className="!min-w-[280px]" />
-          <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[170px]" />
-          <PreviewSelect label="Направление" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} className="w-[180px]" />
-          <ResetFiltersButton
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Направление" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} width="lg" />
+          <PreviewResetButton
             disabled={!filtersActive}
             onClick={() => {
               setSearch('');
@@ -397,13 +330,13 @@ export function AssignmentsPage(): JSX.Element {
               setStatus('all');
             }}
           />
-        </div>
+        </PreviewToolbar>
 
         <PreviewTable>
           <PreviewTableHead>
             <PreviewTh className="min-w-[180px]">Задание</PreviewTh>
             <PreviewTh className="w-[150px] xl:w-[186px]">Ментор</PreviewTh>
-            <PreviewTh className="w-[150px] xl:w-[175px]">Филиал / направление</PreviewTh>
+            <PreviewTh className="w-[150px] xl:w-[175px]">{isOrgAdmin ? 'Филиал / направление' : 'Направление'}</PreviewTh>
             <PreviewTh className="w-[130px] xl:w-[150px]">Статус</PreviewTh>
             <PreviewTh className="w-[125px] xl:w-[145px]">Дедлайн</PreviewTh>
             <PreviewTh className="hidden w-[120px] xl:table-cell" title="Последняя активность">
@@ -439,7 +372,7 @@ export function AssignmentsPage(): JSX.Element {
                   <MentorCell name={assignment.mentorName} />
                 </PreviewTd>
                 <PreviewTd>
-                  <ScopeCell branchName={assignment.branchName} categoryName={assignment.categoryName} />
+                  <ScopeCell branchName={assignment.branchName} categoryName={assignment.categoryName} showBranch={isOrgAdmin} />
                 </PreviewTd>
                 <PreviewTd>
                   <StatusCell status={assignment.status} />
@@ -455,11 +388,12 @@ export function AssignmentsPage(): JSX.Element {
           </tbody>
         </PreviewTable>
 
-        <PaginationFooter
+        <PreviewPagination
           page={currentPage}
           totalPages={totalPages}
           totalCount={rows.length}
           pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
           onPageChange={setPage}
           onPageSizeChange={setPageSize}
         />

@@ -4,8 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
-import { PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewActionCell, PreviewActionTh, PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
+import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { PREVIEW_BRANCH_USER_DISTRIBUTION } from '../../mocks/ui-preview/branches.preview';
 import { ActivateBranchDialog } from '../../features/admin-branches/ActivateBranchDialog';
 import { AssignBranchAdminDialog } from '../../features/admin-branches/AssignBranchAdminDialog';
@@ -65,14 +65,16 @@ type ActionDialogState =
 export function BranchesPage(): JSX.Element {
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
-  const currentBranchRawName = authUser?.branch?.name ?? null;
+  const currentBranchId = authUser?.branch?.id ?? null;
   const navigate = useNavigate();
   const realBranchContext = useBranchContext();
 
   const allBranches = useBranchesPreview();
+  // `PreviewBranch.name` — городское display-имя ("Худжанд"), а `authUser.branch.name` —
+  // институциональное («Филиал Худжанд», см. branchDirectory.ts) — сравнивать нужно по `id`.
   const scopedBranches = useMemo(
-    () => (isOrgAdmin ? allBranches : allBranches.filter((candidate) => candidate.name === currentBranchRawName)),
-    [allBranches, isOrgAdmin, currentBranchRawName],
+    () => (isOrgAdmin ? allBranches : allBranches.filter((candidate) => candidate.id === currentBranchId)),
+    [allBranches, isOrgAdmin, currentBranchId],
   );
 
   const [search, setSearch] = useState('');
@@ -111,9 +113,17 @@ export function BranchesPage(): JSX.Element {
     });
   }, [scopedBranches, search, status]);
 
+  const filtersActive = search.trim().length > 0 || status !== 'all';
+
   const totalCategories = scopedBranches.reduce((sum, b) => sum + b.categoriesCount, 0);
   const activeCount = scopedBranches.filter((b) => b.isActive).length;
   const withoutAdmin = scopedBranches.filter((b) => b.adminUserId === null).length;
+
+  const distributionTotal = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, entry) => sum + entry.count, 0);
+  const userDistribution = PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => ({
+    ...entry,
+    pct: distributionTotal === 0 ? 0 : Math.round((entry.count / distributionTotal) * 100),
+  }));
 
   const actions = useBranchPreviewActions();
 
@@ -129,8 +139,8 @@ export function BranchesPage(): JSX.Element {
   return (
     <div className="space-y-6">
       <PreviewPageHeader
-        title="Филиалы"
-        subtitle="Управление филиалами и их текущим состоянием"
+        title={isOrgAdmin ? 'Филиалы' : 'Филиал'}
+        subtitle={isOrgAdmin ? 'Управление филиалами и их текущим состоянием' : 'Профиль вашего филиала — доступен только для чтения'}
         action={
           isOrgAdmin ? (
             <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
@@ -147,18 +157,12 @@ export function BranchesPage(): JSX.Element {
         <PreviewMetricCard icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label="Без администратора" value={String(withoutAdmin)} tone={withoutAdmin > 0 ? 'warning' : 'default'} />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 min-[1600px]:grid-cols-[minmax(0,1fr)_320px]">
+      <div className={`grid grid-cols-1 items-start gap-4 ${isOrgAdmin ? 'min-[1600px]:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
         <Card padded={false} className="min-w-0">
           <PreviewToolbar>
             <PreviewSearchInput placeholder="Поиск по названию или коду…" value={search} onChange={setSearch} />
-            <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} />
-            <button
-              type="button"
-              onClick={() => { setSearch(''); setStatus('all'); }}
-              className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-            >
-              Сбросить
-            </button>
+            <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
+            <PreviewResetButton disabled={!filtersActive} onClick={() => { setSearch(''); setStatus('all'); }} />
           </PreviewToolbar>
 
           <PreviewTable>
@@ -170,7 +174,7 @@ export function BranchesPage(): JSX.Element {
               <PreviewTh className="w-[105px]">Активные задания</PreviewTh>
               <PreviewTh className="w-[100px]">Статус</PreviewTh>
               <PreviewTh className="w-20">Здоровье</PreviewTh>
-              <PreviewTh className="w-11" />
+              <PreviewActionTh />
             </PreviewTableHead>
             <tbody>
               {rows.map((branchRow) => (
@@ -220,8 +224,7 @@ export function BranchesPage(): JSX.Element {
                   <PreviewTd className="whitespace-nowrap">
                     <HealthValue value={branchRow.healthPct} />
                   </PreviewTd>
-                  <PreviewTd
-                    className="text-right"
+                  <PreviewActionCell
                     onClick={(event) => { event.stopPropagation(); }}
                   >
                     <BranchActionMenu
@@ -235,36 +238,48 @@ export function BranchesPage(): JSX.Element {
                       onActivate={() => { setActionDialog({ type: 'activate', branch: branchRow }); }}
                       onDeactivate={() => { setActionDialog({ type: 'deactivate', branch: branchRow }); }}
                     />
-                  </PreviewTd>
+                  </PreviewActionCell>
                 </tr>
               ))}
             </tbody>
           </PreviewTable>
         </Card>
 
-        <SectionCard title="Распределение пользователей по филиалам" className="h-fit self-start" padded>
-          <ul className="space-y-4">
-            {PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => {
-              const total = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, e) => sum + e.count, 0);
-              const pct = Math.round((entry.count / total) * 100);
-              return (
-                <li key={entry.label}>
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="text-ink-muted">{entry.label}</span>
-                    <span className="font-medium tabular-nums text-ink-secondary">{entry.count}</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-                    <div className="h-full rounded-full bg-brand/70" style={{ width: `${pct}%` }} />
+        {isOrgAdmin ? (
+          <SectionCard
+            title="Распределение пользователей"
+            description={`${distributionTotal} по филиалам`}
+            className="h-fit self-start"
+            padded
+          >
+            <ul className="space-y-3">
+              {userDistribution.map((entry, index) => (
+                <li key={entry.label} className="flex items-center gap-3">
+                  <span className="w-4 shrink-0 text-center text-[11px] font-semibold tabular-nums text-ink-disabled">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                      <span className="truncate text-[13px] font-medium text-ink">{entry.label}</span>
+                      <span className="shrink-0 text-[12.5px] tabular-nums">
+                        <span className="font-semibold text-ink">{entry.count}</span>
+                        <span className="ml-1 text-ink-muted">{entry.pct}%</span>
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${entry.pct}%` }} />
+                    </div>
                   </div>
                 </li>
-              );
-            })}
-          </ul>
-        </SectionCard>
+              ))}
+            </ul>
+          </SectionCard>
+        ) : null}
       </div>
 
       <BranchDetailsDrawer
         branchId={branchId}
+        branches={scopedBranches}
         onClose={closeBranchDetails}
         isOrgAdmin={isOrgAdmin}
         onOpenUser={(userId) => { navigate(`/admin/users?userId=${userId}`); }}

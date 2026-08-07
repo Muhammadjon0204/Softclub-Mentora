@@ -7,19 +7,22 @@ import { ResetSettingsDialog } from '../../features/admin-settings/ResetSettings
 import { updateOrganizationNamePreview, useOrganizationPreview } from '../../features/admin-settings/organizationPreviewStore';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
+import { useAuth } from '../../auth/useAuth';
 import { UnsavedChangesDialog, useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
 import { FormField, FormInput, FormSelect, ReadOnlyField } from '../../shared/ui/FormField';
 
-const TABS = [
+/** Организация/безопасность/уведомления/интеграции — Organization Admin domain (ADR-001 8.1, ORG-024). */
+const ORG_ADMIN_TABS = [
   { key: 'organization', label: 'Организация' },
   { key: 'security', label: 'Безопасность' },
   { key: 'notifications', label: 'Уведомления' },
   { key: 'integrations', label: 'Интеграции' },
   { key: 'interface', label: 'Интерфейс' },
 ];
+const BRANCH_ADMIN_TABS = [{ key: 'interface', label: 'Интерфейс' }];
 
 function ReadOnlyRow({ label, value }: { label: string; value: string }): JSX.Element {
   return (
@@ -81,7 +84,11 @@ interface SettingsSnapshot {
  * OrganizationSettings в Release 1.0 не существует (ORG-024).
  */
 export function SettingsPage(): JSX.Element {
-  const [tab, setTab] = useState('organization');
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const TABS = isOrgAdmin ? ORG_ADMIN_TABS : BRANCH_ADMIN_TABS;
+
+  const [tab, setTab] = useState(isOrgAdmin ? 'organization' : 'interface');
   const toast = useToast();
 
   const organization = useOrganizationPreview();
@@ -207,16 +214,26 @@ export function SettingsPage(): JSX.Element {
         <SectionCard title="Интерфейс">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormField label="Язык интерфейса" htmlFor="settings-ui-language">
-              <FormSelect id="settings-ui-language" value={uiLanguage} onChange={(event) => { setUiLanguage(event.target.value); }}>
-                <option value="ru">Русский</option>
-                <option value="tg">Тоҷикӣ</option>
-              </FormSelect>
+              <FormSelect
+                id="settings-ui-language"
+                value={uiLanguage}
+                onValueChange={setUiLanguage}
+                options={[
+                  { value: 'ru', label: 'Русский' },
+                  { value: 'tg', label: 'Тоҷикӣ' },
+                ]}
+              />
             </FormField>
             <FormField label="Sidebar по умолчанию" htmlFor="settings-sidebar">
-              <FormSelect id="settings-sidebar" value={sidebarDefault} onChange={(event) => { setSidebarDefault(event.target.value); }}>
-                <option value="expanded">Развёрнут</option>
-                <option value="collapsed">Свёрнут</option>
-              </FormSelect>
+              <FormSelect
+                id="settings-sidebar"
+                value={sidebarDefault}
+                onValueChange={setSidebarDefault}
+                options={[
+                  { value: 'expanded', label: 'Развёрнут' },
+                  { value: 'collapsed', label: 'Свёрнут' },
+                ]}
+              />
             </FormField>
           </div>
           <div className="mt-1">
@@ -244,12 +261,17 @@ export function SettingsPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Настройки" subtitle="Параметры организации и административного интерфейса" />
+      <PreviewPageHeader
+        title="Настройки"
+        subtitle={isOrgAdmin ? 'Параметры организации и административного интерфейса' : 'Параметры интерфейса'}
+      />
 
       <Card padded={false}>
-        <div className="px-5 pt-4 sm:px-6">
-          <PreviewTabs tabs={TABS} active={tab} onChange={requestTabChange} />
-        </div>
+        {TABS.length > 1 ? (
+          <div className="px-5 pt-4 sm:px-6">
+            <PreviewTabs tabs={TABS} active={tab} onChange={requestTabChange} />
+          </div>
+        ) : null}
         <div className="p-5 sm:p-6">{content}</div>
       </Card>
 

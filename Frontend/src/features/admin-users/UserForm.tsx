@@ -95,25 +95,41 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
       <FormSection title="Роль и доступ">
         <div className="space-y-4">
           <FormField label="Роль" htmlFor="user-create-role" required error={errors.role?.message}>
-            <FormSelect id="user-create-role" invalid={errors.role !== undefined} {...register('role')}>
-              {ROLE_SELECT_OPTIONS.filter((option) => isOrgAdmin || option.value !== 'BranchAdmin').map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </FormSelect>
+            <Controller
+              control={control}
+              name="role"
+              render={({ field }) => (
+                <FormSelect
+                  id="user-create-role"
+                  invalid={errors.role !== undefined}
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  options={ROLE_SELECT_OPTIONS.filter((option) => isOrgAdmin || option.value !== 'BranchAdmin')}
+                />
+              )}
+            />
           </FormField>
 
           {isOrgAdmin ? (
             <FormField label="Филиал" htmlFor="user-create-branch" required error={errors.branchName?.message}>
-              <FormSelect id="user-create-branch" invalid={errors.branchName !== undefined} {...register('branchName')}>
-                <option value="">Выберите филиал</option>
-                {BRANCH_DIRECTORY.map((branch) => (
-                  <option key={branch.id} value={branch.rawName}>
-                    {branch.displayName}
-                  </option>
-                ))}
-              </FormSelect>
+              <Controller
+                control={control}
+                name="branchName"
+                render={({ field }) => (
+                  <FormSelect
+                    id="user-create-branch"
+                    invalid={errors.branchName !== undefined}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    placeholder="Выберите филиал"
+                    options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+                  />
+                )}
+              />
             </FormField>
           ) : (
             <ReadOnlyField label="Филиал" value={BRANCH_DIRECTORY.find((branch) => branch.rawName === currentBranchRawName)?.displayName ?? '—'} hint="Ваш филиал — изменить нельзя" />
@@ -125,14 +141,17 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
                 control={control}
                 name="categoryName"
                 render={({ field }) => (
-                  <FormSelect id="user-create-category" disabled={branchName.length === 0} invalid={errors.categoryName !== undefined} value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref}>
-                    <option value="">Выберите направление</option>
-                    {categoryOptions.map((category) => (
-                      <option key={category.id} value={category.name}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </FormSelect>
+                  <FormSelect
+                    id="user-create-category"
+                    disabled={branchName.length === 0}
+                    invalid={errors.categoryName !== undefined}
+                    value={field.value ?? ''}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    placeholder="Выберите направление"
+                    options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+                  />
                 )}
               />
             </FormField>
@@ -143,13 +162,20 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
       <FormSection title="Приглашение">
         <div className="space-y-4">
           <FormField label="Язык уведомлений" htmlFor="user-create-language">
-            <FormSelect id="user-create-language" {...register('notificationLanguage')}>
-              {NOTIFICATION_LANGUAGES.map((lang) => (
-                <option key={lang} value={lang}>
-                  {NOTIFICATION_LANGUAGE_LABEL[lang]}
-                </option>
-              ))}
-            </FormSelect>
+            <Controller
+              control={control}
+              name="notificationLanguage"
+              render={({ field }) => (
+                <FormSelect
+                  id="user-create-language"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  options={NOTIFICATION_LANGUAGES.map((lang) => ({ value: lang, label: NOTIFICATION_LANGUAGE_LABEL[lang] }))}
+                />
+              )}
+            />
           </FormField>
           <FormCheckbox label="Отправить приглашение сразу" {...register('sendInvitationNow')} />
         </div>
@@ -171,6 +197,7 @@ export function UserEditForm({ formId, user, bannerError, onDirtyChange, onSubmi
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
   } = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditSchema),
@@ -201,13 +228,20 @@ export function UserEditForm({ formId, user, bannerError, onDirtyChange, onSubmi
 
       <FormSection title="Уведомления">
         <FormField label="Язык уведомлений" htmlFor="user-edit-language">
-          <FormSelect id="user-edit-language" {...register('notificationLanguage')}>
-            {NOTIFICATION_LANGUAGES.map((lang) => (
-              <option key={lang} value={lang}>
-                {NOTIFICATION_LANGUAGE_LABEL[lang]}
-              </option>
-            ))}
-          </FormSelect>
+          <Controller
+            control={control}
+            name="notificationLanguage"
+            render={({ field }) => (
+              <FormSelect
+                id="user-edit-language"
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                options={NOTIFICATION_LANGUAGES.map((lang) => ({ value: lang, label: NOTIFICATION_LANGUAGE_LABEL[lang] }))}
+              />
+            )}
+          />
         </FormField>
       </FormSection>
     </form>

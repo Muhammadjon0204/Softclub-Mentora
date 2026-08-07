@@ -18,7 +18,11 @@ export interface AdminNavItem {
   icon: ComponentType<{ className?: string }>;
   /** Есть ли уже рабочая страница за этим пунктом (остальные — «скоро», раздел 12 сессии). */
   implemented: boolean;
-  /** «Филиалы» видит только Organization Admin (ТЗ BRN-006, TEN-003). */
+  /**
+   * «Филиалы» видит только Organization Admin (ТЗ BRN-006, TEN-003). Branch Admin
+   * работает внутри одного фиксированного филиала — тот уже показан read-only в
+   * Topbar (`BranchContextBadge`), отдельный пункт навигации дублировал бы контекст.
+   */
   organizationAdminOnly?: boolean;
 }
 

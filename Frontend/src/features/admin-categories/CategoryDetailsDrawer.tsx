@@ -8,7 +8,6 @@ import { CategoryOverviewSection } from './CategoryOverviewSection';
 import { CategoryPeopleSection } from './CategoryPeopleSection';
 import { CategorySettingsSection } from './CategorySettingsSection';
 import type { PreviewCategoryDetails } from './categoryPresentation';
-import { useCategoriesPreviewResolved } from './categoryPreviewStore';
 
 type CategoryDetailsTab = 'overview' | 'people' | 'settings' | 'activity';
 
@@ -21,6 +20,8 @@ const TABS: { id: CategoryDetailsTab; label: string }[] = [
 
 export interface CategoryDetailsDrawerProps {
   categoryId: string | null;
+  /** Уже scope-отфильтрованный список — чужой Branch неотличим от несуществующего (ADR-001, раздел 2.8). */
+  categories: PreviewCategoryDetails[];
   onClose: () => void;
   canManage: boolean;
   onOpenUser: (userId: string) => void;
@@ -34,6 +35,7 @@ export interface CategoryDetailsDrawerProps {
 /** Открывается по клику на карточку направления (раздел 5 промпта). */
 export function CategoryDetailsDrawer({
   categoryId,
+  categories,
   onClose,
   canManage,
   onOpenUser,
@@ -43,7 +45,6 @@ export function CategoryDetailsDrawer({
   onActivate,
   onDeactivate,
 }: CategoryDetailsDrawerProps): JSX.Element {
-  const categories = useCategoriesPreviewResolved();
   const category = categoryId !== null ? categories.find((candidate) => candidate.id === categoryId) : undefined;
   const [tab, setTab] = useState<CategoryDetailsTab>('overview');
 
