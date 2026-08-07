@@ -8,6 +8,7 @@ import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCar
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewSearchInput, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   ASSIGNMENT_STATUS_LABEL,
   PREVIEW_ASSIGNMENTS,
@@ -15,6 +16,8 @@ import {
   type PreviewAssignment,
   type PreviewAssignmentStatus,
 } from '../../mocks/ui-preview/assignments.preview';
+import { useAuth } from '../../auth/useAuth';
+import { Select } from '../../shared/select';
 import { Card } from '../../shared/ui/Card';
 
 /**
@@ -37,9 +40,7 @@ function initialsOf(fullName: string): string {
 
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Душанбе' },
-  { value: 'Филиал Худжанд', label: 'Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
 const CATEGORY_OPTIONS = [
   { value: 'all', label: 'Все направления' },
@@ -94,7 +95,10 @@ function MentorCell({ name }: { name: string }): JSX.Element {
   );
 }
 
-function ScopeCell({ branchName, categoryName }: { branchName: string; categoryName: string }): JSX.Element {
+function ScopeCell({ branchName, categoryName, showBranch }: { branchName: string; categoryName: string; showBranch: boolean }): JSX.Element {
+  if (!showBranch) {
+    return <p className="truncate text-[13px] font-medium text-ink-secondary">{categoryName}</p>;
+  }
   return (
     <div className="min-w-0">
       <p className="truncate text-[13px] font-semibold text-ink">{formatBranchDisplayName(branchName)}</p>
@@ -215,23 +219,17 @@ function PaginationFooter({ page, totalPages, totalCount, pageSize, onPageChange
         Показано {start}–{end} из {totalCount}
       </span>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
           На странице
-          <select
-            aria-label="Заданий на странице"
-            value={pageSize}
-            onChange={(event) => {
-              onPageSizeChange(Number(event.target.value));
-            }}
-            className="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
+          <Select
+            ariaLabel="Заданий на странице"
+            size="sm"
+            value={String(pageSize)}
+            onValueChange={(next) => { onPageSizeChange(Number(next)); }}
+            options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
+            className="w-[68px]"
+          />
+        </span>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -277,6 +275,15 @@ function PaginationFooter({ page, totalPages, totalCount, pageSize, onPageChange
 }
 
 export function AssignmentsPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentBranchRawName = authUser?.branch?.name ?? null;
+
+  const scopedAssignments = useMemo(
+    () => (isOrgAdmin ? PREVIEW_ASSIGNMENTS : PREVIEW_ASSIGNMENTS.filter((a) => a.branchName === currentBranchRawName)),
+    [isOrgAdmin, currentBranchRawName],
+  );
+
   // Минимальный deep-link из Dashboard (?q=<название>, из «Предстоящих дедлайнов»
   // и ленты активности) — заполняет уже существующий поиск.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -308,13 +315,13 @@ export function AssignmentsPage(): JSX.Element {
 
   const baseFiltered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return PREVIEW_ASSIGNMENTS.filter((a) => {
+    return scopedAssignments.filter((a) => {
       if (query.length > 0 && !a.title.toLowerCase().includes(query) && !a.mentorName.toLowerCase().includes(query)) return false;
-      if (branch !== 'all' && a.branchName !== branch) return false;
+      if (isOrgAdmin && branch !== 'all' && a.branchName !== branch) return false;
       if (category !== 'all' && a.categoryName !== category) return false;
       return true;
     });
-  }, [search, branch, category]);
+  }, [scopedAssignments, search, branch, category, isOrgAdmin]);
 
   const rows = useMemo(() => {
     if (status === 'all') return baseFiltered;
@@ -348,30 +355,46 @@ export function AssignmentsPage(): JSX.Element {
     ];
   }, [baseFiltered]);
 
-  const totalLabel = `${PREVIEW_ASSIGNMENTS.length} ${pluralizeRu(PREVIEW_ASSIGNMENTS.length, 'запись', 'записи', 'записей')}`;
+  const totalLabel = `${scopedAssignments.length} ${pluralizeRu(scopedAssignments.length, 'запись', 'записи', 'записей')}`;
 
   useEffect(() => {
     if (assignmentId === null) return;
     rowRefs.current.get(assignmentId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [assignmentId]);
 
-  const selectedRaw: PreviewAssignment | null = PREVIEW_ASSIGNMENTS.find((a) => a.id === assignmentId) ?? null;
+  // Поиск ведётся только по scopedAssignments — задание чужого филиала для Branch
+  // Admin неотличимо от несуществующего (тот же ErrorState в Drawer, раздел 9 ADR-001).
+  const selectedRaw: PreviewAssignment | null = scopedAssignments.find((a) => a.id === assignmentId) ?? null;
   const selected = useMemo(() => (selectedRaw !== null ? enrichAssignment(selectedRaw) : undefined), [selectedRaw]);
+
+  // Для Branch Admin фиксированные Organization-wide значения PREVIEW_ASSIGNMENT_SUMMARY
+  // показывали бы чужие данные — KPI пересчитываются из уже отфильтрованного scopedAssignments.
+  const summary = isOrgAdmin
+    ? PREVIEW_ASSIGNMENT_SUMMARY
+    : {
+        active: scopedAssignments.length,
+        pendingReview: scopedAssignments.filter((a) => a.status === 'Submitted' || a.status === 'InReview').length,
+        overdue: scopedAssignments.filter((a) => a.status === 'Overdue').length,
+        approvedThisPeriod: scopedAssignments.filter((a) => a.status === 'Approved').length,
+      };
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Задания" subtitle="Контроль состояния заданий по всем направлениям" />
+      <PreviewPageHeader
+        title="Задания"
+        subtitle={isOrgAdmin ? 'Контроль состояния заданий по всем направлениям' : 'Контроль состояния заданий по направлениям филиала'}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные" value={String(PREVIEW_ASSIGNMENT_SUMMARY.active)} />
-        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="Ожидают проверки" value={String(PREVIEW_ASSIGNMENT_SUMMARY.pendingReview)} />
+        <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные" value={String(summary.active)} />
+        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="Ожидают проверки" value={String(summary.pendingReview)} />
         <PreviewMetricCard
           icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />}
           label="Просрочены"
-          value={String(PREVIEW_ASSIGNMENT_SUMMARY.overdue)}
+          value={String(summary.overdue)}
           tone="warning"
         />
-        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Завершены за период" value={String(PREVIEW_ASSIGNMENT_SUMMARY.approvedThisPeriod)} />
+        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Завершены за период" value={String(summary.approvedThisPeriod)} />
       </div>
 
       <Card padded={false} className="min-w-0">
@@ -384,9 +407,11 @@ export function AssignmentsPage(): JSX.Element {
 
         <StatusNavigation items={statusTabItems} active={status} onChange={setStatus} />
 
-        <div className="flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6 xl:grid xl:grid-cols-[minmax(280px,1fr)_170px_180px_auto]">
+        <div
+          className={`flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6 xl:grid ${isOrgAdmin ? 'xl:grid-cols-[minmax(280px,1fr)_170px_180px_auto]' : 'xl:grid-cols-[minmax(280px,1fr)_180px_auto]'}`}
+        >
           <PreviewSearchInput placeholder="Поиск по названию или ментору" value={search} onChange={setSearch} className="!min-w-[280px]" />
-          <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[170px]" />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[170px]" /> : null}
           <PreviewSelect label="Направление" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} className="w-[180px]" />
           <ResetFiltersButton
             disabled={!filtersActive}
@@ -403,7 +428,7 @@ export function AssignmentsPage(): JSX.Element {
           <PreviewTableHead>
             <PreviewTh className="min-w-[180px]">Задание</PreviewTh>
             <PreviewTh className="w-[150px] xl:w-[186px]">Ментор</PreviewTh>
-            <PreviewTh className="w-[150px] xl:w-[175px]">Филиал / направление</PreviewTh>
+            <PreviewTh className="w-[150px] xl:w-[175px]">{isOrgAdmin ? 'Филиал / направление' : 'Направление'}</PreviewTh>
             <PreviewTh className="w-[130px] xl:w-[150px]">Статус</PreviewTh>
             <PreviewTh className="w-[125px] xl:w-[145px]">Дедлайн</PreviewTh>
             <PreviewTh className="hidden w-[120px] xl:table-cell" title="Последняя активность">
@@ -439,7 +464,7 @@ export function AssignmentsPage(): JSX.Element {
                   <MentorCell name={assignment.mentorName} />
                 </PreviewTd>
                 <PreviewTd>
-                  <ScopeCell branchName={assignment.branchName} categoryName={assignment.categoryName} />
+                  <ScopeCell branchName={assignment.branchName} categoryName={assignment.categoryName} showBranch={isOrgAdmin} />
                 </PreviewTd>
                 <PreviewTd>
                   <StatusCell status={assignment.status} />

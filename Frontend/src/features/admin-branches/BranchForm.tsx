@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormField, FormInput, FormSection, FormSelect, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { ADMIN_OPTION_VALUES, branchCreateSchema, branchEditSchema } from './branchForm.schema';
 import type { AdminOptionValue, BranchCreateFormValues, BranchEditFormValues } from './branchForm.schema';
@@ -24,6 +25,7 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
   const {
     register,
     handleSubmit,
+    control,
     watch,
     setError,
     formState: { errors, isDirty },
@@ -90,32 +92,61 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
 
       <FormSection title="Региональные настройки">
         <FormField label="Часовой пояс" htmlFor="branch-create-timezone" required>
-          <FormSelect id="branch-create-timezone" {...register('timezone')}>
-            {TIMEZONE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </FormSelect>
+          <Controller
+            control={control}
+            name="timezone"
+            render={({ field }) => (
+              <FormSelect
+                id="branch-create-timezone"
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                options={TIMEZONE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              />
+            )}
+          />
         </FormField>
       </FormSection>
 
       <FormSection title="Администратор" description="Можно назначить сейчас или отдельным действием позже">
         <div className="space-y-4">
           <FormField label="Администратор филиала" htmlFor="branch-create-admin-option">
-            <FormSelect id="branch-create-admin-option" {...register('adminOption')}>
-              {ADMIN_OPTION_VALUES.map((value) => (
-                <option key={value} value={value}>{value === 'none' ? 'Не назначать сейчас' : 'Выбрать существующего пользователя'}</option>
-              ))}
-            </FormSelect>
+            <Controller
+              control={control}
+              name="adminOption"
+              render={({ field }) => (
+                <FormSelect
+                  id="branch-create-admin-option"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  options={ADMIN_OPTION_VALUES.map((value) => ({ value, label: value === 'none' ? 'Не назначать сейчас' : 'Выбрать существующего пользователя' }))}
+                />
+              )}
+            />
           </FormField>
 
           {(adminOption as AdminOptionValue) === 'existing' ? (
             <FormField label="Пользователь" htmlFor="branch-create-admin-user" required error={errors.adminUserId?.message}>
-              <FormSelect id="branch-create-admin-user" invalid={errors.adminUserId !== undefined} {...register('adminUserId')}>
-                <option value="">Выберите пользователя</option>
-                {adminCandidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email}</option>
-                ))}
-              </FormSelect>
+              <Controller
+                control={control}
+                name="adminUserId"
+                render={({ field }) => (
+                  <SearchSelect
+                    id="branch-create-admin-user"
+                    invalid={errors.adminUserId !== undefined}
+                    value={field.value ?? ''}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    placeholder="Выберите пользователя"
+                    searchPlaceholder="Поиск по имени или email…"
+                    options={adminCandidates.map((candidate) => ({ value: candidate.id, label: candidate.fullName, description: candidate.email }))}
+                  />
+                )}
+              />
             </FormField>
           ) : null}
         </div>
@@ -137,6 +168,7 @@ export function BranchEditForm({ formId, branch, bannerError, onDirtyChange, onS
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
   } = useForm<BranchEditFormValues>({
     resolver: zodResolver(branchEditSchema),
@@ -191,11 +223,20 @@ export function BranchEditForm({ formId, branch, bannerError, onDirtyChange, onS
 
       <FormSection title="Региональные настройки">
         <FormField label="Часовой пояс" htmlFor="branch-edit-timezone" required>
-          <FormSelect id="branch-edit-timezone" {...register('timezone')}>
-            {TIMEZONE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </FormSelect>
+          <Controller
+            control={control}
+            name="timezone"
+            render={({ field }) => (
+              <FormSelect
+                id="branch-edit-timezone"
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                options={TIMEZONE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              />
+            )}
+          />
         </FormField>
       </FormSection>
     </form>

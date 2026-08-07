@@ -227,6 +227,7 @@ export function CategoriesPage(): JSX.Element {
 
       <CategoryDetailsDrawer
         categoryId={categoryId}
+        categories={scopedCategories}
         onClose={closeCategoryDetails}
         canManage
         onOpenUser={(userId) => { navigate(`/admin/users?userId=${userId}`); }}

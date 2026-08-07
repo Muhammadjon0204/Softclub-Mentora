@@ -23,6 +23,8 @@ export interface ExportReportModalProps {
   onOpenChange: (open: boolean) => void;
   branchLabel: string;
   categoryLabel: string;
+  /** Branch Admin не имеет режима «Все филиалы» — секция сравнения филиалов недоступна (TEN-075/TEN-093). */
+  showBranchComparison?: boolean;
 }
 
 /**
@@ -30,10 +32,11 @@ export interface ExportReportModalProps {
  * отчётов — реального production contract здесь нет, backend не создаётся,
  * файл не скачивается.
  */
-export function ExportReportModal({ open, onOpenChange, branchLabel, categoryLabel }: ExportReportModalProps): JSX.Element {
+export function ExportReportModal({ open, onOpenChange, branchLabel, categoryLabel, showBranchComparison = true }: ExportReportModalProps): JSX.Element {
   const toast = useToast();
+  const sectionOptions = showBranchComparison ? SECTION_OPTIONS : SECTION_OPTIONS.filter((option) => option.key !== 'branches');
   const [format, setFormat] = useState<(typeof FORMAT_OPTIONS)[number]['value']>('csv');
-  const [sections, setSections] = useState<Set<string>>(new Set(SECTION_OPTIONS.map((s) => s.key)));
+  const [sections, setSections] = useState<Set<string>>(new Set(sectionOptions.map((s) => s.key)));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function toggleSection(key: string): void {
@@ -77,11 +80,12 @@ export function ExportReportModal({ open, onOpenChange, branchLabel, categoryLab
     >
       <div className="space-y-4">
         <FormField label="Формат" htmlFor="export-format">
-          <FormSelect id="export-format" value={format} onChange={(event) => { setFormat(event.target.value as (typeof FORMAT_OPTIONS)[number]['value']); }}>
-            {FORMAT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </FormSelect>
+          <FormSelect
+            id="export-format"
+            value={format}
+            onValueChange={(next) => { setFormat(next as (typeof FORMAT_OPTIONS)[number]['value']); }}
+            options={FORMAT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+          />
         </FormField>
 
         <dl className="divide-y divide-divider rounded-control border border-line px-3">
@@ -102,7 +106,7 @@ export function ExportReportModal({ open, onOpenChange, branchLabel, categoryLab
         <div>
           <span className="mb-2 block text-[12.5px] font-medium text-ink-secondary">Включаемые секции</span>
           <div className="space-y-2.5">
-            {SECTION_OPTIONS.map((option) => (
+            {sectionOptions.map((option) => (
               <FormCheckbox key={option.key} label={option.label} checked={sections.has(option.key)} onChange={() => { toggleSection(option.key); }} />
             ))}
           </div>

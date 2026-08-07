@@ -62,21 +62,19 @@ export function AdminSidebar({
 
         {variant === 'desktop' ? (
           <div className="absolute -right-4 top-1/2 z-20 -translate-y-1/2">
-            <Tooltip content={collapseLabel}>
-              <button
-                type="button"
-                onClick={onToggleCollapse}
-                aria-label={collapseLabel}
-                aria-expanded={!collapsed}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-secondary shadow-surface transition-colors duration-[170ms] hover:border-brand/40 hover:bg-brand-soft hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              >
-                {collapsed ? (
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                )}
-              </button>
-            </Tooltip>
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              aria-label={collapseLabel}
+              aria-expanded={!collapsed}
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line bg-surface text-ink-secondary shadow-surface transition-colors duration-[170ms] hover:border-brand/40 hover:bg-brand-soft hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              {collapsed ? (
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
           </div>
         ) : null}
       </div>

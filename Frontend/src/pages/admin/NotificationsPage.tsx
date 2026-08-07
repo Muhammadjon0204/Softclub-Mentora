@@ -13,7 +13,9 @@ import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeade
 import { PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
+import { BRANCH_DIRECTORY, branchDisplayName } from '../../features/admin-preview/branchDirectory';
 import { NOTIFICATION_STATUS_LABEL, PREVIEW_DELIVERY_SUCCESS_PCT, PREVIEW_NOTIFICATION_SUMMARY, type PreviewNotificationStatus } from '../../mocks/ui-preview/notifications.preview';
+import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import type { BadgeTone } from '../../shared/ui/Badge';
@@ -33,9 +35,7 @@ const CHANNEL_OPTIONS = [
 ];
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Главный офис' },
-  { value: 'Филиал Худжанд', label: 'Филиал Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Филиал Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
 
 const TABS = [
@@ -48,6 +48,10 @@ const TABS = [
 
 /** /admin/notifications — этап 3: NotificationDetailsDrawer + RetryNotificationDialog поверх shared overlay system. */
 export function NotificationsPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentBranchRawName = authUser?.branch?.name ?? null;
+
   const [tab, setTab] = useState('all');
   const [search, setSearch] = useState('');
   const [channel, setChannel] = useState('all');
@@ -56,7 +60,29 @@ export function NotificationsPage(): JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
 
-  const notifications = useNotificationsPreview();
+  const allNotifications = useNotificationsPreview();
+  // Branch Admin никогда не получает уведомление другого филиала (TEN-045) — фильтр
+  // на границе, до любого поиска/пагинации, а не визуальное скрытие после рендера.
+  const notifications = useMemo(
+    () => (isOrgAdmin ? allNotifications : allNotifications.filter((n) => n.branchName === currentBranchRawName)),
+    [allNotifications, isOrgAdmin, currentBranchRawName],
+  );
+
+  // Фиксированный PREVIEW_NOTIFICATION_SUMMARY посчитан по всей организации — для
+  // Branch Admin KPI и success rate пересчитываются из уже отфильтрованного списка.
+  const summary = isOrgAdmin
+    ? PREVIEW_NOTIFICATION_SUMMARY
+    : {
+        pending: notifications.filter((n) => n.status === 'Pending').length,
+        processing: notifications.filter((n) => n.status === 'Processing').length,
+        sent: notifications.filter((n) => n.status === 'Sent').length,
+        deadLetter: notifications.filter((n) => n.status === 'DeadLetter').length,
+      };
+  const deliverySuccessPct = isOrgAdmin
+    ? PREVIEW_DELIVERY_SUCCESS_PCT
+    : notifications.length === 0
+      ? 0
+      : Math.round((summary.sent / notifications.length) * 100);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const notificationId = searchParams.get('notificationId');
@@ -85,11 +111,13 @@ export function NotificationsPage(): JSX.Element {
       if (tab !== 'all' && n.status !== tab) return false;
       if (query.length > 0 && !n.eventLabel.toLowerCase().includes(query) && !n.recipientName.toLowerCase().includes(query)) return false;
       if (channel !== 'all' && n.channel !== channel) return false;
-      if (branch !== 'all' && n.branchName !== branch) return false;
+      if (isOrgAdmin && branch !== 'all' && n.branchName !== branch) return false;
       return true;
     });
-  }, [notifications, tab, search, channel, branch]);
+  }, [notifications, tab, search, channel, branch, isOrgAdmin]);
 
+  // Тот же приём, что и на /admin/assignments: lookup из уже отфильтрованного
+  // `notifications`, а не из полного стора — чужой Branch неотличим от несуществующего.
   const selected = notificationId !== null ? notifications.find((n) => n.id === notificationId) : undefined;
 
   async function handleRetry(): Promise<void> {
@@ -105,23 +133,26 @@ export function NotificationsPage(): JSX.Element {
   }
 
   const donutData = [
-    { name: 'Доставлено', value: PREVIEW_DELIVERY_SUCCESS_PCT, color: 'var(--success)' },
-    { name: 'Остальное', value: 100 - PREVIEW_DELIVERY_SUCCESS_PCT, color: 'var(--divider)' },
+    { name: 'Доставлено', value: deliverySuccessPct, color: 'var(--success)' },
+    { name: 'Остальное', value: 100 - deliverySuccessPct, color: 'var(--divider)' },
   ];
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Уведомления" subtitle="Статус отправки Email и Telegram уведомлений" />
+      <PreviewPageHeader
+        title="Уведомления"
+        subtitle={isOrgAdmin ? 'Статус отправки Email и Telegram уведомлений' : 'Статус отправки уведомлений филиала'}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="В очереди" value={String(PREVIEW_NOTIFICATION_SUMMARY.pending)} />
-        <PreviewMetricCard icon={<Loader2 className="h-5 w-5" aria-hidden="true" />} label="Обрабатываются" value={String(PREVIEW_NOTIFICATION_SUMMARY.processing)} />
-        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Отправлены" value={String(PREVIEW_NOTIFICATION_SUMMARY.sent)} />
+        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="В очереди" value={String(summary.pending)} />
+        <PreviewMetricCard icon={<Loader2 className="h-5 w-5" aria-hidden="true" />} label="Обрабатываются" value={String(summary.processing)} />
+        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Отправлены" value={String(summary.sent)} />
         <PreviewMetricCard
           icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />}
           label="Ошибки доставки"
-          value={String(PREVIEW_NOTIFICATION_SUMMARY.deadLetter)}
-          tone={PREVIEW_NOTIFICATION_SUMMARY.deadLetter > 0 ? 'warning' : 'default'}
+          value={String(summary.deadLetter)}
+          tone={summary.deadLetter > 0 ? 'warning' : 'default'}
         />
         <Card padded={false} className="flex h-full items-center gap-3 p-4">
           <div className="relative h-14 w-14 shrink-0">
@@ -135,7 +166,7 @@ export function NotificationsPage(): JSX.Element {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="text-[13px] font-bold tabular-nums text-ink">{PREVIEW_DELIVERY_SUCCESS_PCT}%</span>
+              <span className="text-[13px] font-bold tabular-nums text-ink">{deliverySuccessPct}%</span>
             </div>
           </div>
           <div>
@@ -151,7 +182,7 @@ export function NotificationsPage(): JSX.Element {
         </div>
         <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по событию или получателю…" value={search} onChange={setSearch} />
-          <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} /> : null}
           <PreviewSelect label="Канал" value={channel} onChange={setChannel} options={CHANNEL_OPTIONS} />
           <PreviewResetButton
             onClick={() => {
@@ -167,7 +198,7 @@ export function NotificationsPage(): JSX.Element {
             <PreviewTh>Событие</PreviewTh>
             <PreviewTh className="w-[160px]">Получатель</PreviewTh>
             <PreviewTh className="w-[90px]">Канал</PreviewTh>
-            <PreviewTh className="w-[150px]">Scope</PreviewTh>
+            {isOrgAdmin ? <PreviewTh className="w-[150px]">Филиал</PreviewTh> : null}
             <PreviewTh className="w-[125px]">Статус</PreviewTh>
             <PreviewTh className="w-[75px]">Попытки</PreviewTh>
             <PreviewTh className="w-[125px]">Создано</PreviewTh>
@@ -202,7 +233,7 @@ export function NotificationsPage(): JSX.Element {
                   <PreviewTd className="whitespace-nowrap">
                     <Badge tone={n.channel === 'Telegram' ? 'info' : 'neutral'}>{n.channel}</Badge>
                   </PreviewTd>
-                  <PreviewTd className="truncate text-[12.5px]">{n.branchName}</PreviewTd>
+                  {isOrgAdmin ? <PreviewTd className="truncate text-[12.5px]">{branchDisplayName(n.branchName)}</PreviewTd> : null}
                   <PreviewTd className="whitespace-nowrap">
                     <Badge tone={STATUS_TONE[n.status]}>{NOTIFICATION_STATUS_LABEL[n.status]}</Badge>
                   </PreviewTd>

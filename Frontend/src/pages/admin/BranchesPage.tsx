@@ -65,14 +65,16 @@ type ActionDialogState =
 export function BranchesPage(): JSX.Element {
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
-  const currentBranchRawName = authUser?.branch?.name ?? null;
+  const currentBranchId = authUser?.branch?.id ?? null;
   const navigate = useNavigate();
   const realBranchContext = useBranchContext();
 
   const allBranches = useBranchesPreview();
+  // `PreviewBranch.name` — городское display-имя ("Худжанд"), а `authUser.branch.name` —
+  // институциональное («Филиал Худжанд», см. branchDirectory.ts) — сравнивать нужно по `id`.
   const scopedBranches = useMemo(
-    () => (isOrgAdmin ? allBranches : allBranches.filter((candidate) => candidate.name === currentBranchRawName)),
-    [allBranches, isOrgAdmin, currentBranchRawName],
+    () => (isOrgAdmin ? allBranches : allBranches.filter((candidate) => candidate.id === currentBranchId)),
+    [allBranches, isOrgAdmin, currentBranchId],
   );
 
   const [search, setSearch] = useState('');
@@ -129,8 +131,8 @@ export function BranchesPage(): JSX.Element {
   return (
     <div className="space-y-6">
       <PreviewPageHeader
-        title="Филиалы"
-        subtitle="Управление филиалами и их текущим состоянием"
+        title={isOrgAdmin ? 'Филиалы' : 'Филиал'}
+        subtitle={isOrgAdmin ? 'Управление филиалами и их текущим состоянием' : 'Профиль вашего филиала — доступен только для чтения'}
         action={
           isOrgAdmin ? (
             <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
@@ -147,7 +149,7 @@ export function BranchesPage(): JSX.Element {
         <PreviewMetricCard icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label="Без администратора" value={String(withoutAdmin)} tone={withoutAdmin > 0 ? 'warning' : 'default'} />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 min-[1600px]:grid-cols-[minmax(0,1fr)_320px]">
+      <div className={`grid grid-cols-1 items-start gap-4 ${isOrgAdmin ? 'min-[1600px]:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
         <Card padded={false} className="min-w-0">
           <PreviewToolbar>
             <PreviewSearchInput placeholder="Поиск по названию или коду…" value={search} onChange={setSearch} />
@@ -242,29 +244,32 @@ export function BranchesPage(): JSX.Element {
           </PreviewTable>
         </Card>
 
-        <SectionCard title="Распределение пользователей по филиалам" className="h-fit self-start" padded>
-          <ul className="space-y-4">
-            {PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => {
-              const total = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, e) => sum + e.count, 0);
-              const pct = Math.round((entry.count / total) * 100);
-              return (
-                <li key={entry.label}>
-                  <div className="mb-1.5 flex items-center justify-between text-xs">
-                    <span className="text-ink-muted">{entry.label}</span>
-                    <span className="font-medium tabular-nums text-ink-secondary">{entry.count}</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-                    <div className="h-full rounded-full bg-brand/70" style={{ width: `${pct}%` }} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </SectionCard>
+        {isOrgAdmin ? (
+          <SectionCard title="Распределение пользователей по филиалам" className="h-fit self-start" padded>
+            <ul className="space-y-4">
+              {PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => {
+                const total = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, e) => sum + e.count, 0);
+                const pct = Math.round((entry.count / total) * 100);
+                return (
+                  <li key={entry.label}>
+                    <div className="mb-1.5 flex items-center justify-between text-xs">
+                      <span className="text-ink-muted">{entry.label}</span>
+                      <span className="font-medium tabular-nums text-ink-secondary">{entry.count}</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
+                      <div className="h-full rounded-full bg-brand/70" style={{ width: `${pct}%` }} />
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </SectionCard>
+        ) : null}
       </div>
 
       <BranchDetailsDrawer
         branchId={branchId}
+        branches={scopedBranches}
         onClose={closeBranchDetails}
         isOrgAdmin={isOrgAdmin}
         onOpenUser={(userId) => { navigate(`/admin/users?userId=${userId}`); }}

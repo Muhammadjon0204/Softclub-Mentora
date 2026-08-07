@@ -8,7 +8,6 @@ import { BranchAdminSection } from './BranchAdminSection';
 import { BranchMetricsSection } from './BranchMetricsSection';
 import { BranchOverviewSection } from './BranchOverviewSection';
 import type { PreviewBranchDetails } from './branchPresentation';
-import { useBranchesPreview } from './branchPreviewStore';
 
 type BranchDetailsTab = 'overview' | 'admin' | 'metrics' | 'activity';
 
@@ -21,6 +20,8 @@ const TABS: { id: BranchDetailsTab; label: string }[] = [
 
 export interface BranchDetailsDrawerProps {
   branchId: string | null;
+  /** Уже scope-отфильтрованный список — чужой Branch неотличим от несуществующего (ADR-001, раздел 2.8). */
+  branches: PreviewBranchDetails[];
   onClose: () => void;
   isOrgAdmin: boolean;
   onOpenUser: (userId: string) => void;
@@ -34,6 +35,7 @@ export interface BranchDetailsDrawerProps {
 /** Открывается по клику на строку (раздел 24 промпта) — читает филиал напрямую из `branchPreviewStore`. */
 export function BranchDetailsDrawer({
   branchId,
+  branches,
   onClose,
   isOrgAdmin,
   onOpenUser,
@@ -43,7 +45,6 @@ export function BranchDetailsDrawer({
   onActivate,
   onDeactivate,
 }: BranchDetailsDrawerProps): JSX.Element {
-  const branches = useBranchesPreview();
   const branch = branchId !== null ? branches.find((candidate) => candidate.id === branchId) : undefined;
   const [tab, setTab] = useState<BranchDetailsTab>('overview');
 

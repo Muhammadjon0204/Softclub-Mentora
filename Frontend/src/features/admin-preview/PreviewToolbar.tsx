@@ -1,6 +1,8 @@
 import { ListFilter, Search } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { Select } from '../../shared/select';
+
 /** Общая полоса фильтров: одинаковая высота/spacing на всех preview-страницах. */
 export function PreviewToolbar({ children }: { children: ReactNode }): JSX.Element {
   return (
@@ -45,24 +47,9 @@ interface PreviewSelectProps {
   className?: string;
 }
 
-/** Нативный `<select>` в стилистике остальных контролов; ширина 140–180px, фиксированная (раздел 9). */
+/** Кастомный dropdown в стилистике остальных контролов; ширина 140–180px, фиксированная (раздел 9). */
 export function PreviewSelect({ label, value, onChange, options, className = 'w-[160px]' }: PreviewSelectProps): JSX.Element {
-  return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-      className={`h-10 shrink-0 rounded-control border border-line bg-surface px-3 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${className}`}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
+  return <Select ariaLabel={label} value={value} onValueChange={onChange} options={options} className={`shrink-0 ${className}`} />;
 }
 
 export function PreviewResetButton({ onClick }: { onClick: () => void }): JSX.Element {

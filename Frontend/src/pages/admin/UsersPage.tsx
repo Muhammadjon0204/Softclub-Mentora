@@ -26,6 +26,7 @@ import { useUsersPreview } from '../../features/admin-users/userPreviewStore';
 import { ROLE_LABEL, STATUS_LABEL, PREVIEW_NEW_USERS_SERIES } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
 import { useAuth } from '../../auth/useAuth';
+import { Select } from '../../shared/select';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 
@@ -145,17 +146,17 @@ function UsersPagination({ page, totalPages, totalCount, pageSize, onPageChange,
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
       <span>Показано {start}–{end} из {totalCount}</span>
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
+        <span className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
           На странице
-          <select
-            aria-label="Пользователей на странице"
-            value={pageSize}
-            onChange={(event) => { onPageSizeChange(Number(event.target.value)); }}
-            className="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </label>
+          <Select
+            ariaLabel="Пользователей на странице"
+            size="sm"
+            value={String(pageSize)}
+            onValueChange={(next) => { onPageSizeChange(Number(next)); }}
+            options={PAGE_SIZE_OPTIONS.map((size) => ({ value: String(size), label: String(size) }))}
+            className="w-[68px]"
+          />
+        </span>
         <div className="flex items-center gap-1">
           <button type="button" disabled={page <= 1} onClick={() => { onPageChange(page - 1); }} aria-label="Предыдущая страница" className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent">
             ‹
@@ -388,6 +389,7 @@ export function UsersPage(): JSX.Element {
 
       <UserDetailsDrawer
         userId={userId}
+        users={scopedUsers}
         onClose={closeUserDetails}
         isOrgAdmin={isOrgAdmin}
         onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}

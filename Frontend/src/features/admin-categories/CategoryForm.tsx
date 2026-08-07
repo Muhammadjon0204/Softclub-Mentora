@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
 import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormSelect, FormTextarea, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { BRANCH_DIRECTORY } from '../admin-preview/branchDirectory';
 import { CATEGORY_CREATE_DEFAULTS, categoryCreateSchema, categoryEditSchema } from './categoryForm.schema';
@@ -73,12 +74,22 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
           </FormField>
           {isOrgAdmin ? (
             <FormField label="Филиал" htmlFor="category-create-branch" required error={errors.branchName?.message}>
-              <FormSelect id="category-create-branch" invalid={errors.branchName !== undefined} {...register('branchName')}>
-                <option value="">Выберите филиал</option>
-                {BRANCH_DIRECTORY.map((branch) => (
-                  <option key={branch.id} value={branch.rawName}>{branch.displayName}</option>
-                ))}
-              </FormSelect>
+              <Controller
+                control={control}
+                name="branchName"
+                render={({ field }) => (
+                  <FormSelect
+                    id="category-create-branch"
+                    invalid={errors.branchName !== undefined}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                    ref={field.ref}
+                    placeholder="Выберите филиал"
+                    options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+                  />
+                )}
+              />
             </FormField>
           ) : (
             <ReadOnlyField label="Филиал" value={BRANCH_DIRECTORY.find((branch) => branch.rawName === currentBranchRawName)?.displayName ?? '—'} hint="Ваш филиал — изменить нельзя" />
@@ -92,12 +103,17 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
             control={control}
             name="leadUserId"
             render={({ field }) => (
-              <FormSelect id="category-create-lead" disabled={branchName.length === 0} value={field.value ?? ''} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref}>
-                <option value="">Не назначать сейчас</option>
-                {leadCandidates.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email}</option>
-                ))}
-              </FormSelect>
+              <SearchSelect
+                id="category-create-lead"
+                disabled={branchName.length === 0}
+                value={field.value ?? ''}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                placeholder="Не назначать сейчас"
+                searchPlaceholder="Поиск по имени или email…"
+                options={leadCandidates.map((candidate) => ({ value: candidate.id, label: candidate.fullName, description: candidate.email }))}
+              />
             )}
           />
         </FormField>
@@ -106,11 +122,20 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
       <FormSection title="Настройки задания">
         <div className="space-y-4">
           <FormField label="Часовой пояс" htmlFor="category-create-timezone" required>
-            <FormSelect id="category-create-timezone" {...register('timezone')}>
-              {TIMEZONE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </FormSelect>
+            <Controller
+              control={control}
+              name="timezone"
+              render={({ field }) => (
+                <FormSelect
+                  id="category-create-timezone"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  options={TIMEZONE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                />
+              )}
+            />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Дедлайн (время)" htmlFor="category-create-due-time" required error={errors.defaultDueTimeLocal?.message} hint="Формат ЧЧ:ММ">
@@ -144,6 +169,7 @@ export function CategoryEditForm({ formId, category, bannerError, onDirtyChange,
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isDirty },
   } = useForm<CategoryEditFormValues>({
     resolver: zodResolver(categoryEditSchema),
@@ -185,11 +211,20 @@ export function CategoryEditForm({ formId, category, bannerError, onDirtyChange,
       <FormSection title="Настройки задания">
         <div className="space-y-4">
           <FormField label="Часовой пояс" htmlFor="category-edit-timezone" required>
-            <FormSelect id="category-edit-timezone" {...register('timezone')}>
-              {TIMEZONE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </FormSelect>
+            <Controller
+              control={control}
+              name="timezone"
+              render={({ field }) => (
+                <FormSelect
+                  id="category-edit-timezone"
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  ref={field.ref}
+                  options={TIMEZONE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+                />
+              )}
+            />
           </FormField>
           <div className="grid grid-cols-2 gap-4">
             <FormField label="Дедлайн (время)" htmlFor="category-edit-due-time" required error={errors.defaultDueTimeLocal?.message} hint="Формат ЧЧ:ММ">

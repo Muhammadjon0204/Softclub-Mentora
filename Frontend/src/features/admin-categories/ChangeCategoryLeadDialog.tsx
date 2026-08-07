@@ -2,6 +2,7 @@ import { UserCog } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { ConfirmDialog } from '../../shared/overlays';
+import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
 import { useUsersPreview } from '../admin-users/userPreviewStore';
 import type { PreviousLeadFate } from './categoryPreviewStore';
@@ -68,32 +69,37 @@ export function ChangeCategoryLeadDialog({ category, open, onOpenChange, isSubmi
       details={
         <div className="space-y-4">
           <FormField label="Новый руководитель" htmlFor="change-lead-new">
-            <FormSelect id="change-lead-new" value={newLeadId} onChange={(event) => { setNewLeadId(event.target.value); }}>
-              <option value="">Выберите пользователя</option>
-              {candidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email}</option>
-              ))}
-            </FormSelect>
+            <SearchSelect
+              id="change-lead-new"
+              value={newLeadId}
+              onValueChange={setNewLeadId}
+              placeholder="Выберите пользователя"
+              searchPlaceholder="Поиск по имени или email…"
+              options={candidates.map((candidate) => ({ value: candidate.id, label: candidate.fullName, description: candidate.email }))}
+            />
           </FormField>
 
           {currentLead !== undefined ? (
             <FormField label="Судьба предыдущего руководителя" htmlFor="change-lead-fate">
-              <FormSelect id="change-lead-fate" value={fate} onChange={(event) => { setFate(event.target.value as PreviousLeadFate); setTransferTargetId(''); }}>
-                {FATE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="change-lead-fate"
+                value={fate}
+                onValueChange={(next) => { setFate(next as PreviousLeadFate); setTransferTargetId(''); }}
+                options={FATE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              />
             </FormField>
           ) : null}
 
           {currentLead !== undefined && needsTransferTarget ? (
             <FormField label="Целевое направление" htmlFor="change-lead-target" required error={transferTargetId.length === 0 ? 'Выберите направление' : undefined}>
-              <FormSelect id="change-lead-target" value={transferTargetId} onChange={(event) => { setTransferTargetId(event.target.value); }}>
-                <option value="">Выберите направление</option>
-                {otherCategories.map((entry) => (
-                  <option key={entry.id} value={entry.id}>{entry.name}</option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="change-lead-target"
+                value={transferTargetId}
+                onValueChange={setTransferTargetId}
+                placeholder="Выберите направление"
+                invalid={transferTargetId.length === 0}
+                options={otherCategories.map((entry) => ({ value: entry.id, label: entry.name }))}
+              />
             </FormField>
           ) : null}
 
