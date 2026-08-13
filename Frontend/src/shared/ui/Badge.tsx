@@ -25,7 +25,7 @@ interface BadgeProps {
 export function Badge({ tone = 'neutral', children, className = '' }: BadgeProps): JSX.Element {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-medium leading-5 ${TONE_CLASSES[tone]} ${className}`}
+      className={`inline-flex w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[12px] font-medium leading-5 ${TONE_CLASSES[tone]} ${className}`}
     >
       {children}
     </span>

@@ -14,13 +14,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   trailingIcon?: ReactNode;
 }
 
+/**
+ * Opacity-модификатор поверх CSS-переменного цвета (`bg-brand/50`) в этой
+ * сборке Tailwind не генерируется — класс просто не попадает в CSS, и
+ * disabled/hover-состояние визуально не отличалось от обычного (Lead UI
+ * upgrade, раздел 11: тот же класс бага, что «чёрные рамки» у графиков).
+ * Arbitrary rgba() — тот же цвет токена, без opacity-резолюции темы.
+ */
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand text-white shadow-sm hover:bg-brand-hover active:bg-brand-active disabled:bg-brand/50',
+    'bg-brand text-white shadow-sm hover:bg-brand-hover active:bg-brand-active disabled:bg-[rgba(91,92,226,0.5)]',
   secondary:
     'border border-line bg-surface text-ink hover:bg-surface-hover active:bg-surface-hover disabled:text-ink-disabled',
   ghost: 'text-ink-secondary hover:bg-surface-hover hover:text-ink disabled:text-ink-disabled',
-  danger: 'bg-danger text-white shadow-sm hover:bg-danger/90 active:bg-danger disabled:bg-danger/50',
+  danger: 'bg-danger text-white shadow-sm hover:bg-[rgba(201,74,74,0.9)] active:bg-danger disabled:bg-[rgba(201,74,74,0.5)]',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

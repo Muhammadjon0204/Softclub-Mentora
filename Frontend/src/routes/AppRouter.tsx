@@ -7,6 +7,7 @@ import { dashboardPathForRole } from '../auth/roleRedirect';
 import { useAuth } from '../auth/useAuth';
 import { AuthBootstrapScreen } from '../components/auth/AuthBootstrapScreen';
 import { AdminLayout } from '../layouts/AdminLayout';
+import { LeadLayout } from '../layouts/LeadLayout';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
@@ -22,6 +23,13 @@ import { NotificationsPage } from '../pages/admin/NotificationsPage';
 import { ReportsPage } from '../pages/admin/ReportsPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
+import { DashboardPage as LeadDashboardPage } from '../pages/lead/DashboardPage';
+import { SchedulePage as LeadSchedulePage } from '../pages/lead/SchedulePage';
+import { SuggestionsPage as LeadSuggestionsPage } from '../pages/lead/SuggestionsPage';
+import { AssignmentsPage as LeadAssignmentsPage } from '../pages/lead/AssignmentsPage';
+import { ReviewQueuePage as LeadReviewQueuePage } from '../pages/lead/ReviewQueuePage';
+import { TeamPage as LeadTeamPage } from '../pages/lead/TeamPage';
+import { ReportsPage as LeadReportsPage } from '../pages/lead/ReportsPage';
 
 /** Аутентифицированному на /login делать нечего — уводим на его дашборд. */
 function RedirectIfAuthenticated({ children }: { children: ReactNode }): JSX.Element {
@@ -89,17 +97,31 @@ export function AppRouter(): JSX.Element {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 
-      {/* Защищённые маршруты-заглушки: Lead/Mentor проектируются отдельным этапом. */}
+      {/* Lead-панель (Phase 3, ТЗ 2.2 раздел 24.4): единый `/lead/*`, ровно маршруты
+          из таблицы «Страницы Lead» — никаких `/lead-panel/*` или иных вариантов
+          (тот же принцип, что `FE-030` закрепляет для `/admin/*`). Detail-роуты
+          не заводятся — `?assignmentId=`/`?mentorId=`/`?topicId=` + drawer, тот же
+          приём, что уже применён в разделе `/admin/*`. */}
       <Route
-        path="/lead/dashboard"
+        path="/lead"
         element={
           <RequireAuth>
             <RequireRole allowed={['Lead']}>
-              <DashboardPlaceholder title="Дашборд лида" />
+              <LeadLayout />
             </RequireRole>
           </RequireAuth>
         }
-      />
+      >
+        <Route path="dashboard" element={<LeadDashboardPage />} />
+        <Route path="schedule" element={<LeadSchedulePage />} />
+        <Route path="suggestions" element={<LeadSuggestionsPage />} />
+        <Route path="assignments" element={<LeadAssignmentsPage />} />
+        <Route path="review-queue" element={<LeadReviewQueuePage />} />
+        <Route path="team" element={<LeadTeamPage />} />
+        <Route path="reports" element={<LeadReportsPage />} />
+      </Route>
+
+      {/* Защищённый маршрут-заглушка: Mentor проектируется отдельным этапом. */}
       <Route
         path="/mentor/dashboard"
         element={

@@ -12,6 +12,7 @@ import { loginSchema, type LoginFormValues } from '../../schemas/auth.schema';
 import { PasswordField, TextField } from '../ui/TextField';
 import { applyServerValidation } from './applyServerValidation';
 import { AuthError } from './AuthError';
+import { DevAccountsPanel } from './DevAccountsPanel';
 import { SubmitButton } from './SubmitButton';
 
 export function LoginForm(): JSX.Element {
@@ -25,6 +26,7 @@ export function LoginForm(): JSX.Element {
     handleSubmit,
     setError,
     setFocus,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -59,52 +61,67 @@ export function LoginForm(): JSX.Element {
     mutation.mutate(values);
   });
 
+  /** Только заполняет поля — вход всё ещё требует явного нажатия «Войти». */
+  const handleDevFill = (email: string, password: string): void => {
+    setValue('email', email, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    setValue('password', password, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+  };
+
   return (
-    <form onSubmit={onSubmit} noValidate className="space-y-4">
-      <TextField
-        label="Email"
-        type="email"
-        inputMode="email"
-        autoComplete="email"
-        placeholder="name@company.com"
-        autoFocus
-        disabled={mutation.isPending}
-        error={errors.email?.message}
-        {...register('email')}
-      />
-
-      <div className="space-y-2">
-        <PasswordField
-          label="Пароль"
-          autoComplete="current-password"
-          disabled={mutation.isPending}
-          error={errors.password?.message}
-          {...register('password')}
-        />
-        <div className="flex justify-end">
-          <Link
-            to="/forgot-password"
-            className="rounded text-sm font-medium text-indigo-600 transition hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-          >
-            Забыли пароль?
-          </Link>
-        </div>
-      </div>
-
+    <div className="space-y-5">
       {!isOnline ? (
         <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-800">
           Нет соединения — вход временно недоступен.
         </p>
       ) : null}
 
-      <AuthError
-        error={mutation.error}
-        retryAfterSeconds={countdown.isActive ? countdown.remaining : null}
-      />
+      <AuthError error={mutation.error} retryAfterSeconds={countdown.isActive ? countdown.remaining : null} />
 
-      <SubmitButton isSubmitting={mutation.isPending} disabled={isBlocked} submittingLabel="Выполняется вход">
-        {countdown.isActive ? `Повторить через ${String(countdown.remaining)} сек.` : 'Войти'}
-      </SubmitButton>
-    </form>
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <TextField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="name@company.com"
+          autoFocus
+          tone="auth"
+          disabled={mutation.isPending}
+          error={errors.email?.message}
+          {...register('email')}
+        />
+
+        <div className="space-y-2">
+          <PasswordField
+            label="Пароль"
+            autoComplete="current-password"
+            tone="auth"
+            disabled={mutation.isPending}
+            error={errors.password?.message}
+            {...register('password')}
+          />
+          <div className="flex justify-end">
+            <Link
+              to="/forgot-password"
+              className="rounded text-sm font-medium text-brand transition-colors duration-150 hover:text-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none"
+            >
+              Забыли пароль?
+            </Link>
+          </div>
+        </div>
+
+        <SubmitButton
+          tone="auth"
+          isSubmitting={mutation.isPending}
+          disabled={isBlocked}
+          submittingLabel="Выполняется вход"
+          className="mt-2"
+        >
+          {countdown.isActive ? `Повторить через ${String(countdown.remaining)} сек.` : 'Войти'}
+        </SubmitButton>
+      </form>
+
+      <DevAccountsPanel onFill={handleDevFill} />
+    </div>
   );
 }

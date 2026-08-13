@@ -74,3 +74,24 @@
       sans-serif;
   }
 }
+
+/**
+ * Recharts (Pie/Line/Area/Bar) даёт своим SVG-примитивам нативную
+ * фокусируемость для клавиатурной доступности — без явного `outline`
+ * браузер рисует собственный чёрный/тёмный focus ring поверх графика
+ * (жалоба «чёрные рамки на графиках», Lead UI upgrade). Ring не убираем
+ * совсем — оставляем мягкий брендовый только на `:focus-visible`, чтобы
+ * не сломать клавиатурную доступность (раздел 3.9 промпта).
+ */
+.recharts-wrapper,
+.recharts-wrapper *,
+.recharts-surface {
+  outline: none;
+}
+
+.recharts-wrapper :is(.recharts-pie-sector, .recharts-sector, .recharts-rectangle, .recharts-dot, .recharts-active-dot, .recharts-layer):focus-visible,
+.recharts-surface:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
