@@ -17,7 +17,8 @@ import { ExportReportModal } from '../../features/admin-reports/ExportReportModa
 import { MetricDetailsDrawer } from '../../features/admin-reports/MetricDetailsDrawer';
 import type { MetricKey } from '../../features/admin-reports/reportPresentation';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewResetButton, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   PREVIEW_AI_SUMMARY,
   PREVIEW_BRANCH_COMPARISON,
@@ -27,6 +28,7 @@ import {
   PREVIEW_REPORT_KPIS,
   PREVIEW_REPORT_PERIOD_LABEL,
 } from '../../mocks/ui-preview/reports.preview';
+import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
@@ -35,10 +37,11 @@ import { ChartCard } from '../../shared/ui/ChartCard';
 
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Главный офис' },
-  { value: 'Филиал Худжанд', label: 'Филиал Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Филиал Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
+/** Branch Admin не видит «Лучший филиал» / сравнение — это Organization Admin domain (TZ 21.6). */
+const BRANCH_ADMIN_AI_SUMMARY_TEXT =
+  'На этой неделе общий процент завершения заданий вашего филиала увеличился на 12% по сравнению с предыдущей неделей и составил 78%. Доля просроченных заданий снизилась до 8.6%, что является хорошим показателем. Категория «UI/UX Design» требует внимания — там нет назначенного Lead и заметно выше доля просрочек. Рекомендуется в первую очередь назначить руководителя направления для UI/UX Design.';
 const CATEGORY_OPTIONS = [
   { value: 'all', label: 'Все категории' },
   { value: 'C#', label: 'C#' },
@@ -51,6 +54,9 @@ const METRIC_KEYS: MetricKey[] = ['completion', 'overdue', 'firstPass', 'reviewT
 
 /** UI-прототип /admin/reports — этап 3: MetricDetailsDrawer + ExportReportModal поверх shared overlay system. */
 export function ReportsPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+
   const [branch, setBranch] = useState('all');
   const [category, setCategory] = useState('all');
   const [exportOpen, setExportOpen] = useState(false);
@@ -72,14 +78,15 @@ export function ReportsPage(): JSX.Element {
     setSearchParams(next);
   }
 
-  const branchLabel = BRANCH_OPTIONS.find((option) => option.value === branch)?.label ?? 'Все филиалы';
+  const branchLabel = isOrgAdmin ? (BRANCH_OPTIONS.find((option) => option.value === branch)?.label ?? 'Все филиалы') : (authUser?.branch?.name ?? '—');
   const categoryLabel = CATEGORY_OPTIONS.find((option) => option.value === category)?.label ?? 'Все категории';
+  const filtersActive = (isOrgAdmin && branch !== 'all') || category !== 'all';
 
   return (
     <div className="space-y-6">
       <PreviewPageHeader
         title="Отчёты"
-        subtitle="Аналитика эффективности филиалов и направлений"
+        subtitle={isOrgAdmin ? 'Аналитика эффективности филиалов и направлений' : 'Аналитика эффективности направлений филиала'}
         action={
           <>
             <span className="hidden h-10 items-center gap-2 rounded-control border border-line bg-surface px-3 text-[13px] text-ink-secondary sm:flex">
@@ -94,8 +101,15 @@ export function ReportsPage(): JSX.Element {
       />
 
       <Card className="flex flex-wrap items-center gap-2.5">
-        <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
-        <PreviewSelect label="Категория" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} />
+        {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+        <PreviewSelect label="Категория" value={category} onChange={setCategory} options={CATEGORY_OPTIONS} width="lg" />
+        <PreviewResetButton
+          disabled={!filtersActive}
+          onClick={() => {
+            setBranch('all');
+            setCategory('all');
+          }}
+        />
       </Card>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -133,17 +147,19 @@ export function ReportsPage(): JSX.Element {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Сравнение филиалов" description="Процент завершения заданий по филиалам">
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={PREVIEW_BRANCH_COMPARISON} layout="vertical" margin={{ top: 8, right: 24, bottom: 0, left: 8 }}>
-              <CartesianGrid stroke="var(--divider)" horizontal={false} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} unit="%" />
-              <YAxis type="category" dataKey="branchName" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} width={110} />
-              <RechartsTooltip contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 13 }} />
-              <Bar dataKey="completionPct" name="Завершение" fill="var(--primary)" radius={[0, 6, 6, 0]} barSize={22} isAnimationActive={false} />
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+        {isOrgAdmin ? (
+          <ChartCard title="Сравнение филиалов" description="Процент завершения заданий по филиалам">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={PREVIEW_BRANCH_COMPARISON} layout="vertical" margin={{ top: 8, right: 24, bottom: 0, left: 8 }}>
+                <CartesianGrid stroke="var(--divider)" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 12 }} axisLine={{ stroke: 'var(--border)' }} tickLine={false} unit="%" />
+                <YAxis type="category" dataKey="branchName" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} axisLine={false} tickLine={false} width={110} />
+                <RechartsTooltip contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 13 }} />
+                <Bar dataKey="completionPct" name="Завершение" fill="var(--primary)" radius={[0, 6, 6, 0]} barSize={22} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        ) : null}
 
         <ChartCard title="Результаты категорий" description="Завершение и просрочки по направлениям">
           <ResponsiveContainer width="100%" height={240}>
@@ -189,7 +205,7 @@ export function ReportsPage(): JSX.Element {
           </div>
           <Badge tone="info">{PREVIEW_AI_SUMMARY.generatedLabel}</Badge>
         </div>
-        <p className="text-[13.5px] leading-[21px] text-ink-secondary">{PREVIEW_AI_SUMMARY.text}</p>
+        <p className="text-[13.5px] leading-[21px] text-ink-secondary">{isOrgAdmin ? PREVIEW_AI_SUMMARY.text : BRANCH_ADMIN_AI_SUMMARY_TEXT}</p>
         <div>
           <Button
             variant="secondary"
@@ -204,7 +220,7 @@ export function ReportsPage(): JSX.Element {
       </Card>
 
       <MetricDetailsDrawer metricKey={metricKey} onClose={closeMetric} scopeLabel={`${branchLabel} · ${categoryLabel}`} />
-      <ExportReportModal open={exportOpen} onOpenChange={setExportOpen} branchLabel={branchLabel} categoryLabel={categoryLabel} />
+      <ExportReportModal open={exportOpen} onOpenChange={setExportOpen} branchLabel={branchLabel} categoryLabel={categoryLabel} showBranchComparison={isOrgAdmin} />
     </div>
   );
 }

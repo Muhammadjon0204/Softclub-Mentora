@@ -5,8 +5,8 @@ import { useSearchParams } from 'react-router-dom';
 
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
-import { PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewActionCell, PreviewActionTh, PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
+import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import { BlockUserDialog } from '../../features/admin-users/BlockUserDialog';
 import { ChangeUserRoleDialog } from '../../features/admin-users/ChangeUserRoleDialog';
@@ -123,53 +123,6 @@ function LastLoginCell({ label }: { label: string }): JSX.Element {
     <div title={label}>
       <p className="whitespace-nowrap text-[13px] tabular-nums text-ink-secondary">{value.primary}</p>
       {value.secondary !== undefined ? <p className="whitespace-nowrap text-[11.5px] tabular-nums text-ink-muted">{value.secondary}</p> : null}
-    </div>
-  );
-}
-
-interface UsersPaginationProps {
-  page: number;
-  totalPages: number;
-  totalCount: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (size: number) => void;
-}
-
-function UsersPagination({ page, totalPages, totalCount, pageSize, onPageChange, onPageSizeChange }: UsersPaginationProps): JSX.Element {
-  const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalCount);
-  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-3.5 text-[13px] text-ink-muted sm:px-6">
-      <span>Показано {start}–{end} из {totalCount}</span>
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-1.5 whitespace-nowrap text-ink-muted">
-          На странице
-          <select
-            aria-label="Пользователей на странице"
-            value={pageSize}
-            onChange={(event) => { onPageSizeChange(Number(event.target.value)); }}
-            className="h-8 rounded-[8px] border border-line bg-surface px-2 text-[13px] text-ink-secondary outline-none transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </label>
-        <div className="flex items-center gap-1">
-          <button type="button" disabled={page <= 1} onClick={() => { onPageChange(page - 1); }} aria-label="Предыдущая страница" className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent">
-            ‹
-          </button>
-          {pageNumbers.map((number) => (
-            <button key={number} type="button" onClick={() => { onPageChange(number); }} aria-current={number === page ? 'page' : undefined} className={`flex h-8 w-8 items-center justify-center rounded-[8px] text-[13px] font-medium transition ${number === page ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover'}`}>
-              {number}
-            </button>
-          ))}
-          <button type="button" disabled={page >= totalPages} onClick={() => { onPageChange(page + 1); }} aria-label="Следующая страница" className="flex h-8 w-8 items-center justify-center rounded-[8px] text-ink-secondary transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-disabled disabled:hover:bg-transparent">
-            ›
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -308,19 +261,15 @@ export function UsersPage(): JSX.Element {
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>
-          <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-ink-secondary">{rows.length} пользователей</span>
-          <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} className="!min-w-[300px]" />
-          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} className="w-[124px]" /> : null}
-          <PreviewSelect label="Роль" value={role} onChange={setRole} options={ROLE_OPTIONS} className="w-[124px]" />
-          <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} className="w-[124px]" />
-          <button
-            type="button"
+          <span className="basis-full text-[13px] font-medium text-ink-secondary">{rows.length} пользователей</span>
+          <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Роль" value={role} onChange={setRole} options={ROLE_OPTIONS} width="md" />
+          <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
+          <PreviewResetButton
             disabled={!filtersActive}
             onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('all'); }}
-            className="flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-surface px-3 text-[13px] font-medium text-ink-secondary transition hover:bg-surface-hover hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            Сбросить
-          </button>
+          />
         </PreviewToolbar>
 
         <PreviewTable>
@@ -330,7 +279,7 @@ export function UsersPage(): JSX.Element {
             <PreviewTh className="w-[140px] xl:w-[180px]">Область доступа</PreviewTh>
             <PreviewTh className="w-[120px]">Статус</PreviewTh>
             <PreviewTh className="hidden w-[140px] xl:table-cell">Последний вход</PreviewTh>
-            <PreviewTh className="w-11" />
+            <PreviewActionTh />
           </PreviewTableHead>
           <tbody>
             {pageRows.map((rowUser) => (
@@ -357,8 +306,7 @@ export function UsersPage(): JSX.Element {
                 <PreviewTd><ScopeCell user={rowUser} /></PreviewTd>
                 <PreviewTd><StatusCell status={rowUser.status} /></PreviewTd>
                 <PreviewTd className="hidden xl:table-cell"><LastLoginCell label={rowUser.lastLoginLabel} /></PreviewTd>
-                <PreviewTd
-                  className="text-center"
+                <PreviewActionCell
                   onClick={(event) => {
                     event.stopPropagation();
                   }}
@@ -377,17 +325,18 @@ export function UsersPage(): JSX.Element {
                     onUnblock={() => { setActionDialog({ type: 'unblock', user: rowUser }); }}
                     onDeactivate={() => { setActionDialog({ type: 'deactivate', user: rowUser }); }}
                   />
-                </PreviewTd>
+                </PreviewActionCell>
               </tr>
             ))}
           </tbody>
         </PreviewTable>
 
-        <UsersPagination page={currentPage} totalPages={totalPages} totalCount={rows.length} pageSize={pageSize} onPageChange={setPage} onPageSizeChange={setPageSize} />
+        <PreviewPagination page={currentPage} totalPages={totalPages} totalCount={rows.length} pageSize={pageSize} pageSizeOptions={PAGE_SIZE_OPTIONS} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </Card>
 
       <UserDetailsDrawer
         userId={userId}
+        users={scopedUsers}
         onClose={closeUserDetails}
         isOrgAdmin={isOrgAdmin}
         onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}

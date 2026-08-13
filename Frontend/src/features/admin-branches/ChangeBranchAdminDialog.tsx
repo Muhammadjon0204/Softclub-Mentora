@@ -2,6 +2,7 @@ import { UserCog } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { ConfirmDialog } from '../../shared/overlays';
+import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
 import { activeCategoriesForBranch } from '../admin-users/userPresentation';
 import { useUsersPreview } from '../admin-users/userPreviewStore';
@@ -67,32 +68,37 @@ export function ChangeBranchAdminDialog({ branch, open, onOpenChange, isSubmitti
       details={
         <div className="space-y-4">
           <FormField label="Новый администратор" htmlFor="change-admin-new">
-            <FormSelect id="change-admin-new" value={newAdminId} onChange={(event) => { setNewAdminId(event.target.value); }}>
-              <option value="">Выберите пользователя</option>
-              {candidates.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>{candidate.fullName} · {candidate.email}</option>
-              ))}
-            </FormSelect>
+            <SearchSelect
+              id="change-admin-new"
+              value={newAdminId}
+              onValueChange={setNewAdminId}
+              placeholder="Выберите пользователя"
+              searchPlaceholder="Поиск по имени или email…"
+              options={candidates.map((candidate) => ({ value: candidate.id, label: candidate.fullName, description: candidate.email }))}
+            />
           </FormField>
 
           {currentAdmin !== undefined ? (
             <FormField label="Роль текущего администратора после смены" htmlFor="change-admin-prev-role">
-              <FormSelect id="change-admin-prev-role" value={previousRole} onChange={(event) => { setPreviousRole(event.target.value as PreviousAdminRoleChoice); setPreviousCategory(''); }}>
-                {PREVIOUS_ROLE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="change-admin-prev-role"
+                value={previousRole}
+                onValueChange={(next) => { setPreviousRole(next as PreviousAdminRoleChoice); setPreviousCategory(''); }}
+                options={PREVIOUS_ROLE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+              />
             </FormField>
           ) : null}
 
           {currentAdmin !== undefined && needsCategory ? (
             <FormField label="Направление" htmlFor="change-admin-prev-category" required error={previousCategory.length === 0 ? 'Выберите направление' : undefined}>
-              <FormSelect id="change-admin-prev-category" value={previousCategory} onChange={(event) => { setPreviousCategory(event.target.value); }}>
-                <option value="">Выберите направление</option>
-                {categoryOptions.map((category) => (
-                  <option key={category.id} value={category.name}>{category.name}</option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="change-admin-prev-category"
+                value={previousCategory}
+                onValueChange={setPreviousCategory}
+                placeholder="Выберите направление"
+                invalid={previousCategory.length === 0}
+                options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+              />
             </FormField>
           ) : null}
 

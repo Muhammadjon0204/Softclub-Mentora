@@ -64,16 +64,9 @@ export function BlockUserDialog({ user, open, onOpenChange, isSubmitting, onConf
         <FormSelect
           id="block-reason"
           value={reasonValue}
-          onChange={(event) => {
-            setReasonValue(event.target.value as BlockReasonValue);
-          }}
-        >
-          {BLOCK_REASONS.map((entry) => (
-            <option key={entry.value} value={entry.value}>
-              {entry.label}
-            </option>
-          ))}
-        </FormSelect>
+          onValueChange={(next) => { setReasonValue(next as BlockReasonValue); }}
+          options={BLOCK_REASONS.map((entry) => ({ value: entry.value, label: entry.label }))}
+        />
       </FormField>
 
       {isOther ? (

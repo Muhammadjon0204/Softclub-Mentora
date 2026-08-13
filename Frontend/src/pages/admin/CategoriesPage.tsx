@@ -129,9 +129,10 @@ export function CategoriesPage(): JSX.Element {
               value={branch}
               onChange={setBranch}
               options={[{ value: 'all', label: 'Все филиалы' }, ...BRANCH_DIRECTORY.map((b) => ({ value: b.rawName, label: b.displayName }))]}
+              width="lg"
             />
           ) : null}
-          <PreviewSelect label="Lead" value={leadFilter} onChange={setLeadFilter} options={LEAD_OPTIONS} />
+          <PreviewSelect label="Lead" value={leadFilter} onChange={setLeadFilter} options={LEAD_OPTIONS} width="md" />
           <PreviewResetButton
             onClick={() => {
               setSearch('');
@@ -161,7 +162,7 @@ export function CategoriesPage(): JSX.Element {
                     openCategoryDetails(category.id);
                   }
                 }}
-                className={`cursor-pointer rounded-panel border p-4 outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                className={`cursor-pointer rounded-panel border p-5 outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
                   category.id === categoryId ? 'border-brand ring-1 ring-brand' : isUnassigned ? 'border-warning-border bg-warning-soft/40' : 'border-line bg-surface hover:bg-surface-hover'
                 }`}
               >
@@ -227,6 +228,7 @@ export function CategoriesPage(): JSX.Element {
 
       <CategoryDetailsDrawer
         categoryId={categoryId}
+        categories={scopedCategories}
         onClose={closeCategoryDetails}
         canManage
         onOpenUser={(userId) => { navigate(`/admin/users?userId=${userId}`); }}

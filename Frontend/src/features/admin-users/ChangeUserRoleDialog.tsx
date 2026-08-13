@@ -61,13 +61,12 @@ export function ChangeUserRoleDialog({ user, open, onOpenChange, isOrgAdmin, cur
       details={
         <div className="space-y-4">
           <FormField label="Новая роль" htmlFor="change-role-role">
-            <FormSelect id="change-role-role" value={role} onChange={(event) => { setRole(event.target.value as AssignableRoleValue); }}>
-              {assignableRoles.map((value) => (
-                <option key={value} value={value}>
-                  {ROLE_LABEL[value]}
-                </option>
-              ))}
-            </FormSelect>
+            <FormSelect
+              id="change-role-role"
+              value={role}
+              onValueChange={(next) => { setRole(next as AssignableRoleValue); }}
+              options={assignableRoles.map((value) => ({ value, label: ROLE_LABEL[value] }))}
+            />
           </FormField>
 
           {isOrgAdmin ? (
@@ -75,30 +74,25 @@ export function ChangeUserRoleDialog({ user, open, onOpenChange, isOrgAdmin, cur
               <FormSelect
                 id="change-role-branch"
                 value={branchName}
-                onChange={(event) => {
-                  setBranchName(event.target.value);
+                onValueChange={(next) => {
+                  setBranchName(next);
                   setCategoryName('');
                 }}
-              >
-                {BRANCH_DIRECTORY.map((branch) => (
-                  <option key={branch.id} value={branch.rawName}>
-                    {branch.displayName}
-                  </option>
-                ))}
-              </FormSelect>
+                options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+              />
             </FormField>
           ) : null}
 
           {needsCategory ? (
             <FormField label="Направление" htmlFor="change-role-category" required error={categoryName.length === 0 ? 'Выберите направление' : undefined}>
-              <FormSelect id="change-role-category" value={categoryName} onChange={(event) => { setCategoryName(event.target.value); }}>
-                <option value="">Выберите направление</option>
-                {categoryOptions.map((category) => (
-                  <option key={category.id} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="change-role-category"
+                value={categoryName}
+                onValueChange={setCategoryName}
+                placeholder="Выберите направление"
+                invalid={categoryName.length === 0}
+                options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+              />
             </FormField>
           ) : null}
 

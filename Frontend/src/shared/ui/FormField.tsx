@@ -1,5 +1,8 @@
 import { forwardRef, useId } from 'react';
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
+import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+
+import { Select } from '../select';
+import type { SelectProps } from '../select';
 
 /**
  * Лёгкие form-примитивы Admin UI, совместимые с `react-hook-form` (`register()`
@@ -70,20 +73,13 @@ export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(function F
   return <input ref={ref} className={`${CONTROL_BASE} ${controlTone(invalid)} ${className}`} {...rest} />;
 });
 
-interface FormSelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
-  invalid?: boolean;
-}
-
-export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(function FormSelect(
-  { invalid, className = '', children, ...rest },
-  ref,
-) {
-  return (
-    <select ref={ref} className={`${CONTROL_BASE} ${controlTone(invalid)} ${className}`} {...rest}>
-      {children}
-    </select>
-  );
-});
+/**
+ * Кастомный dropdown (раздел 3 промпта «убрать native `<select>`»), не
+ * браузерный `<select>` — API прежний по духу (`invalid`/`id`/`disabled`),
+ * но `value`/`onChange(event)`/`<option>`-дети заменены на `value`/`onValueChange`/`options`.
+ */
+export type FormSelectProps = SelectProps;
+export const FormSelect = Select;
 
 interface FormTextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   invalid?: boolean;

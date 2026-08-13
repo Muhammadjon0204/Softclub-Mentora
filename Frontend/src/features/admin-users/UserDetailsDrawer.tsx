@@ -9,7 +9,6 @@ import { UserOverviewSection } from './UserOverviewSection';
 import { UserSecuritySection } from './UserSecuritySection';
 import { STATUS_META } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
-import { useUsersPreview } from './userPreviewStore';
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 
 type UserDetailsTab = 'overview' | 'access' | 'security' | 'activity';
@@ -23,6 +22,12 @@ const TABS: { id: UserDetailsTab; label: string }[] = [
 
 export interface UserDetailsDrawerProps {
   userId: string | null;
+  /**
+   * Уже scope-отфильтрованный список (branch/all в зависимости от adminScope
+   * вызывающей страницы) — НЕ полный store. Так чужой Branch неотличим от
+   * несуществующего пользователя: тот же `ErrorState` ниже (ADR-001, раздел 2.8).
+   */
+  users: PreviewUserDetails[];
   onClose: () => void;
   isOrgAdmin: boolean;
   onEdit: (user: PreviewUserDetails) => void;
@@ -36,12 +41,14 @@ export interface UserDetailsDrawerProps {
 }
 
 /**
- * Открывается по клику на строку (не по `…`, раздел 6 промпта). Читает
- * пользователя напрямую из `userPreviewStore` — после любой mutation (смена
- * роли, блокировка…) drawer обновляется сам, без ручного refetch.
+ * Открывается по клику на строку (не по `…`, раздел 6 промпта). Ищет
+ * пользователя в уже scope-отфильтрованном списке страницы (`users` prop,
+ * подписанном на `userPreviewStore`) — после любой mutation (смена роли,
+ * блокировка…) drawer обновляется сам, без ручного refetch.
  */
 export function UserDetailsDrawer({
   userId,
+  users,
   onClose,
   isOrgAdmin,
   onEdit,
@@ -53,7 +60,6 @@ export function UserDetailsDrawer({
   onUnblock,
   onDeactivate,
 }: UserDetailsDrawerProps): JSX.Element {
-  const users = useUsersPreview();
   const user = userId !== null ? users.find((candidate) => candidate.id === userId) : undefined;
   const [tab, setTab] = useState<UserDetailsTab>('overview');
 

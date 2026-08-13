@@ -58,29 +58,24 @@ export function TransferUserDialog({ user, open, onOpenChange, isSubmitting, onC
             <FormSelect
               id="transfer-branch"
               value={branchName}
-              onChange={(event) => {
-                setBranchName(event.target.value);
+              onValueChange={(next) => {
+                setBranchName(next);
                 setCategoryName('');
               }}
-            >
-              {BRANCH_DIRECTORY.map((branch) => (
-                <option key={branch.id} value={branch.rawName}>
-                  {branch.displayName}
-                </option>
-              ))}
-            </FormSelect>
+              options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+            />
           </FormField>
 
           {needsCategory ? (
             <FormField label="Новое направление" htmlFor="transfer-category" required error={categoryName.length === 0 ? 'Выберите направление' : undefined}>
-              <FormSelect id="transfer-category" value={categoryName} onChange={(event) => { setCategoryName(event.target.value); }}>
-                <option value="">Выберите направление</option>
-                {categoryOptions.map((category) => (
-                  <option key={category.id} value={category.name}>
-                    {category.name}
-                  </option>
-                ))}
-              </FormSelect>
+              <FormSelect
+                id="transfer-category"
+                value={categoryName}
+                onValueChange={setCategoryName}
+                placeholder="Выберите направление"
+                invalid={categoryName.length === 0}
+                options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+              />
             </FormField>
           ) : null}
 

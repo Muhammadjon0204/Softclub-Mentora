@@ -5,8 +5,9 @@ import { useSearchParams } from 'react-router-dom';
 import { PreviewDrawer } from '../../features/admin-preview/PreviewDrawer';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
-import { PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
+import { PreviewActionCell, PreviewActionTh, PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
+import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import {
   AUDIT_RESULT_LABEL,
   PREVIEW_AUDIT_ENTRIES,
@@ -14,6 +15,7 @@ import {
   type PreviewAuditEntry,
   type PreviewAuditResult,
 } from '../../mocks/ui-preview/audit.preview';
+import { useAuth } from '../../auth/useAuth';
 import { Badge } from '../../shared/ui/Badge';
 import type { BadgeTone } from '../../shared/ui/Badge';
 import { IconButton } from '../../shared/ui/Button';
@@ -32,9 +34,7 @@ const RESULT_OPTIONS = [
 ];
 const BRANCH_OPTIONS = [
   { value: 'all', label: 'Все филиалы' },
-  { value: 'Главный офис', label: 'Главный офис' },
-  { value: 'Филиал Худжанд', label: 'Филиал Худжанд' },
-  { value: 'Филиал Бохтар', label: 'Филиал Бохтар' },
+  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
 
 function shortCorrelationId(id: string): string {
@@ -68,6 +68,17 @@ function CopyCorrelationId({ id }: { id: string }): JSX.Element {
  * (как и в Assignments), таблица на всю ширину.
  */
 export function AuditPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentBranchRawName = authUser?.branch?.name ?? null;
+
+  // Branch Admin не видит Organization-level записи (branchName === null, TEN-041)
+  // и записи чужих филиалов — фильтр на границе, до поиска и остальных фильтров.
+  const scopedEntries = useMemo(
+    () => (isOrgAdmin ? PREVIEW_AUDIT_ENTRIES : PREVIEW_AUDIT_ENTRIES.filter((entry) => entry.branchName === currentBranchRawName)),
+    [isOrgAdmin, currentBranchRawName],
+  );
+
   // Минимальный deep-link из Dashboard-карточки «Последняя активность» (?q=<имя>) —
   // заполняет уже существующий поиск.
   const [searchParams] = useSearchParams();
@@ -79,7 +90,7 @@ export function AuditPage(): JSX.Element {
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return PREVIEW_AUDIT_ENTRIES.filter((entry) => {
+    return scopedEntries.filter((entry) => {
       if (
         query.length > 0 &&
         !entry.actorName.toLowerCase().includes(query) &&
@@ -88,11 +99,20 @@ export function AuditPage(): JSX.Element {
       ) {
         return false;
       }
-      if (branch !== 'all' && entry.branchName !== branch) return false;
+      if (isOrgAdmin && branch !== 'all' && entry.branchName !== branch) return false;
       if (result !== 'all' && entry.result !== result) return false;
       return true;
     });
-  }, [search, branch, result]);
+  }, [scopedEntries, search, branch, result, isOrgAdmin]);
+
+  const summary = isOrgAdmin
+    ? PREVIEW_AUDIT_SUMMARY
+    : {
+        today: scopedEntries.length,
+        success: scopedEntries.filter((entry) => entry.result === 'Success').length,
+        rejected: scopedEntries.filter((entry) => entry.result === 'Rejected').length,
+        system: scopedEntries.filter((entry) => entry.actorName === 'Система').length,
+      };
 
   const selected: PreviewAuditEntry | null = rows.find((entry) => entry.id === selectedId) ?? null;
 
@@ -110,20 +130,23 @@ export function AuditPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Журнал аудита" subtitle="История административных и системных действий" />
+      <PreviewPageHeader
+        title="Журнал аудита"
+        subtitle={isOrgAdmin ? 'История административных и системных действий' : 'История действий в филиале'}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<ScrollText className="h-5 w-5" aria-hidden="true" />} label="Событий сегодня" value={String(PREVIEW_AUDIT_SUMMARY.today)} />
-        <PreviewMetricCard icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />} label="Успешные" value={String(PREVIEW_AUDIT_SUMMARY.success)} />
-        <PreviewMetricCard icon={<ShieldX className="h-5 w-5" aria-hidden="true" />} label="Отклонённые" value={String(PREVIEW_AUDIT_SUMMARY.rejected)} tone="warning" />
-        <PreviewMetricCard icon={<ShieldAlert className="h-5 w-5" aria-hidden="true" />} label="Системные" value={String(PREVIEW_AUDIT_SUMMARY.system)} />
+        <PreviewMetricCard icon={<ScrollText className="h-5 w-5" aria-hidden="true" />} label="Событий сегодня" value={String(summary.today)} />
+        <PreviewMetricCard icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />} label="Успешные" value={String(summary.success)} />
+        <PreviewMetricCard icon={<ShieldX className="h-5 w-5" aria-hidden="true" />} label="Отклонённые" value={String(summary.rejected)} tone="warning" />
+        <PreviewMetricCard icon={<ShieldAlert className="h-5 w-5" aria-hidden="true" />} label="Системные" value={String(summary.system)} />
       </div>
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по пользователю, действию, объекту…" value={search} onChange={setSearch} />
-          <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} />
-          <PreviewSelect label="Результат" value={result} onChange={setResult} options={RESULT_OPTIONS} />
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          <PreviewSelect label="Результат" value={result} onChange={setResult} options={RESULT_OPTIONS} width="sm" />
           <PreviewResetButton
             onClick={() => {
               setSearch('');
@@ -137,12 +160,12 @@ export function AuditPage(): JSX.Element {
           <PreviewTableHead>
             <PreviewTh className="w-[120px]">Время</PreviewTh>
             <PreviewTh className="w-[190px]">Пользователь</PreviewTh>
-            <PreviewTh className="w-[150px]">Scope</PreviewTh>
+            {isOrgAdmin ? <PreviewTh className="w-[150px]">Филиал</PreviewTh> : null}
             <PreviewTh>Действие</PreviewTh>
             <PreviewTh>Объект</PreviewTh>
             <PreviewTh className="w-[105px]">Результат</PreviewTh>
             <PreviewTh className="w-[130px]">Correlation ID</PreviewTh>
-            <PreviewTh className="w-11" />
+            <PreviewActionTh />
           </PreviewTableHead>
           <tbody>
             {rows.map((entry) => (
@@ -161,7 +184,7 @@ export function AuditPage(): JSX.Element {
                 <PreviewTd>
                   <PreviewCellStack primary={entry.actorName} secondary={entry.actorRole} />
                 </PreviewTd>
-                <PreviewTd className="truncate text-[12.5px]">{entry.branchName ?? '—'}</PreviewTd>
+                {isOrgAdmin ? <PreviewTd className="truncate text-[12.5px]">{entry.branchName ?? '—'}</PreviewTd> : null}
                 <PreviewTd className="truncate" title={entry.action}>
                   {entry.action}
                 </PreviewTd>
@@ -174,7 +197,7 @@ export function AuditPage(): JSX.Element {
                 <PreviewTd className="whitespace-nowrap">
                   <CopyCorrelationId id={entry.correlationId} />
                 </PreviewTd>
-                <PreviewTd className="text-right">
+                <PreviewActionCell>
                   <IconButton
                     label="Открыть детали"
                     size="sm"
@@ -185,7 +208,7 @@ export function AuditPage(): JSX.Element {
                   >
                     <Eye className="h-4 w-4" aria-hidden="true" />
                   </IconButton>
-                </PreviewTd>
+                </PreviewActionCell>
               </PreviewTr>
             ))}
           </tbody>

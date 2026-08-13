@@ -77,29 +77,3 @@ export function PreviewTextInput({
     />
   );
 }
-
-export function PreviewFieldSelect({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-}): JSX.Element {
-  return (
-    <select
-      value={value}
-      onChange={(event) => {
-        onChange(event.target.value);
-      }}
-      className={FIELD_CLASSES}
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
-  );
-}
