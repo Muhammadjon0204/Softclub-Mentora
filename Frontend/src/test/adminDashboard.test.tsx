@@ -26,13 +26,9 @@ describe('Admin UI: фундамент и Dashboard', () => {
     expect(screen.getByText('Филиалы')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Все филиалы/i })).toBeInTheDocument();
 
-    // Дашборд в режиме «Все филиалы» показывает таблицу филиалов, а не категорий.
-    expect(await screen.findByRole('heading', { name: 'Состояние филиалов' })).toBeInTheDocument();
-    expect(screen.getAllByText('Главный офис').length).toBeGreaterThan(0);
-    expect(screen.getByText('Филиал Худжанд')).toBeInTheDocument();
-    expect(screen.getByText('Филиал Бохтар')).toBeInTheDocument();
-    // Филиал Бохтар намеренно без Branch Admin (ТЗ TEN-017) — заметно на дашборде.
-    expect(screen.getByText('без Admin')).toBeInTheDocument();
+    // Дашборд в режиме «Все филиалы» показывает ranking-карточку по всем
+    // филиалам (раздел 12 полироли — сменила таблицу «Состояние филиалов»).
+    expect(await screen.findByRole('heading', { name: 'Лучший филиал' })).toBeInTheDocument();
   });
 
   // 2
@@ -45,12 +41,14 @@ describe('Admin UI: фундамент и Dashboard', () => {
 
     // Badge виден (несколько вхождений имени филиала допустимы — sidebar + topbar).
     expect(screen.getAllByText('Главный офис').length).toBeGreaterThan(0);
-    // У Branch Admin нет интерактивного селектора филиала.
-    expect(document.querySelector('[aria-haspopup="listbox"]')).toBeNull();
+    // У Branch Admin нет интерактивного селектора филиала — ищем только в
+    // topbar (`aria-haspopup="listbox"` глобально уже не уникален: тот же
+    // атрибут теперь и у несвязанного «Период аналитики» в теле дашборда).
+    expect(document.querySelector('header [aria-haspopup="listbox"]')).toBeNull();
 
-    // Показатели относятся к категориям, а не к сводке по филиалам.
-    expect(await screen.findByRole('heading', { name: 'Состояние категорий' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Состояние филиалов' })).toBeNull();
+    // Показатели относятся к текущему филиалу (single-branch режим), не к ranking по всем.
+    expect(await screen.findByRole('heading', { name: 'Результат филиала' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Лучший филиал' })).toBeNull();
   });
 
   // 3 + 6 + 7
@@ -64,18 +62,18 @@ describe('Admin UI: фундамент и Dashboard', () => {
     await user.type(screen.getByPlaceholderText('Поиск по филиалам…'), 'Худжанд');
     await user.click(await screen.findByRole('option', { name: /Худжанд/i }));
 
-    // Заголовок сменился на филиальный, таблица филиалов исчезла — новых
-    // «Все филиалы» данных быть не может одновременно со сводкой по категориям.
+    // Заголовок сменился на филиальный, ranking-карточка «по всем филиалам»
+    // исчезла — новых «Все филиалы» данных быть не может одновременно со
+    // сводкой по одному филиалу.
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Обзор филиала' })).toBeInTheDocument();
     });
-    expect(screen.queryByRole('heading', { name: 'Состояние филиалов' })).toBeNull();
-    expect(await screen.findByRole('heading', { name: 'Состояние категорий' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Лучший филиал' })).toBeNull();
+    expect(await screen.findByRole('heading', { name: 'Результат филиала' })).toBeInTheDocument();
 
-    // Категория Design существует только в Худжанде и её вести некому (ТЗ SCH-018) —
-    // характерный, проверяемый признак того, что подгрузились именно его данные.
+    // Категория Design существует только в Худжанде (ТЗ SCH-018) — характерный,
+    // проверяемый признак того, что подгрузились именно его данные.
     expect(await screen.findByText('Design')).toBeInTheDocument();
-    expect(screen.getByText('нет лида')).toBeInTheDocument();
   });
 
   // 8
@@ -107,7 +105,7 @@ describe('Admin UI: фундамент и Dashboard', () => {
     await loginAs(TEST_ACCOUNTS.admin);
     renderApp('/admin/dashboard');
 
-    expect(await screen.findByText('Не удалось загрузить обзор')).toBeInTheDocument();
+    expect(await screen.findByText('Не удалось загрузить данные обзора')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /повторить/i })).toBeInTheDocument();
   });
 });
@@ -251,7 +249,11 @@ describe('Admin shell: sidebar collapse и profile dropdown', () => {
 
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByRole('menuitem', { name: /выйти/i })).toBeNull();
+    // Панель остаётся в DOM до конца exit-анимации (130мс, `useOverlayPresence`) —
+    // то же самое, что видит реальный пользователь (плавное исчезновение, не мгновенный unmount).
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem', { name: /выйти/i })).toBeNull();
+    });
     expect(trigger).toHaveFocus();
   });
 
@@ -265,7 +267,9 @@ describe('Admin shell: sidebar collapse и profile dropdown', () => {
 
     await user.click(heading);
 
-    expect(screen.queryByRole('menuitem', { name: /выйти/i })).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole('menuitem', { name: /выйти/i })).toBeNull();
+    });
   });
 
   it('на mobile trigger профиля остаётся доступен через стабильный aria-label (виден только avatar)', async () => {

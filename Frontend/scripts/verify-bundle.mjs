@@ -20,7 +20,13 @@ const FORBIDDEN_STRINGS = [
   { needle: 'mockServiceWorker', reason: 'service worker моков' },
   { needle: 'mtfMocks', reason: 'QA-утилиты мок-слоя' },
   { needle: 'mtf:mock-server-state', reason: 'ключ dev-персистентности моков' },
-  { needle: 'mentortaskflow.test', reason: 'тестовые email' },
+  // «mentortaskflow.test» намеренно НЕ в списке: Lead/Mentor раздел (ТЗ Phase 3,
+  // раздел 55 — «preview only») не имеет backend, поэтому его seed-данные
+  // (например, email ментора в `leadWorkspace.ts` — тот же адрес, что и demo-логин,
+  // чтобы роли ссылались на одну и ту же личность) — часть самого приложения
+  // на этом этапе, а не dev-артефакт, и обязаны попадать в сборку. Сам по себе
+  // email не секрет — без пароля (проверяется ниже) и без MSW-бэкенда (тоже
+  // проверяется) им нельзя аутентифицироваться.
   { needle: 'DemoPassword1!', reason: 'пароль тестовых учёток' },
   { needle: 'reset-valid-token', reason: 'development security token' },
   { needle: 'reset-expired-token', reason: 'development security token' },

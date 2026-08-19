@@ -84,6 +84,6 @@ describe('Маршрутизация и guard-ы', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/mentor/dashboard');
     });
-    expect(screen.getByRole('heading', { name: 'Дашборд ментора' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Обзор' })).toBeInTheDocument();
   });
 });

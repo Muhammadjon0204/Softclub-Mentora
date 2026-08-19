@@ -21,8 +21,3 @@ export function usePreviewToast(): [string | null, (message: string) => void] {
 
   return [null, show];
 }
-
-/** Рендеринг toast теперь глобальный (`ToastViewport`) — этот компонент ничего не рендерит. */
-export function PreviewToast(_props: { message: string | null }): null {
-  return null;
-}

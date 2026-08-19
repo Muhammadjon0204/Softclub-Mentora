@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { Modal } from '../../../shared/overlays';
 import { Button } from '../../../shared/ui/Button';
@@ -20,7 +20,7 @@ export interface TopicAssignmentFormModalProps {
 }
 
 export function TopicAssignmentFormModal({ open, existing, onOpenChange, onSubmit }: TopicAssignmentFormModalProps): JSX.Element {
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<TopicAssignmentFormValues>({
+  const { register, control, handleSubmit, reset, formState: { errors } } = useForm<TopicAssignmentFormValues>({
     resolver: zodResolver(topicAssignmentSchema),
     defaultValues: { type: existing?.type ?? 'HomeTask', title: existing?.title ?? '', description: existing?.description ?? '', isRequired: existing?.isRequired ?? true },
   });
@@ -39,9 +39,20 @@ export function TopicAssignmentFormModal({ open, existing, onOpenChange, onSubmi
         className="space-y-4"
       >
         <FormField label="Тип" htmlFor="tpa-type" required>
-          <FormSelect id="tpa-type" {...register('type')}>
-            {TYPE_OPTIONS.map((type) => <option key={type} value={type}>{TOPIC_ASSIGNMENT_TYPE_LABEL[type]}</option>)}
-          </FormSelect>
+          <Controller
+            control={control}
+            name="type"
+            render={({ field }) => (
+              <FormSelect
+                id="tpa-type"
+                value={field.value}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                options={TYPE_OPTIONS.map((type) => ({ value: type, label: TOPIC_ASSIGNMENT_TYPE_LABEL[type] }))}
+              />
+            )}
+          />
         </FormField>
         <FormField label="Название" htmlFor="tpa-title" required error={errors.title?.message}>
           <FormInput id="tpa-title" invalid={errors.title !== undefined} {...register('title')} />

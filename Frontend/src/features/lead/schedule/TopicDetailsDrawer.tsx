@@ -87,7 +87,7 @@ export function TopicDetailsDrawer({ topic, topicId, onClose, onEditTopic }: Top
                           {item.description.length > 0 ? <p className="mt-0.5 text-[12.5px] text-ink-muted">{item.description}</p> : null}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => { setTpaModal({ mode: 'edit', item }); }}>
+                          <Button variant="ghost" size="sm" onClick={() => { setTpaModal({ mode: 'edit', item }); }} title="Изменить шаблон">
                             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                           <Button

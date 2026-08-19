@@ -8,11 +8,11 @@ import { useAuth } from '../auth/useAuth';
 import { AuthBootstrapScreen } from '../components/auth/AuthBootstrapScreen';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { LeadLayout } from '../layouts/LeadLayout';
+import { MentorLayout } from '../layouts/MentorLayout';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { SetPasswordPage } from '../pages/auth/SetPasswordPage';
-import { DashboardPlaceholder } from '../pages/dashboard/DashboardPlaceholder';
 import { AssignmentsPage } from '../pages/admin/AssignmentsPage';
 import { AuditPage } from '../pages/admin/AuditPage';
 import { BranchesPage } from '../pages/admin/BranchesPage';
@@ -30,6 +30,12 @@ import { AssignmentsPage as LeadAssignmentsPage } from '../pages/lead/Assignment
 import { ReviewQueuePage as LeadReviewQueuePage } from '../pages/lead/ReviewQueuePage';
 import { TeamPage as LeadTeamPage } from '../pages/lead/TeamPage';
 import { ReportsPage as LeadReportsPage } from '../pages/lead/ReportsPage';
+import { DashboardPage as MentorDashboardPage } from '../pages/mentor/DashboardPage';
+import { SchedulePage as MentorSchedulePage } from '../pages/mentor/SchedulePage';
+import { AssignmentsPage as MentorAssignmentsPage } from '../pages/mentor/AssignmentsPage';
+import { HistoryPage as MentorHistoryPage } from '../pages/mentor/HistoryPage';
+import { ReportsPage as MentorReportsPage } from '../pages/mentor/ReportsPage';
+import { NotificationsPage as MentorNotificationsPage } from '../pages/mentor/NotificationsPage';
 
 /** Аутентифицированному на /login делать нечего — уводим на его дашборд. */
 function RedirectIfAuthenticated({ children }: { children: ReactNode }): JSX.Element {
@@ -121,17 +127,27 @@ export function AppRouter(): JSX.Element {
         <Route path="reports" element={<LeadReportsPage />} />
       </Route>
 
-      {/* Защищённый маршрут-заглушка: Mentor проектируется отдельным этапом. */}
+      {/* Mentor-панель: тот же приём, что `/lead/*` — единый `/mentor/*`, ровно
+          маршруты из навигации `MENTOR_NAV_ITEMS` (ТЗ 2.2, раздел 24.5: Mentor
+          исполняет назначенные Lead задания, а не управляет ими). Detail-роуты
+          не заводятся — `?assignmentId=`/`?topicId=` + drawer. */}
       <Route
-        path="/mentor/dashboard"
+        path="/mentor"
         element={
           <RequireAuth>
             <RequireRole allowed={['Mentor']}>
-              <DashboardPlaceholder title="Дашборд ментора" />
+              <MentorLayout />
             </RequireRole>
           </RequireAuth>
         }
-      />
+      >
+        <Route path="dashboard" element={<MentorDashboardPage />} />
+        <Route path="schedule" element={<MentorSchedulePage />} />
+        <Route path="tasks" element={<MentorAssignmentsPage />} />
+        <Route path="history" element={<MentorHistoryPage />} />
+        <Route path="reports" element={<MentorReportsPage />} />
+        <Route path="notifications" element={<MentorNotificationsPage />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

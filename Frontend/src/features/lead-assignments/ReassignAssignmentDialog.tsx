@@ -34,12 +34,15 @@ export function ReassignAssignmentDialog({ open, onOpenChange, assignmentTitle, 
       onConfirm={() => { onConfirm(mentorId); }}
       details={
         <FormField label="Новый ментор" htmlFor="reassign-mentor" required hint={mentors.length === 0 ? 'Нет других активных менторов направления' : undefined}>
-          <FormSelect id="reassign-mentor" value={mentorId} onChange={(event) => { setMentorId(event.target.value); }}>
-            <option value="">Выберите ментора</option>
-            {mentors.map((mentor) => (
-              <option key={mentor.id} value={mentor.id}>{mentor.fullName}</option>
-            ))}
-          </FormSelect>
+          <FormSelect
+            id="reassign-mentor"
+            value={mentorId}
+            onValueChange={setMentorId}
+            options={[
+              { value: '', label: 'Выберите ментора' },
+              ...mentors.map((mentor) => ({ value: mentor.id, label: mentor.fullName })),
+            ]}
+          />
         </FormField>
       }
     />

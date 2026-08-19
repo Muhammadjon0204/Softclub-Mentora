@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider } from '../auth/AuthProvider';
 import { AppRouter } from '../routes/AppRouter';
+import { OverlayProvider, ToastProvider } from '../shared/overlays';
 
 /** Показывает текущий маршрут — так проще проверять redirect'ы. */
 function LocationProbe(): JSX.Element {
@@ -35,8 +36,12 @@ export function renderApp(initialPath = '/login', options: RenderAppOptions = {}
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <AuthProvider>
-          <AppRouter />
-          <LocationProbe />
+          <OverlayProvider>
+            <ToastProvider>
+              <AppRouter />
+              <LocationProbe />
+            </ToastProvider>
+          </OverlayProvider>
         </AuthProvider>
       </MemoryRouter>
     </QueryClientProvider>

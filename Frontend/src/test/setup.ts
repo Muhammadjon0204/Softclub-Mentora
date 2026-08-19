@@ -11,6 +11,30 @@ import { resetDb } from '../mocks/db';
 import { clearMockServerState } from '../mocks/persistence';
 import { server } from '../mocks/server';
 
+// jsdom не реализует ResizeObserver — им пользуются компоненты вроде
+// `DashboardRankingRow` для проверки truncation. Реальный layout в тестах не
+// нужен, поэтому достаточно no-op заглушки, как делает testing-library для Popper и т.п.
+class ResizeObserverStub {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+globalThis.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver;
+
+// jsdom тоже не реализует window.matchMedia (нужен `useFloatingChartTooltip`
+// для `prefers-reduced-motion`) — статичный MediaQueryList с matches: false,
+// тот же приём, что общепринятая заглушка для jsdom в CRA/Next тестах.
+window.matchMedia ??= ((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: () => {},
+  removeListener: () => {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  dispatchEvent: () => false,
+})) as unknown as typeof window.matchMedia;
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
 });

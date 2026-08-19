@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
 import { LEAD_ASSIGNMENTS } from '../../../mocks/ui-preview/leadAssignments.preview';
-import type { LeadAssignmentRecord, LeadTaskEventRecord } from '../../../mocks/ui-preview/leadAssignments.preview';
+import type { LeadAssignmentRecord, LeadSubmissionFile, LeadSubmissionRecord, LeadTaskEventRecord } from '../../../mocks/ui-preview/leadAssignments.preview';
 import { MOCK_NOW } from '../../../mocks/domain/reference';
-import { canAcceptSuggestion, canCancel, canDecideReview, canEdit, canPublish, canReassign, canStartReview } from './leadAssignmentPresentation';
+import { canAcceptSuggestion, canCancel, canDecideReview, canEdit, canPublish, canReassign, canStartReview, canSubmit } from './leadAssignmentPresentation';
 
 /**
  * Module-level preview-стор для Assignment (тот же приём, что
@@ -41,6 +41,15 @@ export class LeadAssignmentPreviewError extends Error {}
 function getScoped(categoryId: string, id: string): LeadAssignmentRecord {
   const found = assignments.find((a) => a.id === id);
   if (found === undefined || found.categoryId !== categoryId) {
+    throw new LeadAssignmentPreviewError('Задание не найдено');
+  }
+  return found;
+}
+
+/** SUB-001: Mentor владеет Assignment только если `mentorId` совпадает — тот же anti-enumeration приём, что `getScoped` для Lead/`categoryId`. */
+function getOwnedByMentor(mentorId: string, id: string): LeadAssignmentRecord {
+  const found = assignments.find((a) => a.id === id);
+  if (found === undefined || found.mentorId !== mentorId) {
     throw new LeadAssignmentPreviewError('Задание не найдено');
   }
   return found;
@@ -254,5 +263,58 @@ export function requestReworkPreview(categoryId: string, id: string, leadName: s
       { ...a, status: 'NeedsRework', currentDueAt: reworkDueAt, submissions },
       { kind: 'ReviewNeedsRework', occurredAt: MOCK_NOW, actorName: leadName },
     );
+  });
+}
+
+/* --------------------------------------- действия Mentor ---------------------------------------- */
+
+export interface SubmitInput {
+  files: LeadSubmissionFile[];
+  comment: string | null;
+}
+
+/**
+ * SUB-001..SUB-004, переходы №5/13/16 таблицы 13.3: Mentor загружает
+ * Submission по своему Assignment. Единственная Mentor-легальная мутация в
+ * этом файле — намеренно не вынесена в отдельный mentor-стор, потому что это
+ * тот же самый Assignment, который видит и решает Lead («ONE TASK», не два
+ * параллельных объекта — см. `features/mentor/assignments/mentorAssignmentPreviewStore.ts`,
+ * который лишь реэкспортирует эту функцию). Никогда не переводит статус
+ * дальше `Submitted` — в `InReview`/`Approved`/`NeedsRework` может перевести
+ * только Lead (`startReviewPreview`/`approvePreview`/`requestReworkPreview`).
+ */
+export function submitPreview(mentorId: string, id: string, mentorName: string, input: SubmitInput): LeadAssignmentRecord {
+  const existing = getOwnedByMentor(mentorId, id);
+  if (!canSubmit(existing)) throw new LeadAssignmentPreviewError('Загрузка решения недоступна в текущем статусе задания');
+  if (existing.status === 'Overdue' && !existing.allowLateSubmission) {
+    throw new LeadAssignmentPreviewError('Приём работ по этой задаче закрыт. Обратитесь к тимлиду.');
+  }
+  if (input.files.length === 0) throw new LeadAssignmentPreviewError('Прикрепите хотя бы один файл');
+  const trimmedComment = input.comment !== null && input.comment.trim().length > 0 ? input.comment.trim() : null;
+  const isLate = existing.status === 'Overdue';
+
+  return patch(id, (a) => {
+    const versionNumber = a.submissions.length + 1;
+    const submission: LeadSubmissionRecord = {
+      id: `${a.id}-sub-${String(versionNumber)}`,
+      versionNumber,
+      submittedAt: MOCK_NOW,
+      isLate,
+      comment: trimmedComment,
+      files: input.files,
+      review: null,
+    };
+    const withSubmission = {
+      ...a,
+      status: 'Submitted' as const,
+      firstSubmittedAt: a.firstSubmittedAt ?? MOCK_NOW,
+      submissions: [...a.submissions, submission],
+    };
+    return pushEvent(withSubmission, {
+      kind: isLate ? 'LateSubmissionUploaded' : 'SubmissionUploaded',
+      occurredAt: MOCK_NOW,
+      actorName: mentorName,
+      detail: `Версия ${String(versionNumber)}`,
+    });
   });
 }

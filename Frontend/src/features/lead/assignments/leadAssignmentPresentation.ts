@@ -87,6 +87,20 @@ export function canDecideReview(a: LeadAssignmentRecord): boolean {
   return a.status === 'InReview';
 }
 
+/**
+ * SUB-001/13.5: Mentor может загрузить Submission только из Assigned,
+ * NeedsRework или Overdue (последнее — только если `allowLateSubmission`).
+ * Живёт здесь, а не в отдельном mentor-файле: это тот же единственный
+ * источник истины о переходах, что и остальные `canX()` — Mentor и Lead
+ * работают над одним и тем же `LeadAssignmentRecord` (см.
+ * `features/mentor/assignments/mentorAssignmentPreviewStore.ts`).
+ */
+export function canSubmit(a: LeadAssignmentRecord): boolean {
+  if (a.status === 'Assigned' || a.status === 'NeedsRework') return true;
+  if (a.status === 'Overdue') return a.allowLateSubmission;
+  return false;
+}
+
 export interface AssignmentCapabilities {
   canPublish: boolean;
   canAcceptSuggestion: boolean;
@@ -96,6 +110,7 @@ export interface AssignmentCapabilities {
   canCancel: boolean;
   canStartReview: boolean;
   canDecideReview: boolean;
+  canSubmit: boolean;
   isTerminal: boolean;
 }
 
@@ -110,6 +125,7 @@ export function assignmentCapabilities(a: LeadAssignmentRecord): AssignmentCapab
     canCancel: canCancel(a),
     canStartReview: canStartReview(a),
     canDecideReview: canDecideReview(a),
+    canSubmit: canSubmit(a),
     isTerminal: isTerminal(a.status),
   };
 }

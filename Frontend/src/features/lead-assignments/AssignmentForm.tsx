@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { formatCategoryDate, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
@@ -55,6 +55,7 @@ export function AssignmentForm({ formId, existing, bannerError, onDirtyChange, o
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
@@ -116,12 +117,15 @@ export function AssignmentForm({ formId, existing, bannerError, onDirtyChange, o
       {bannerError !== null ? <FormBannerError message={bannerError} /> : null}
 
       <FormField label="Тема расписания" htmlFor="af-topic" hint="Необязательно — можно создать индивидуальное задание вне расписания">
-        <FormSelect id="af-topic" value={selectedTopicAssignmentId} onChange={(event) => { handleTemplateChange(event.target.value); }}>
-          <option value="">Индивидуальное задание</option>
-          {topicAssignmentOptions.map((option) => (
-            <option key={option.id} value={option.id}>{option.label}</option>
-          ))}
-        </FormSelect>
+        <FormSelect
+          id="af-topic"
+          value={selectedTopicAssignmentId}
+          onValueChange={handleTemplateChange}
+          options={[
+            { value: '', label: 'Индивидуальное задание' },
+            ...topicAssignmentOptions.map((option) => ({ value: option.id, label: option.label })),
+          ]}
+        />
       </FormField>
 
       <FormField label="Название" htmlFor="af-title" required error={errors.title?.message}>
@@ -133,12 +137,24 @@ export function AssignmentForm({ formId, existing, bannerError, onDirtyChange, o
       </FormField>
 
       <FormField label="Ментор" htmlFor="af-mentor" required error={errors.mentorId?.message} hint={mentors.length === 0 ? 'В направлении пока нет активных менторов' : undefined}>
-        <FormSelect id="af-mentor" invalid={errors.mentorId !== undefined} {...register('mentorId')}>
-          <option value="">Выберите ментора</option>
-          {mentors.map((mentor) => (
-            <option key={mentor.id} value={mentor.id}>{mentor.fullName}</option>
-          ))}
-        </FormSelect>
+        <Controller
+          control={control}
+          name="mentorId"
+          render={({ field }) => (
+            <FormSelect
+              id="af-mentor"
+              invalid={errors.mentorId !== undefined}
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              ref={field.ref}
+              options={[
+                { value: '', label: 'Выберите ментора' },
+                ...mentors.map((mentor) => ({ value: mentor.id, label: mentor.fullName })),
+              ]}
+            />
+          )}
+        />
       </FormField>
 
       <div className="grid grid-cols-2 gap-3">
