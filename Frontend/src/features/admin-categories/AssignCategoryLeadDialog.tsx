@@ -6,7 +6,8 @@ import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField } from '../../shared/ui/FormField';
 import { branchDisplayName } from '../admin-users/userPresentation';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
+import type { LeadCandidateRef } from './useCategoryActions';
 import type { PreviewCategoryDetails } from './categoryPresentation';
 
 export interface AssignCategoryLeadDialogProps {
@@ -14,13 +15,17 @@ export interface AssignCategoryLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
-  onConfirm: (leadUserId: string) => Promise<void>;
+  onConfirm: (lead: LeadCandidateRef) => Promise<void>;
 }
 
-/** ConfirmDialog + select кандидата (раздел 11 промпта). */
+/**
+ * ConfirmDialog + select кандидата (раздел 11 промпта). `reason` для `POST /users/{id}/change-role`
+ * генерируется автоматически из контекста этого действия (не переспрашивается у админа — единственное
+ * решение уже объяснено выбором «Назначить руководителя», см. `useCategoryActions.assignLead`).
+ */
 export function AssignCategoryLeadDialog({ category, open, onOpenChange, isSubmitting, onConfirm }: AssignCategoryLeadDialogProps): JSX.Element {
-  const users = useUsersPreview();
-  const candidates = category !== null ? users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchName === category.branchName) : [];
+  const { users } = useUsersQuery();
+  const candidates = category !== null ? users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchId === category.branchId) : [];
   const [selectedId, setSelectedId] = useState('');
 
   useEffect(() => {
@@ -43,10 +48,10 @@ export function AssignCategoryLeadDialog({ category, open, onOpenChange, isSubmi
       }
       confirmLabel="Назначить"
       loading={isSubmitting}
-      confirmDisabled={category === null || selectedId.length === 0}
+      confirmDisabled={category === null || selected === undefined}
       onConfirm={async () => {
-        if (category === null || selectedId.length === 0) return;
-        await onConfirm(selectedId);
+        if (category === null || selected === undefined) return;
+        await onConfirm({ id: selected.id, concurrencyToken: selected.concurrencyToken ?? '', fullName: selected.fullName });
         onOpenChange(false);
       }}
       details={

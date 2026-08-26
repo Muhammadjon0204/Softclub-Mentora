@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 
 import { mentorNow } from '../mentor/scope/mentorDateFormat';
-import { useScopedMentorAssignments } from '../mentor/scope/useScopedMentorAssignments';
+import { useScopedMentorAssignmentsWithEvents } from '../mentor/scope/useScopedMentorAssignments';
 import { DAY_MS } from '../../mocks/domain/reference';
 import { markAllNotificationsRead, markNotificationRead, seedReadStateOnce, useMentorNotificationReadIds } from './mentorNotificationReadStore';
 import { buildMentorNotifications } from './mentorNotificationSource';
@@ -19,7 +19,7 @@ export interface UseMentorNotificationsResult {
 
 /** Единая точка чтения ленты уведомлений ментора — комбинирует производные данные (`buildMentorNotifications`) с состоянием прочитанности. */
 export function useMentorNotifications(): UseMentorNotificationsResult {
-  const assignments = useScopedMentorAssignments();
+  const assignments = useScopedMentorAssignmentsWithEvents();
   const readIds = useMentorNotificationReadIds();
 
   const all = useMemo(() => buildMentorNotifications(assignments), [assignments]);

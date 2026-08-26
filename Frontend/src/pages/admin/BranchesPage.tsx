@@ -15,14 +15,15 @@ import { BranchFormDrawer } from '../../features/admin-branches/BranchFormDrawer
 import type { BranchFormDrawerState } from '../../features/admin-branches/BranchFormDrawer';
 import { ChangeBranchAdminDialog } from '../../features/admin-branches/ChangeBranchAdminDialog';
 import { DeactivateBranchDialog } from '../../features/admin-branches/DeactivateBranchDialog';
-import { useBranchPreviewActions } from '../../features/admin-branches/useBranchPreviewActions';
+import { useBranchActions } from '../../features/admin-branches/useBranchActions';
 import type { PreviewBranchDetails } from '../../features/admin-branches/branchPresentation';
-import { useBranchesPreview } from '../../features/admin-branches/branchPreviewStore';
+import { useBranchesQuery } from '../../features/admin-branches/useBranchesQuery';
 import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { StatusDot } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
+import { ErrorState } from '../../shared/ui/ErrorState';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Все статусы' },
@@ -69,7 +70,8 @@ export function BranchesPage(): JSX.Element {
   const navigate = useNavigate();
   const realBranchContext = useBranchContext();
 
-  const allBranches = useBranchesPreview();
+  const branchesQuery = useBranchesQuery();
+  const allBranches = branchesQuery.branches;
   // `PreviewBranch.name` — городское display-имя ("Худжанд"), а `authUser.branch.name` —
   // институциональное («Филиал Худжанд», см. branchDirectory.ts) — сравнивать нужно по `id`.
   const scopedBranches = useMemo(
@@ -125,10 +127,10 @@ export function BranchesPage(): JSX.Element {
     pct: distributionTotal === 0 ? 0 : Math.round((entry.count / distributionTotal) * 100),
   }));
 
-  const actions = useBranchPreviewActions();
+  const actions = useBranchActions();
 
   async function handleDeactivate(target: PreviewBranchDetails): Promise<void> {
-    await actions.deactivateBranch(target.id);
+    await actions.deactivateBranch(target.id, target.concurrencyToken ?? '');
     // Раздел 34 промпта: если деактивированный филиал был выбран в реальном BranchContext,
     // Organization Admin переключается на «Все филиалы» — контекст не должен «зависать» на неактивном.
     if (isOrgAdmin && realBranchContext.selectedBranchId === target.id) {
@@ -177,7 +179,20 @@ export function BranchesPage(): JSX.Element {
               <PreviewActionTh />
             </PreviewTableHead>
             <tbody>
-              {rows.map((branchRow) => (
+              {branchesQuery.isPending ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-10 text-center text-[13px] text-ink-muted sm:px-6">
+                    Загрузка филиалов…
+                  </td>
+                </tr>
+              ) : branchesQuery.error !== null ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-2 sm:px-6">
+                    <ErrorState error={branchesQuery.error} title="Не удалось загрузить филиалы" onRetry={branchesQuery.refetch} />
+                  </td>
+                </tr>
+              ) : (
+                rows.map((branchRow) => (
                 <tr
                   key={branchRow.id}
                   ref={(node) => {
@@ -240,7 +255,8 @@ export function BranchesPage(): JSX.Element {
                     />
                   </PreviewActionCell>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </PreviewTable>
         </Card>
@@ -297,8 +313,10 @@ export function BranchesPage(): JSX.Element {
         open={actionDialog?.type === 'assignAdmin'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (adminUserId) => {
-          if (actionDialog?.type === 'assignAdmin') await actions.assignAdmin(actionDialog.branch.id, adminUserId);
+        onConfirm={async (_adminUserId) => {
+          // TODO(users-domain): назначение администратора филиала — POST /users/{id}/change-role,
+          // вне скоупа этой интеграции. `useBranchActions.assignAdmin` — информационный no-op.
+          if (actionDialog?.type === 'assignAdmin') await actions.assignAdmin(actionDialog.branch.id);
         }}
       />
 
@@ -307,8 +325,10 @@ export function BranchesPage(): JSX.Element {
         open={actionDialog?.type === 'changeAdmin'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (input) => {
-          if (actionDialog?.type === 'changeAdmin') await actions.changeAdmin(actionDialog.branch.id, input);
+        onConfirm={async (_input) => {
+          // TODO(users-domain): смена администратора филиала — POST /users/{id}/change-role,
+          // вне скоупа этой интеграции. `useBranchActions.changeAdmin` — информационный no-op.
+          if (actionDialog?.type === 'changeAdmin') await actions.changeAdmin(actionDialog.branch.id);
         }}
       />
 
@@ -318,7 +338,7 @@ export function BranchesPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async () => {
-          if (actionDialog?.type === 'activate') await actions.activateBranch(actionDialog.branch.id);
+          if (actionDialog?.type === 'activate') await actions.activateBranch(actionDialog.branch.id, actionDialog.branch.concurrencyToken ?? '');
         }}
       />
 

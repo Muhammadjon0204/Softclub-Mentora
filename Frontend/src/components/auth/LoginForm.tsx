@@ -12,7 +12,6 @@ import { loginSchema, type LoginFormValues } from '../../schemas/auth.schema';
 import { PasswordField, TextField } from '../ui/TextField';
 import { applyServerValidation } from './applyServerValidation';
 import { AuthError } from './AuthError';
-import { DevAccountsPanel } from './DevAccountsPanel';
 import { SubmitButton } from './SubmitButton';
 
 export function LoginForm(): JSX.Element {
@@ -26,7 +25,6 @@ export function LoginForm(): JSX.Element {
     handleSubmit,
     setError,
     setFocus,
-    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -60,12 +58,6 @@ export function LoginForm(): JSX.Element {
     if (isBlocked || mutation.isPending) return;
     mutation.mutate(values);
   });
-
-  /** Только заполняет поля — вход всё ещё требует явного нажатия «Войти». */
-  const handleDevFill = (email: string, password: string): void => {
-    setValue('email', email, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-    setValue('password', password, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-  };
 
   return (
     <div className="space-y-5">
@@ -121,7 +113,6 @@ export function LoginForm(): JSX.Element {
         </SubmitButton>
       </form>
 
-      <DevAccountsPanel onFill={handleDevFill} />
     </div>
   );
 }

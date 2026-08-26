@@ -7,11 +7,12 @@ import { PreviewActionMenu } from '../../features/admin-preview/PreviewActionMen
 import type { PreviewActionMenuItem } from '../../features/admin-preview/PreviewActionMenu';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
 import { LEAD_STATUS_META, canStartReview, pluralizeRu, sourceLabel } from '../../features/lead/assignments/leadAssignmentPresentation';
-import { LeadAssignmentPreviewError, approvePreview, requestReworkPreview, startReviewPreview } from '../../features/lead/assignments/leadAssignmentPreviewStore';
+import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
 import { formatCategoryDateTime, formatRelative, leadNow } from '../../features/lead/scope/leadDateFormat';
-import { mentorNameOf, scopedActiveMentors } from '../../features/lead/scope/leadScopedData';
+import { useActiveLeadMentors, useLeadMentorNameResolver } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useResolvedLeadAssignment, useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
+import { useReviewActions } from '../../features/lead/reviews/useReviewActions';
 import { ReviewWorkspaceDrawer } from '../../features/lead-reviews/ReviewWorkspaceDrawer';
 import { DAY_MS } from '../../mocks/domain/reference';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
@@ -31,13 +32,13 @@ function waitingLabel(waitingSinceMs: number): string {
 
 interface ReviewQueueRowProps {
   assignment: LeadAssignmentRecord;
-  categoryId: string;
   timeZoneId: string;
   waitingSince: number;
   selected: boolean;
   onOpen: (id: string) => void;
   actionItems: PreviewActionMenuItem[];
   rowRef: (node: HTMLDivElement | null) => void;
+  mentorNameOf: (mentorId: string) => string;
 }
 
 /**
@@ -50,7 +51,7 @@ interface ReviewQueueRowProps {
  * остальные фиксированы и малы); mobile/tablet (`< md`) — тот же контент
  * складывается в компактную карточку вместо сжатия табличных колонок.
  */
-function ReviewQueueRow({ assignment: a, categoryId, timeZoneId, waitingSince, selected, onOpen, actionItems, rowRef }: ReviewQueueRowProps): JSX.Element {
+function ReviewQueueRow({ assignment: a, timeZoneId, waitingSince, selected, onOpen, actionItems, rowRef, mentorNameOf }: ReviewQueueRowProps): JSX.Element {
   const latest = a.submissions[a.submissions.length - 1];
   const statusMeta = LEAD_STATUS_META[a.status];
   const waitingMs = Math.max(0, leadNow() - waitingSince);
@@ -78,9 +79,9 @@ function ReviewQueueRow({ assignment: a, categoryId, timeZoneId, waitingSince, s
   const mentorBlock = (
     <div className="flex min-w-0 items-center gap-2">
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[9.5px] font-semibold text-brand">
-        {initialsOf(mentorNameOf(categoryId, a.mentorId))}
+        {initialsOf(mentorNameOf(a.mentorId))}
       </span>
-      <span className="truncate text-[12.5px] font-medium text-ink-secondary">{mentorNameOf(categoryId, a.mentorId)}</span>
+      <span className="truncate text-[12.5px] font-medium text-ink-secondary">{mentorNameOf(a.mentorId)}</span>
     </div>
   );
 
@@ -168,6 +169,9 @@ export function ReviewQueuePage(): JSX.Element {
   const scope = useLeadScope();
   const toast = useToast();
   const assignments = useScopedLeadAssignments();
+  const mentorNameOf = useLeadMentorNameResolver();
+  const assignmentActions = useAssignmentActions();
+  const reviewActions = useReviewActions();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [mentorFilter, setMentorFilter] = useState('all');
@@ -190,7 +194,7 @@ export function ReviewQueuePage(): JSX.Element {
     return items.map((a) => ({ assignment: a, waitingSince: a.firstSubmittedAt ?? a.assignedAt ?? 0 }));
   }, [assignments]);
 
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
   const mentorOptions = [{ value: 'all', label: 'Все менторы' }, ...mentors.map((m) => ({ value: m.id, label: m.fullName }))];
   const filtersActive = search.trim().length > 0 || mentorFilter !== 'all';
 
@@ -198,14 +202,14 @@ export function ReviewQueuePage(): JSX.Element {
     const query = search.trim().toLowerCase();
     const filtered = rawQueue.filter(({ assignment: a }) => {
       if (query.length > 0) {
-        const mentorName = mentorNameOf(scope.categoryId, a.mentorId).toLowerCase();
+        const mentorName = mentorNameOf(a.mentorId).toLowerCase();
         if (!a.title.toLowerCase().includes(query) && !mentorName.includes(query)) return false;
       }
       if (mentorFilter !== 'all' && a.mentorId !== mentorFilter) return false;
       return true;
     });
     return filtered.sort((a, b) => a.waitingSince - b.waitingSince);
-  }, [rawQueue, search, mentorFilter, scope.categoryId]);
+  }, [rawQueue, search, mentorFilter, mentorNameOf]);
 
   function openRow(id: string): void {
     const next = new URLSearchParams(searchParams);
@@ -221,18 +225,19 @@ export function ReviewQueuePage(): JSX.Element {
     window.requestAnimationFrame(() => { if (idToFocus !== null) rowRefs.current.get(idToFocus)?.focus(); });
   }
 
+  function token(a: LeadAssignmentRecord): string {
+    return a.concurrencyToken ?? '';
+  }
+
   /** Единственный пункт меню — «Начать проверку»; «Открыть» не добавлен нарочно, он дублировал бы клик по строке (раздел P промпта). */
   function buildActionItems(a: LeadAssignmentRecord): PreviewActionMenuItem[] {
     if (!canStartReview(a)) return [];
     return [{
       label: 'Начать проверку',
       onClick: () => {
-        try {
-          startReviewPreview(scope.categoryId, a.id, scope.leadName);
-          openRow(a.id);
-        } catch (error) {
-          toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось начать проверку');
-        }
+        assignmentActions.startReview(a.id, token(a))
+          .then(() => { openRow(a.id); })
+          .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось начать проверку'); });
       },
     }];
   }
@@ -281,12 +286,12 @@ export function ReviewQueuePage(): JSX.Element {
               <ReviewQueueRow
                 key={a.id}
                 assignment={a}
-                categoryId={scope.categoryId}
                 timeZoneId={scope.timeZoneId}
                 waitingSince={waitingSince}
                 selected={a.id === assignmentId}
                 onOpen={openRow}
                 actionItems={buildActionItems(a)}
+                mentorNameOf={mentorNameOf}
                 rowRef={(node) => { if (node) rowRefs.current.set(a.id, node); else rowRefs.current.delete(a.id); }}
               />
             ))}
@@ -298,30 +303,22 @@ export function ReviewQueuePage(): JSX.Element {
         assignment={selected}
         assignmentId={assignmentId}
         onClose={closeDrawer}
+        mentorNameOf={mentorNameOf}
         onStartReview={(a) => {
-          try {
-            startReviewPreview(scope.categoryId, a.id, scope.leadName);
-          } catch (error) {
-            toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось начать проверку');
-          }
+          assignmentActions.startReview(a.id, token(a))
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось начать проверку'); });
         }}
         onApprove={(a, comment) => {
-          try {
-            approvePreview(scope.categoryId, a.id, scope.leadName, comment);
-            toast.success('Задание одобрено');
-            closeDrawer();
-          } catch (error) {
-            toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось одобрить задание');
-          }
+          // RV1: `reviewActions.approve` resolves the LATEST submission's id from `a.submissions`
+          // itself (already hydrated by `useResolvedLeadAssignment`) — see `useReviewActions.ts`.
+          reviewActions.approve(a, comment)
+            .then(() => { toast.success('Задание одобрено'); closeDrawer(); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось одобрить задание'); });
         }}
         onNeedsRework={(a, comment, reworkDueAtMs) => {
-          try {
-            requestReworkPreview(scope.categoryId, a.id, scope.leadName, comment, reworkDueAtMs);
-            toast.success('Задание возвращено на доработку');
-            closeDrawer();
-          } catch (error) {
-            toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось вернуть на доработку');
-          }
+          reviewActions.requestRework(a, comment, reworkDueAtMs)
+            .then(() => { toast.success('Задание возвращено на доработку'); closeDrawer(); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось вернуть на доработку'); });
         }}
       />
     </div>

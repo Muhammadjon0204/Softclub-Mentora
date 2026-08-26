@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import type { UseFormSetError, UseFormSetFocus } from 'react-hook-form';
 
 import { useUsersPreview } from '../admin-users/userPreviewStore';
 import { SearchSelect } from '../../shared/select';
@@ -10,11 +11,16 @@ import type { AdminOptionValue, BranchCreateFormValues, BranchEditFormValues } f
 import { DEFAULT_TIMEZONE, TIMEZONE_OPTIONS } from './branchPresentation';
 import type { PreviewBranchDetails } from './branchPresentation';
 
+export interface BranchFormSubmitHelpers<TValues extends BranchCreateFormValues | BranchEditFormValues> {
+  setError: UseFormSetError<TValues>;
+  setFocus: UseFormSetFocus<TValues>;
+}
+
 export interface BranchCreateFormProps {
   formId: string;
   bannerError: string | null;
   onDirtyChange: (dirty: boolean) => void;
-  onSubmit: (values: BranchCreateFormValues, helpers: { setNameError: (message: string) => void; setCodeError: (message: string) => void }) => void | Promise<void>;
+  onSubmit: (values: BranchCreateFormValues, helpers: BranchFormSubmitHelpers<BranchCreateFormValues>) => void | Promise<void>;
 }
 
 /** Секции 1–4 из раздела 28 промпта: Основная информация → Контакты → Региональные настройки → Администратор. */
@@ -28,6 +34,7 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
     control,
     watch,
     setError,
+    setFocus,
     formState: { errors, isDirty },
   } = useForm<BranchCreateFormValues>({
     resolver: zodResolver(branchCreateSchema),
@@ -52,10 +59,7 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
   const adminOption = watch('adminOption');
 
   const submit = handleSubmit((values) => {
-    void onSubmit(values, {
-      setNameError: (message) => { setError('name', { type: 'server', message }); },
-      setCodeError: (message) => { setError('code', { type: 'server', message }); },
-    });
+    void onSubmit(values, { setError, setFocus });
   });
 
   return (

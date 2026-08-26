@@ -86,6 +86,13 @@ export interface LeadAssignmentRecord {
   allowLateSubmission: boolean;
   submissions: LeadSubmissionRecord[];
   events: LeadTaskEventRecord[];
+  /**
+   * Real `AssignmentDto.concurrencyToken` — required by every mutation (`publish`, `accept-suggestion`,
+   * `reassign`, `start-review`, `cancel`, `PUT`). Optional here only so the (now largely unused, see
+   * `leadAssignmentPreviewStore.ts`) preview fixture array below doesn't need a synthetic value per
+   * record; every real record from `assignmentAdapter.ts` always sets it.
+   */
+  concurrencyToken?: string;
 }
 
 /** Lead каждой из трёх demo-категорий — используется как имя ревьюера/актора событий. */

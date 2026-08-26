@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
+import { getGenericErrorMessage, getProblemCode } from '../../api/problemDetails';
 import { Drawer, UnsavedChangesDialog } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import { UserCreateForm, UserEditForm } from './UserForm';
-import { UserPreviewError, useUsersPreview } from './userPreviewStore';
-import { useUserPreviewActions } from './useUserPreviewActions';
+import { useUserActions } from './useUserActions';
+import { useUsersQuery } from './useUsersQuery';
 import type { UserCreateFormValues, UserEditFormValues } from './userForm.schema';
 
 export type UserFormDrawerState = { mode: 'create' } | { mode: 'edit'; userId: string };
@@ -15,7 +16,6 @@ export interface UserFormDrawerProps {
   state: UserFormDrawerState | null;
   onClose: () => void;
   isOrgAdmin: boolean;
-  currentBranchRawName: string | null;
 }
 
 /**
@@ -23,9 +23,9 @@ export interface UserFormDrawerProps {
  * но infrastructure (dirty-tracking, UnsavedChangesDialog, submitting lock)
  * общая.
  */
-export function UserFormDrawer({ state, onClose, isOrgAdmin, currentBranchRawName }: UserFormDrawerProps): JSX.Element {
-  const users = useUsersPreview();
-  const { createUser, updateUser, isSubmitting } = useUserPreviewActions();
+export function UserFormDrawer({ state, onClose, isOrgAdmin }: UserFormDrawerProps): JSX.Element {
+  const { users } = useUsersQuery();
+  const { createUser, updateUser, isSubmitting } = useUserActions();
 
   const [dirty, setDirty] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
@@ -56,19 +56,21 @@ export function UserFormDrawer({ state, onClose, isOrgAdmin, currentBranchRawNam
         fullName: values.fullName,
         email: values.email,
         role: values.role,
-        branchName: values.branchName,
-        categoryName: values.categoryName !== undefined && values.categoryName.length > 0 ? values.categoryName : null,
+        branchId: values.branchId,
+        categoryId: values.categoryId !== undefined && values.categoryId.length > 0 ? values.categoryId : null,
         notificationLanguage: values.notificationLanguage,
         sendInvitationNow: values.sendInvitationNow,
       });
       setDirty(false);
       onClose();
     } catch (error) {
-      if (error instanceof UserPreviewError) {
-        helpers.setEmailError(error.message);
+      // 409 RESOURCE_ALREADY_EXISTS (email занят) — привязываем к полю, как раньше делал preview store.
+      // Код не входит в `AuthErrorCode` (см. комментарий у `getGenericErrorMessage` в problemDetails.ts) — сравниваем как строку.
+      if ((getProblemCode(error) as string | null) === 'RESOURCE_ALREADY_EXISTS') {
+        helpers.setEmailError(getGenericErrorMessage(error));
         return;
       }
-      setBannerError('Не удалось создать пользователя. Попробуйте ещё раз.');
+      setBannerError(getGenericErrorMessage(error));
     }
   }
 
@@ -76,11 +78,11 @@ export function UserFormDrawer({ state, onClose, isOrgAdmin, currentBranchRawNam
     if (editingUser === undefined) return;
     setBannerError(null);
     try {
-      await updateUser(editingUser.id, values);
+      await updateUser(editingUser.id, editingUser.concurrencyToken ?? '', values);
       setDirty(false);
       onClose();
-    } catch {
-      setBannerError('Не удалось сохранить изменения. Попробуйте ещё раз.');
+    } catch (error) {
+      setBannerError(getGenericErrorMessage(error));
     }
   }
 
@@ -107,14 +109,7 @@ export function UserFormDrawer({ state, onClose, isOrgAdmin, currentBranchRawNam
         }
       >
         {state?.mode === 'create' ? (
-          <UserCreateForm
-            formId={FORM_ID}
-            isOrgAdmin={isOrgAdmin}
-            currentBranchRawName={currentBranchRawName}
-            bannerError={bannerError}
-            onDirtyChange={setDirty}
-            onSubmit={handleCreateSubmit}
-          />
+          <UserCreateForm formId={FORM_ID} isOrgAdmin={isOrgAdmin} bannerError={bannerError} onDirtyChange={setDirty} onSubmit={handleCreateSubmit} />
         ) : state?.mode === 'edit' && editingUser !== undefined ? (
           <UserEditForm formId={FORM_ID} user={editingUser} bannerError={bannerError} onDirtyChange={setDirty} onSubmit={handleEditSubmit} />
         ) : null}

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 
+import { applyServerValidation } from '../../components/auth/applyServerValidation';
+import { getGenericErrorMessage } from '../../api/problemDetails';
 import { Drawer, UnsavedChangesDialog } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import { BranchCreateForm, BranchEditForm } from './BranchForm';
-import { BranchPreviewError, useBranchesPreview } from './branchPreviewStore';
-import { useBranchPreviewActions } from './useBranchPreviewActions';
+import type { BranchFormSubmitHelpers } from './BranchForm';
+import { useBranchActions } from './useBranchActions';
+import { useBranchesQuery } from './useBranchesQuery';
 import type { BranchCreateFormValues, BranchEditFormValues } from './branchForm.schema';
 
 export type BranchFormDrawerState = { mode: 'create' } | { mode: 'edit'; branchId: string };
@@ -18,8 +21,8 @@ export interface BranchFormDrawerProps {
 
 /** Один Drawer на create/edit — та же infrastructure, что и `UserFormDrawer` (раздел 28/31 промпта). */
 export function BranchFormDrawer({ state, onClose }: BranchFormDrawerProps): JSX.Element {
-  const branches = useBranchesPreview();
-  const { createBranch, updateBranch, isSubmitting } = useBranchPreviewActions();
+  const { branches } = useBranchesQuery();
+  const { createBranch, updateBranch, isSubmitting } = useBranchActions();
 
   const [dirty, setDirty] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
@@ -45,29 +48,22 @@ export function BranchFormDrawer({ state, onClose }: BranchFormDrawerProps): JSX
 
   async function handleCreateSubmit(
     values: BranchCreateFormValues,
-    helpers: { setNameError: (message: string) => void; setCodeError: (message: string) => void },
+    helpers: BranchFormSubmitHelpers<BranchCreateFormValues>,
   ): Promise<void> {
     setBannerError(null);
     try {
-      await createBranch({
-        name: values.name,
-        code: values.code,
-        city: values.city,
-        address: values.address,
-        email: values.email,
-        phone: values.phone,
-        timezone: values.timezone,
-        adminUserId: values.adminOption === 'existing' && values.adminUserId !== undefined && values.adminUserId.length > 0 ? values.adminUserId : null,
-      });
+      // city/email/phone намеренно не уходят в запрос — см. комментарий в
+      // `useBranchActions.createBranch` (backend их не знает, поле остаётся
+      // в форме как известный, задокументированный пробел).
+      await createBranch(
+        { name: values.name, code: values.code, address: values.address, timezone: values.timezone },
+        values.adminOption === 'existing' && values.adminUserId !== undefined && values.adminUserId.length > 0,
+      );
       setDirty(false);
       onClose();
     } catch (error) {
-      if (error instanceof BranchPreviewError) {
-        if (error.message.includes('код')) helpers.setCodeError(error.message);
-        else helpers.setNameError(error.message);
-        return;
-      }
-      setBannerError('Не удалось создать филиал. Попробуйте ещё раз.');
+      const handledByField = applyServerValidation<BranchCreateFormValues>(error, ['name', 'code'], helpers.setError, helpers.setFocus);
+      if (!handledByField) setBannerError(getGenericErrorMessage(error));
     }
   }
 
@@ -75,11 +71,15 @@ export function BranchFormDrawer({ state, onClose }: BranchFormDrawerProps): JSX
     if (editingBranch === undefined) return;
     setBannerError(null);
     try {
-      await updateBranch(editingBranch.id, values);
+      await updateBranch(editingBranch.id, editingBranch.concurrencyToken ?? '', editingBranch.code, {
+        name: values.name,
+        address: values.address,
+        timezone: values.timezone,
+      });
       setDirty(false);
       onClose();
-    } catch {
-      setBannerError('Не удалось сохранить изменения. Попробуйте ещё раз.');
+    } catch (error) {
+      setBannerError(getGenericErrorMessage(error));
     }
   }
 

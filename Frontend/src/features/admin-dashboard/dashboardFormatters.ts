@@ -5,18 +5,14 @@ import type {
 } from '../../api/admin/dashboard';
 import type { DeltaTone, SemanticTone } from './dashboard.types';
 
-/** Presentation-only переименование филиалов — согласовано с /admin/users, /admin/branches, /admin/assignments. */
+/**
+ * Раньше подменяла три конкретных preview-фикстуры на более "живые" названия городов для демо.
+ * Реальный `Branch.Name` — то, что администратор сам ввёл при создании филиала (например,
+ * "Главный офис") — не подменяется ничем; обнаружено как реальный баг при первой live-проверке
+ * (2026-08-22): филиал с настоящим именем "Главный офис" отображался как "Душанбе" на Dashboard.
+ */
 export function formatBranchDisplayName(branchName: string): string {
-  switch (branchName) {
-    case 'Главный офис':
-      return 'Душанбе';
-    case 'Филиал Худжанд':
-      return 'Худжанд';
-    case 'Филиал Бохтар':
-      return 'Бохтар';
-    default:
-      return branchName;
-  }
+  return branchName;
 }
 
 export function pluralizeRu(n: number, one: string, few: string, many: string): string {

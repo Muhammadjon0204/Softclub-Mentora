@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { Drawer, UnsavedChangesDialog } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
-import { LeadAssignmentPreviewError, createDraftPreview, editAssignmentPreview } from '../lead/assignments/leadAssignmentPreviewStore';
+import { useAssignmentActions } from '../lead/assignments/useAssignmentActions';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { useResolvedLeadAssignment } from '../lead/scope/useScopedLeadAssignments';
 import { AssignmentForm } from './AssignmentForm';
@@ -20,11 +20,11 @@ export interface AssignmentFormDrawerProps {
 export function AssignmentFormDrawer({ state, onClose }: AssignmentFormDrawerProps): JSX.Element {
   const scope = useLeadScope();
   const editingAssignment = useResolvedLeadAssignment(state?.mode === 'edit' ? state.assignmentId : null);
+  const { isSubmitting: submitting, createDraft, updateAssignment } = useAssignmentActions();
 
   const [dirty, setDirty] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     setDirty(false);
@@ -43,33 +43,31 @@ export function AssignmentFormDrawer({ state, onClose }: AssignmentFormDrawerPro
     onClose();
   }
 
-  function handleSubmit(values: { title: string; description: string; mentorId: string; dueAtMs: number; topicAssignmentId: string | null }): void {
+  async function handleSubmit(values: { title: string; description: string; mentorId: string; dueAtMs: number; topicAssignmentId: string | null }): Promise<void> {
     setBannerError(null);
-    setSubmitting(true);
     try {
       if (state?.mode === 'edit' && editingAssignment !== undefined) {
-        editAssignmentPreview(scope.categoryId, editingAssignment.id, {
+        // LA5 fix: `updateAssignment` always sends `dueAtMs` regardless of the assignment's current
+        // status — see the fix note in `useAssignmentActions.ts`.
+        await updateAssignment(editingAssignment.id, editingAssignment.concurrencyToken ?? '', {
           title: values.title,
           description: values.description,
           mentorId: values.mentorId,
-          dueAt: values.dueAtMs,
+          dueAtMs: values.dueAtMs,
         });
       } else {
-        createDraftPreview({
-          categoryId: scope.categoryId,
+        await createDraft({
           title: values.title,
           description: values.description,
           mentorId: values.mentorId,
-          dueAt: values.dueAtMs,
-          leadName: scope.leadName,
+          dueAtMs: values.dueAtMs,
+          topicAssignmentId: values.topicAssignmentId,
         });
       }
       setDirty(false);
       onClose();
     } catch (error) {
-      setBannerError(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось сохранить задание. Попробуйте ещё раз.');
-    } finally {
-      setSubmitting(false);
+      setBannerError(error instanceof Error ? error.message : 'Не удалось сохранить задание. Попробуйте ещё раз.');
     }
   }
 

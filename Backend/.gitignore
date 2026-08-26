@@ -1,0 +1,60 @@
+## .NET
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+artifacts/
+*.user
+*.suo
+*.userprefs
+*.dll
+*.exe
+*.pdb
+*.cache
+project.lock.json
+project.fragment.lock.json
+
+## Test results
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.coverage
+*.trx
+TestResults/
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.sln.docstates
+*.DotSettings.user
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+## Logs
+logs/
+*.log
+
+## Generated OpenAPI specification — a CI artifact, published per API-002 rather than committed.
+## Committing it would create a second source of truth that drifts from the code it is generated from.
+openapi-v1.json
+
+## Secrets and local configuration
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+
+## Local data volumes
+.data/
+uploads/

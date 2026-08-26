@@ -9,7 +9,6 @@ import { MentorDetailsDrawer } from '../../features/lead/team/MentorDetailsDrawe
 import { useResolvedLeadMentor, useScopedLeadMentors } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
-import { formatOffsetHoursAgo } from '../../features/lead/scope/leadDateFormat';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
@@ -132,7 +131,7 @@ export function TeamPage(): JSX.Element {
                     </div>
                     <span className="hidden shrink-0 items-center gap-1 text-[12px] text-ink-muted lg:inline-flex">
                       <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {formatOffsetHoursAgo(mentor.lastActiveOffsetHours)}
+                      {mentor.lastLoginLabel}
                     </span>
                     {rework > 0 ? (
                       <span className="hidden shrink-0 rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums text-warning sm:inline-flex">

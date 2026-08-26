@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Drawer, useToast } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
-import { FileDropzone, formatFileSize } from '../../shared/ui/FileDropzone';
+import { FileDropzone } from '../../shared/ui/FileDropzone';
 import type { PendingFile } from '../../shared/ui/FileDropzone';
 import type { SubmissionFile } from '../admin-assignments/assignmentPresentation';
 import { FileDetailsModal } from '../admin-assignments/FileDetailsModal';
@@ -16,9 +16,9 @@ import {
   taskEventLabel,
 } from '../mentor/assignments/mentorAssignmentPresentation';
 import type { MentorAssignmentRecord } from '../mentor/assignments/mentorAssignmentPresentation';
-import { MentorAssignmentPreviewError, submitPreview } from '../mentor/assignments/mentorAssignmentPreviewStore';
 import { formatCategoryDateTime } from '../mentor/scope/mentorDateFormat';
 import { useMentorScope } from '../mentor/scope/useMentorScope';
+import { useSubmitAssignment } from './useSubmitAssignment';
 
 const ACCEPT_EXTENSIONS = ['pdf', 'pptx'];
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
@@ -56,7 +56,13 @@ function OverviewTab({ assignment }: { assignment: MentorAssignmentRecord }): JS
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Назначил" value={assignment.assignedById ?? '—'} />
+        {/*
+          Phase 1E contract map, Open Question #3 (resolved): `AssignedById` is a raw, unmasked Guid a
+          Mentor cannot resolve to a name (`GET /users` is Lead/Admin-only). Same masking principle as
+          `EVT-004`'s `ActorLabel` for the assignment's own event history — a generic role label, never
+          an invented name.
+        */}
+        <Field label="Назначил" value={assignment.assignedById !== null ? 'Руководитель направления' : '—'} />
         {assignment.assignedAt !== null ? <Field label="Назначено" value={formatCategoryDateTime(assignment.assignedAt, scope.timeZoneId)} /> : null}
         <Field label="Начальный дедлайн" value={formatCategoryDateTime(assignment.initialDueAt, scope.timeZoneId)} />
         <Field label="Текущий дедлайн" value={formatCategoryDateTime(assignment.currentDueAt, scope.timeZoneId)} />
@@ -72,40 +78,56 @@ function OverviewTab({ assignment }: { assignment: MentorAssignmentRecord }): JS
   );
 }
 
+/**
+ * SB1 (`POST /assignments/{id}/submissions`) — real upload networking. `handleSubmit` sends one real
+ * `POST` per ready file, sequentially (`useSubmitAssignment.ts`'s `submitFiles`) — each call is its own
+ * new `VersionNumber` on the real backend and its own real `Assigned/NeedsRework/Overdue → Submitted`
+ * transition, so a partial failure across several files is a partial REAL success, not something to
+ * roll back or hide (Phase 1E contract map, Open Question #2 — resolved). `onSubmitted` invalidates the
+ * real queries `useResolvedMentorAssignment` reads from, so the assignment's new status/version show up
+ * from the actual API response, not an optimistic local patch.
+ */
 function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignmentRecord; onSubmitted: () => void }): JSX.Element {
-  const scope = useMentorScope();
   const toast = useToast();
+  const { isSubmitting, submitFiles } = useSubmitAssignment();
   const [pending, setPending] = useState<PendingFile[]>([]);
   const [comment, setComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   const readyFiles = pending.filter((f) => f.status === 'ready');
   const hasBlockingFiles = pending.some((f) => f.status === 'uploading' || f.status === 'error');
-  const canConfirm = readyFiles.length > 0 && !hasBlockingFiles && !submitting;
+  const canConfirm = readyFiles.length > 0 && !hasBlockingFiles && !isSubmitting;
   const isOverdueWarning = assignment.status === 'Overdue';
 
-  function handleSubmit(): void {
+  function updatePendingFile(id: string, patch: Partial<Pick<PendingFile, 'status' | 'progress' | 'errorMessage'>>): void {
+    setPending((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
+  }
+
+  async function handleSubmit(): Promise<void> {
     if (!canConfirm) return;
-    setSubmitting(true);
-    try {
-      submitPreview(scope.mentorId, assignment.id, scope.mentorName, {
-        files: readyFiles.map((f) => ({
-          id: f.id,
-          name: f.file.name,
-          extension: f.file.name.toLowerCase().endsWith('.pptx') ? 'pptx' : 'pdf',
-          sizeLabel: formatFileSize(f.file.size),
-        })),
-        comment: comment.trim().length > 0 ? comment.trim() : null,
-      });
-      toast.success('Решение отправлено на проверку');
-      setPending([]);
+    const attempted = readyFiles;
+    const results = await submitFiles(assignment.id, attempted, updatePendingFile);
+    const succeeded = results.filter((r) => r.outcome === 'success');
+    const failed = results.filter((r) => r.outcome === 'error');
+
+    // Succeeded files are real `Submission` versions now — drop them from the "to send" queue so a
+    // second click can't re-upload the same bytes (real SHA-256 dedup would reject it as
+    // `SUBMISSION_DUPLICATE_CONTENT`). Failed files stay, already marked `'error'` by `submitFiles`, so
+    // "Повторить" queues them for the next attempt.
+    setPending((prev) => prev.filter((f) => !succeeded.some((r) => r.file.id === f.id)));
+
+    if (failed.length === 0) {
+      toast.success(attempted.length > 1 ? `Все файлы (${String(attempted.length)}) отправлены на проверку` : 'Решение отправлено на проверку');
       setComment('');
-      onSubmitted();
-    } catch (error) {
-      toast.error(error instanceof MentorAssignmentPreviewError ? error.message : 'Не удалось отправить решение');
-    } finally {
-      setSubmitting(false);
+    } else if (succeeded.length > 0) {
+      const summary = results
+        .map((r, index) => (r.outcome === 'success' ? `файл ${String(index + 1)} из ${String(results.length)} отправлен` : `файл ${String(index + 1)} — ошибка: ${r.message ?? 'не удалось отправить'}`))
+        .join(', ');
+      toast.error(summary.charAt(0).toUpperCase() + summary.slice(1));
+    } else {
+      toast.error(failed[0]?.message ?? 'Не удалось отправить решение');
     }
+
+    if (succeeded.length > 0) onSubmitted();
   }
 
   return (
@@ -118,7 +140,7 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
           Дедлайн прошёл — решение будет отмечено как сданное с опозданием.
         </p>
       ) : null}
-      <FileDropzone acceptExtensions={ACCEPT_EXTENSIONS} maxSizeBytes={MAX_FILE_SIZE_BYTES} files={pending} onFilesChange={setPending} disabled={submitting} />
+      <FileDropzone acceptExtensions={ACCEPT_EXTENSIONS} maxSizeBytes={MAX_FILE_SIZE_BYTES} files={pending} onFilesChange={setPending} disabled={isSubmitting} />
       <div>
         <label htmlFor="submission-comment" className="mb-1 block text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">
           Комментарий к работе
@@ -128,13 +150,15 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
           rows={3}
           value={comment}
           onChange={(event) => { setComment(event.target.value); }}
-          disabled={submitting}
+          disabled={isSubmitting}
           placeholder="Например: реализовал все требования задания, основные изменения находятся..."
           className="w-full resize-none rounded-control-sm border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition placeholder:text-ink-disabled focus:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand disabled:opacity-60"
         />
+        {/* Backend не хранит комментарий к Submission ни в каком поле — см. docs/INTEGRATION_UI_ISSUES.md, #9 */}
+        <p className="mt-1 text-[11.5px] text-ink-muted">Комментарий не сохраняется на сервере и виден только вам сейчас — у backend нет такого поля.</p>
       </div>
       <div className="flex justify-end">
-        <Button variant="primary" leadingIcon={<Send className="h-4 w-4" aria-hidden="true" />} disabled={!canConfirm} isLoading={submitting} onClick={handleSubmit}>
+        <Button variant="primary" leadingIcon={<Send className="h-4 w-4" aria-hidden="true" />} disabled={!canConfirm} isLoading={isSubmitting} onClick={() => { void handleSubmit(); }}>
           Отправить на проверку
         </Button>
       </div>

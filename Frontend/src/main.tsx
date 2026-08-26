@@ -22,37 +22,21 @@ const queryClient = new QueryClient({
   },
 });
 
-/**
- * MSW стартует только в dev при VITE_USE_MOCKS=true.
- * При любом другом значении bundle моков даже не загружается — сборщик
- * вырезает динамический импорт вместе с недостижимой веткой.
- */
-async function enableMocking(): Promise<void> {
-  if (!import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS !== 'true') return;
-
-  const { worker } = await import('./mocks/browser');
-  await worker.start({ onUnhandledRequest: 'bypass' });
-}
-
 const container = document.getElementById('root');
 if (container === null) throw new Error('Не найден элемент #root');
 
-// Рендер только после старта worker'а: иначе первый bootstrap-refresh
-// успел бы уйти в реальную сеть мимо моков.
-void enableMocking().then(() => {
-  createRoot(container).render(
-    <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <AuthProvider>
-            <OverlayProvider>
-              <ToastProvider>
-                <AppRouter />
-              </ToastProvider>
-            </OverlayProvider>
-          </AuthProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
-    </StrictMode>,
-  );
-});
+createRoot(container).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <OverlayProvider>
+            <ToastProvider>
+              <AppRouter />
+            </ToastProvider>
+          </OverlayProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);

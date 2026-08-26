@@ -32,7 +32,7 @@ export interface BranchDetailsDrawerProps {
   onDeactivate: (branch: PreviewBranchDetails) => void;
 }
 
-/** Открывается по клику на строку (раздел 24 промпта) — читает филиал напрямую из `branchPreviewStore`. */
+/** Открывается по клику на строку (раздел 24 промпта) — филиал ищется в уже загруженном `branches` (реальный `useBranchesQuery`). */
 export function BranchDetailsDrawer({
   branchId,
   branches,

@@ -1,0 +1,142 @@
+# Production-shaped deployment (TZ 32.2).
+#
+# Every value comes from the environment — nothing sensitive is committed (SEC-010, DEPLOY-014).
+# Copy .env.example to .env and fill it in before deploying.
+#
+# Deployment order per DEPLOY-029: backup (on a destructive migration) → mtf-migrator → mtf-api /
+# mtf-worker → smoke check of /health/ready.
+#
+# mtf-web (nginx serving the SPA, TZ 32.2) is absent: the frontend is out of scope for this
+# repository. It is added when the SPA exists.
+
+name: mentortaskflow-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    restart: unless-stopped
+
+  # Runs once per deployment, then exits. Migrations are never applied by the API or the worker
+  # (DEPLOY-016): concurrent replicas would race for schema locks.
+  mtf-migrator:
+    image: ${MTF_IMAGE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      MTF_ROLE: migrator
+      ConnectionStrings__DefaultConnection: ${CONNECTION_STRING_MIGRATOR}
+      Database__MigrateOnStartup: "false"
+      BOOTSTRAP_ORGANIZATION_NAME: ${BOOTSTRAP_ORGANIZATION_NAME}
+      BOOTSTRAP_ORGANIZATION_SLUG: ${BOOTSTRAP_ORGANIZATION_SLUG}
+      BOOTSTRAP_HEAD_OFFICE_NAME: ${BOOTSTRAP_HEAD_OFFICE_NAME}
+      BOOTSTRAP_HEAD_OFFICE_CODE: ${BOOTSTRAP_HEAD_OFFICE_CODE}
+      BOOTSTRAP_HEAD_OFFICE_TIMEZONE: ${BOOTSTRAP_HEAD_OFFICE_TIMEZONE}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+    restart: "no"
+
+  mtf-api:
+    image: ${MTF_IMAGE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ConnectionStrings__DefaultConnection: ${CONNECTION_STRING_APP}
+      Database__MigrateOnStartup: "false"
+      # Hangfire processing belongs to mtf-worker only, so scaling the API never duplicates a job
+      # run (DEPLOY-013).
+      Hangfire__EnableServer: "false"
+      Cors__AllowedOrigins__0: ${CORS_ALLOWED_ORIGIN}
+      AUTH__JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY}
+      # The endpoint is the address a browser reaches, since the presigned URL is followed by the
+      # client, not by the API. Credentials come from the environment and never from a committed file
+      # (SEC-010); the bucket is created by deployment, not at startup.
+      Storage__Endpoint: ${STORAGE_ENDPOINT}
+      Storage__AccessKey: ${STORAGE_ACCESS_KEY}
+      Storage__SecretKey: ${STORAGE_SECRET_KEY}
+      Storage__Bucket: ${STORAGE_BUCKET}
+      Storage__UseSsl: "true"
+      # Staging and Production use the webhook exclusively (TG-002); the secret is the only thing
+      # separating Telegram from anyone who has guessed the URL.
+      Telegram__Enabled: ${TELEGRAM_ENABLED}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+      Telegram__WebhookSecret: ${TELEGRAM_WEBHOOK_SECRET}
+      # The API key is a credential like every other (SEC-010). With AI__ENABLED unset the summary
+      # endpoint answers 404 and every metric of section 21 keeps working (AI-018).
+      Ai__Enabled: ${AI_ENABLED}
+      Ai__ApiKey: ${AI_API_KEY}
+      Ai__ModelId: ${AI_MODEL_ID}
+      Ai__PromptVersion: ${AI_PROMPT_VERSION}
+      # OBS-007: /metrics is unauthenticated, so the boundary is the network. Empty means the
+      # loopback and the private ranges; set it when the collector lives outside them.
+      Metrics__Enabled: "true"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  mtf-worker:
+    image: ${MTF_IMAGE}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      MTF_ROLE: worker
+      ConnectionStrings__DefaultConnection: ${CONNECTION_STRING_APP}
+      Database__MigrateOnStartup: "false"
+      Hangfire__EnableServer: "true"
+      AUTH__JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY}
+      # The queue is drained here and nowhere else. Several replicas would not corrupt anything —
+      # SKIP LOCKED sees to that — but they would multiply the load on the mail provider for no
+      # benefit (DEPLOY-013).
+      Notifications__EnableWorker: "true"
+      Notifications__SmtpHost: ${SMTP_HOST}
+      Notifications__SmtpPort: ${SMTP_PORT}
+      Notifications__SmtpUser: ${SMTP_USER}
+      Notifications__SmtpPassword: ${SMTP_PASSWORD}
+      Notifications__SmtpUseSsl: "true"
+      Notifications__FromAddress: ${SMTP_FROM_ADDRESS}
+      Notifications__AppBaseUrl: ${CORS_ALLOWED_ORIGIN}
+      # The bot token is a credential, so it comes from the environment like every other secret
+      # (SEC-010). The worker sends; the webhook is served by the API.
+      Telegram__Enabled: ${TELEGRAM_ENABLED}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+      # One Hangfire server for the whole installation (TEN-054); the API registers no jobs and runs
+      # none, so scaling it never duplicates a run (DEPLOY-013).
+      Scheduler__Enabled: "true"
+      Scheduler__EnableServer: "true"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:

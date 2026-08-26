@@ -12,7 +12,6 @@ import { FileDetailsModal } from '../admin-assignments/FileDetailsModal';
 import { FilePreviewModal } from '../admin-assignments/FilePreviewModal';
 import { LEAD_STATUS_META, sourceLabel } from '../lead/assignments/leadAssignmentPresentation';
 import { formatCategoryDateTime, formatRelative, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
-import { mentorNameOf } from '../lead/scope/leadScopedData';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
@@ -26,6 +25,7 @@ export interface ReviewWorkspaceDrawerProps {
   onStartReview: (a: LeadAssignmentRecord) => void;
   onApprove: (a: LeadAssignmentRecord, comment: string | null) => void;
   onNeedsRework: (a: LeadAssignmentRecord, comment: string, reworkDueAtMs: number) => void;
+  mentorNameOf: (mentorId: string) => string;
 }
 
 type DecisionMode = 'none' | 'approve' | 'rework';
@@ -96,7 +96,7 @@ function NeedsReworkForm({ timeZoneId, onSubmit }: { timeZoneId: string; onSubmi
  * `InReview` (REV-003); вне этого статуса форма решения не рендерится вовсе —
  * не просто задизейблена.
  */
-export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onStartReview, onApprove, onNeedsRework }: ReviewWorkspaceDrawerProps): JSX.Element {
+export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onStartReview, onApprove, onNeedsRework, mentorNameOf }: ReviewWorkspaceDrawerProps): JSX.Element {
   const scope = useLeadScope();
   const [mode, setMode] = useState<DecisionMode>('none');
   const [previewFile, setPreviewFile] = useState<SubmissionFile | null>(null);
@@ -120,7 +120,7 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
         open={open}
         onOpenChange={(next) => { if (!next) onClose(); }}
         title={assignment?.title ?? 'Проверка решения'}
-        description={assignment !== undefined ? `${mentorNameOf(scope.categoryId, assignment.mentorId)} · Версия ${String(latest?.versionNumber ?? '—')}` : undefined}
+        description={assignment !== undefined ? `${mentorNameOf(assignment.mentorId)} · Версия ${String(latest?.versionNumber ?? '—')}` : undefined}
         size="xl"
         headerActions={
           assignment !== undefined && statusMeta !== null ? (
@@ -138,7 +138,7 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
             <div className="grid grid-cols-2 gap-4 rounded-control border border-line p-4 sm:grid-cols-4">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Ментор</p>
-                <p className="mt-0.5 text-[13px] font-medium text-ink">{mentorNameOf(scope.categoryId, assignment.mentorId)}</p>
+                <p className="mt-0.5 text-[13px] font-medium text-ink">{mentorNameOf(assignment.mentorId)}</p>
               </div>
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Источник</p>

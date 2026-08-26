@@ -32,7 +32,7 @@ export function MentorTopicDetailsDrawer({ topic, topicId, onClose }: MentorTopi
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       title={topic?.title ?? 'Тема'}
-      description={topic !== undefined ? `День ${String(topic.dayNumber)} · ${formatCategoryDate(topic.plannedDate, scope.timeZoneId)}` : undefined}
+      description={topic !== undefined ? `День ${String(topic.dayNumber)}${topic.plannedDate !== null ? ` · ${formatCategoryDate(topic.plannedDate, scope.timeZoneId)}` : ''}` : undefined}
       size="lg"
     >
       {topicId === null ? null : topic === undefined ? (

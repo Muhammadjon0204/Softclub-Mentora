@@ -1,0 +1,143 @@
+# CI pipeline of DEPLOY-027:
+# build → unit tests → integration tests → architecture tests → dependency scan → image build
+# → publish the OpenAPI specification as an artifact.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore MentorTaskFlow.sln
+
+      # NuGetAudit is on and NU1903/NU1904 are errors (SEC-014): a dependency with a known
+      # High or Critical advisory fails the build here rather than reaching an image.
+      - name: Build
+        run: dotnet build MentorTaskFlow.sln --configuration Release --no-restore
+
+      - name: Unit tests
+        run: >
+          dotnet test tests/MentorTaskFlow.UnitTests/MentorTaskFlow.UnitTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=unit.trx"
+          --results-directory TestResults
+
+      # Fast and dependency-free: keeps a layering violation from being discovered only after the
+      # slower integration suite has run.
+      - name: Architecture tests
+        run: >
+          dotnet test tests/MentorTaskFlow.ArchitectureTests/MentorTaskFlow.ArchitectureTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=architecture.trx"
+          --results-directory TestResults
+
+      # Testcontainers starts PostgreSQL (and, from Phase 10, MinIO) against the runner's Docker
+      # daemon; the environment is ephemeral (TZ 32.1, Test).
+      - name: Integration tests
+        run: >
+          dotnet test tests/MentorTaskFlow.IntegrationTests/MentorTaskFlow.IntegrationTests.csproj
+          --configuration Release --no-build
+          --logger "trx;LogFileName=integration.trx"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults/*.trx
+
+  openapi:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # API-002: the specification is generated from code and published as a CI artifact. It is the
+      # machine-readable companion to Приложение D; a divergence between them is a defect.
+      #
+      # `swagger tofile` boots the real host to read the document, so startup validation applies:
+      # every option group registered with ValidateOnStart must satisfy its [Required] members
+      # before the document can be printed (DEPLOY-015). The values below are throwaways that exist
+      # only to get the host to Start — no token is issued, no database is contacted, no bucket and
+      # no mail server are reached — and the signing key is shaped to pass the validator's
+      # placeholder check rather than to be secret. Real secrets come from the secret manager
+      # (SEC-010).
+      #
+      # Adding a new [Required] option means adding it here too, or this job stops producing the
+      # specification. That is the intended trade: DEPLOY-015 says a missing setting must fail at
+      # startup, and the alternative — relaxing the requirement so a CI job is happy — would let a
+      # deployment boot without it.
+      - name: Generate OpenAPI specification
+        env:
+          Auth__JwtSigningKey: openapi-generation-only-0123456789-abcdefghijklmnopqrstuvwxyz
+          Auth__AppBaseUrl: https://app.invalid
+          ConnectionStrings__DefaultConnection: "Host=127.0.0.1;Port=1;Database=openapi;Username=none;Password=none"
+          # Port 1: reachable configuration, unreachable server. Nothing here is ever dialled.
+          Storage__Endpoint: "http://127.0.0.1:1"
+          Storage__AccessKey: openapi-generation-only
+          Storage__SecretKey: openapi-generation-only
+          Notifications__SmtpHost: 127.0.0.1
+        run: |
+          dotnet tool install --global Swashbuckle.AspNetCore.Cli --version 10.2.3
+          dotnet build src/MentorTaskFlow.Api/MentorTaskFlow.Api.csproj --configuration Release
+          swagger tofile --output openapi-v1.json \
+            src/MentorTaskFlow.Api/bin/Release/net10.0/MentorTaskFlow.Api.dll v1
+
+      - name: Upload OpenAPI specification
+        uses: actions/upload-artifact@v7
+        with:
+          name: openapi
+          path: openapi-v1.json
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t mentortaskflow:${{ github.sha }} .
+
+      # SEC-014: the image is scanned as well as the dependency graph. Critical and High findings
+      # fail the job — an image is not shipped with a known exploitable vulnerability.
+      #
+      # The tag carries a `v` prefix. Referencing `0.28.0` without it resolved to nothing, and the job
+      # died in three seconds before ever building an image — which is why the failure looked like a
+      # build problem rather than a missing action.
+      #
+      # Pinned to an exact version rather than a floating major: this is a third-party action, and a
+      # scanner that silently changes behaviour is the one place a supply-chain surprise would be
+      # least visible.
+      - name: Scan image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: mentortaskflow:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true

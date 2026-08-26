@@ -8,7 +8,7 @@ import { FormBannerError, FormField, FormInput, ReadOnlyField, fieldA11yProps } 
 import { useLeadScope } from '../scope/useLeadScope';
 import { createMentorSchema } from './createMentor.schema';
 import type { CreateMentorFormValues } from './createMentor.schema';
-import { LeadMentorPreviewError, createMentorPreview } from './leadMentorPreviewStore';
+import { useTeamActions } from './useTeamActions';
 
 const FORM_ID = 'lead-create-mentor-form';
 
@@ -20,6 +20,7 @@ export interface CreateMentorDrawerProps {
 /** «Добавить ментора» — Branch/Category read-only показаны как контекст, не как выбор (раздел 32 задачи Phase 3). */
 export function CreateMentorDrawer({ open, onClose }: CreateMentorDrawerProps): JSX.Element {
   const scope = useLeadScope();
+  const { isSubmitting, createMentor } = useTeamActions();
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
 
@@ -27,7 +28,7 @@ export function CreateMentorDrawer({ open, onClose }: CreateMentorDrawerProps): 
     register,
     handleSubmit,
     reset,
-    formState: { errors, isDirty, isSubmitting },
+    formState: { errors, isDirty },
   } = useForm<CreateMentorFormValues>({ resolver: zodResolver(createMentorSchema), defaultValues: { fullName: '', email: '' } });
 
   useEffect(() => {
@@ -47,13 +48,13 @@ export function CreateMentorDrawer({ open, onClose }: CreateMentorDrawerProps): 
     onClose();
   }
 
-  function submit(values: CreateMentorFormValues): void {
+  async function submit(values: CreateMentorFormValues): Promise<void> {
     setBannerError(null);
     try {
-      createMentorPreview({ categoryId: scope.categoryId, branchId: scope.branchId, fullName: values.fullName, email: values.email });
+      await createMentor({ fullName: values.fullName, email: values.email });
       onClose();
     } catch (error) {
-      setBannerError(error instanceof LeadMentorPreviewError ? error.message : 'Не удалось создать пользователя');
+      setBannerError(error instanceof Error ? error.message : 'Не удалось создать пользователя');
     }
   }
 

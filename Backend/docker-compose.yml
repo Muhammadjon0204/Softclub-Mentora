@@ -1,0 +1,129 @@
+# Development stack (TZ 32.1). Not for production — see docker-compose.prod.yml.
+#
+# Credentials here are local-only fixtures. Production secrets come from a secret manager and are
+# never committed (SEC-010).
+
+name: mentortaskflow
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mentortaskflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Creates the three non-overlapping database roles of TZ 12.6: app, migrator, retention.
+      - ./scripts/db/01-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mentortaskflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Local SMTP sink — no mail leaves the machine during development.
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # mtf-migrator: the same image, run once, applies migrations and provisions the first tenant
+  # (DEPLOY-016, DEPLOY-022). It connects as mentortaskflow_migrator — the only role with DDL rights
+  # — while the API connects as mentortaskflow_app, which has none (DEPLOY-017).
+  migrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--migrate"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=mentortaskflow;Username=mentortaskflow_migrator;Password=mentortaskflow_dev"
+      Auth__JwtSigningKey: "${AUTH__JWT_SIGNING_KEY:-local-development-signing-key-not-for-any-real-deployment}"
+      Auth__AppBaseUrl: "http://localhost:5173"
+      # DEPLOY-023. No password variable exists: the first administrator receives a set-password link
+      # in this container's log and nothing else (DEPLOY-024, DEPLOY-025).
+      Bootstrap__OrganizationName: "MentorTaskFlow Development"
+      Bootstrap__OrganizationSlug: "mentortaskflow-development"
+      Bootstrap__HeadOfficeName: "Филиал Профсоюз"
+      Bootstrap__HeadOfficeCode: "PROFSOYUZ"
+      Bootstrap__HeadOfficeTimeZone: "Asia/Dushanbe"
+      Bootstrap__AdminEmail: "nurulloadmin@gmail.com"
+      Bootstrap__DevelopmentPassword: "123456"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=mentortaskflow;Username=mentortaskflow_app;Password=mentortaskflow_dev"
+      # False even locally: the migrator owns the schema, so both paths behave the same everywhere
+      # and a developer never sees a race the deployment would not have.
+      Database__MigrateOnStartup: "false"
+      Cors__AllowedOrigins__0: "http://localhost:5173"
+      Auth__JwtSigningKey: "${AUTH__JWT_SIGNING_KEY:-local-development-signing-key-not-for-any-real-deployment}"
+      Auth__AppBaseUrl: "http://localhost:5173"
+      # The API itself talks to MinIO over the compose network (this container's own localhost is not
+      # the minio container's). PublicEndpoint is what actually goes into a presigned URL, because that
+      # URL is followed by the developer's browser afterwards, which cannot resolve the compose service
+      # name at all — the two roles need different addresses for the same MinIO (StorageOptions.PublicEndpoint).
+      Storage__Endpoint: "http://minio:9000"
+      Storage__PublicEndpoint: "http://localhost:9000"
+      Storage__AccessKey: "minioadmin"
+      Storage__SecretKey: "minioadmin"
+      Storage__Bucket: "mentortaskflow"
+      Storage__EnsureBucketOnStartup: "true"
+      # One process locally, so it both serves and drains. mailhog captures everything it sends.
+      Notifications__EnableWorker: "true"
+      Notifications__SmtpHost: "mailhog"
+      Notifications__SmtpPort: "1025"
+      Notifications__AppBaseUrl: "http://localhost:5173"
+      # Disabled: Hangfire.PostgreSql always runs with PrepareSchemaIfNecessary=true
+      # (InfrastructureServiceCollectionExtensions.cs) and tries to auto-create its own schema using
+      # this connection - but this connects as mentortaskflow_app, which by design (DEPLOY-017) has no
+      # DDL rights (only mentortaskflow_migrator does). The auto-install fails with "permission denied
+      # for database" in an infinite retry loop that never lets the API start listening. This is a real,
+      # pre-existing gap: Hangfire's schema needs to be provisioned by the migrator (like every EF Core
+      # table already is), not auto-installed by the app role - tracked as follow-up work, not fixed
+      # here. Disabled for local dev until that's done; PrepareSchemaIfNecessary=true is otherwise
+      # correct for a deployment where the schema truly doesn't exist yet.
+      Scheduler__Enabled: "false"
+      Scheduler__EnableServer: "false"
+    ports:
+      - "5000:8080"
+
+volumes:
+  postgres-data:
+  minio-data:

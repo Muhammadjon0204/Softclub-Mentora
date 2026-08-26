@@ -97,3 +97,44 @@ export function getStatus(error: unknown): number | null {
   if (!axios.isAxiosError(error)) return null;
   return error.response?.status ?? null;
 }
+
+/**
+ * Универсальный fallback-текст ошибки для доменов без собственной
+ * `MESSAGE_BY_CODE` карты (Auth уже покрыт `components/auth/authErrorMessages.ts`).
+ * Organization/Branches и прочие admin-домены не имеют сгенерированного
+ * OpenAPI-контракта (см. `api/admin/*.ts` — DTO написаны вручную), поэтому их
+ * `ProblemDetails.code` не входит в `AuthErrorCode` — сравнивать его с
+ * `AuthErrorCode`-литералами напрямую не даёт TypeScript (`no overlap`).
+ * Здесь код читается как обычная строка в обход этого ограничения.
+ *
+ * `CONCURRENCY_CONFLICT` — общий RFC7807-код optimistic concurrency, может
+ * прийти от любого домена с `ConcurrencyToken` (Organization, Branches) —
+ * поэтому обрабатывается здесь один раз, а не в каждом domain-хелпере отдельно.
+ *
+ * `SUBMISSION_DUPLICATE_CONTENT` — SB1 (`POST /assignments/{id}/submissions`), реальный SHA-256-дедуп:
+ * байт-в-байт тот же файл уже был отправлен по этому Assignment раньше. Это не общая ошибка «что-то
+ * пошло не так» — сообщение говорит Mentor именно то, что произошло, тем же приёмом, что и
+ * `CONCURRENCY_CONFLICT` выше (см. `docs/PHASE_1E_LEAD_MENTOR_CONTRACT_MAP.md`, решение по SB1).
+ */
+export function getGenericErrorMessage(error: unknown): string {
+  const problem = toProblemDetails(error);
+  const code = problem?.code as string | undefined;
+
+  if (code === 'CONCURRENCY_CONFLICT') {
+    return 'Данные были изменены в другом месте. Обновите страницу и попробуйте снова.';
+  }
+  if (code === 'SUBMISSION_DUPLICATE_CONTENT') {
+    return 'Этот файл уже был отправлен ранее — повторная загрузка того же файла не создаёт новую версию.';
+  }
+  if (problem !== null && problem.detail.length > 0) return problem.detail;
+  if (isNetworkError(error)) {
+    return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.';
+  }
+
+  const status = getStatus(error);
+  if (status !== null && status >= 500) {
+    return 'Сервер временно недоступен. Попробуйте позже.';
+  }
+
+  return 'Не удалось выполнить запрос. Попробуйте ещё раз.';
+}

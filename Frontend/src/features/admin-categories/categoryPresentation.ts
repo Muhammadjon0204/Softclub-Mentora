@@ -1,5 +1,4 @@
 import type { PreviewCategory, PreviewCategoryColor } from '../../mocks/ui-preview/categories.preview';
-import type { PreviewUserDetails } from '../admin-users/userPresentation';
 
 export { branchDisplayName, BRANCH_DIRECTORY } from '../admin-preview/branchDirectory';
 
@@ -43,75 +42,24 @@ export interface PreviewCategoryDetails extends PreviewCategory {
   allowLateSubmission: boolean;
   completedThisPeriod: number;
   activity: CategoryActivityEntry[];
+  /** Реальный GUID филиала — для мутаций (`useCategoryActions.ts`). */
+  branchId: string;
+  /** `undefined` у preview-фикстур; строка у данных с backend. */
+  concurrencyToken?: string;
+  /**
+   * `timezone`/`defaultDueTimeLocal`/`defaultDueDays`/`allowLateSubmission` выше приходят из
+   * отдельного backend-ресурса (`GET /categories/{id}/settings`, свой `concurrencyToken`) и не
+   * входят в список `GET /categories` — при построении списка это плейсхолдеры по умолчанию,
+   * `true` только после того как `useCategorySettingsQuery()` реально их загрузил.
+   */
+  settingsLoaded?: boolean;
 }
 
-function stableHash(id: string): number {
+/** Детерминированный хэш id — используется для стабильного `colorToken` (`useCategoriesQuery.ts`), не связан с seed-данными preview. */
+export function stableHash(id: string): number {
   let hash = 0;
   for (let index = 0; index < id.length; index += 1) hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
   return hash;
-}
-
-const SEED_CREATED_LABEL: Record<string, string> = {
-  'cat-csharp': '11.01.2023',
-  'cat-frontend': '11.01.2023',
-  'cat-python': '02.02.2023',
-  'cat-uiux': '21.06.2023',
-  'cat-mobile': '18.04.2023',
-  'cat-qa': '05.05.2023',
-  'cat-devops': '30.07.2023',
-  'cat-data': '05.05.2023',
-};
-
-const SEED_DESCRIPTION: Record<string, string> = {
-  'cat-csharp': 'Backend-разработка на .NET/C# для сервисов организации.',
-  'cat-frontend': 'Клиентские интерфейсы на React и TypeScript.',
-  'cat-python': 'Python-разработка и автоматизация.',
-  'cat-uiux': 'Проектирование интерфейсов и пользовательский опыт.',
-  'cat-mobile': 'Мобильная разработка для iOS и Android.',
-  'cat-qa': 'Тестирование и контроль качества.',
-  'cat-devops': 'Инфраструктура, CI/CD и эксплуатация.',
-  'cat-data': 'Анализ данных и модели машинного обучения.',
-};
-
-function findLeadUserId(category: PreviewCategory, users: PreviewUserDetails[]): string | null {
-  if (category.leadName === null) return null;
-  const match = users.find((user) => user.role === 'Lead' && user.fullName === category.leadName && user.branchName === category.branchName);
-  return match?.id ?? null;
-}
-
-/** Достраивает preview-категорию полями настроек/активности, не трогая `categories.preview.ts`. */
-export function enrichCategory(category: PreviewCategory, users: PreviewUserDetails[]): PreviewCategoryDetails {
-  const hash = stableHash(category.id);
-  const createdLabel = SEED_CREATED_LABEL[category.id] ?? '—';
-  const leadUserId = findLeadUserId(category, users);
-
-  const activity: CategoryActivityEntry[] = [
-    { id: `${category.id}-ev-created`, kind: 'created', label: 'Направление создано', actorName: 'Администратор', relativeTime: createdLabel, absoluteLabel: createdLabel },
-  ];
-  if (category.leadName !== null) {
-    activity.unshift({
-      id: `${category.id}-ev-lead`,
-      kind: 'lead_assigned',
-      label: 'Назначен руководитель направления',
-      detail: category.leadName,
-      actorName: 'Администратор',
-      relativeTime: createdLabel,
-      absoluteLabel: createdLabel,
-    });
-  }
-
-  return {
-    ...category,
-    description: SEED_DESCRIPTION[category.id] ?? null,
-    leadUserId,
-    createdLabel,
-    timezone: DEFAULT_TIMEZONE,
-    defaultDueTimeLocal: DEFAULT_DUE_TIME,
-    defaultDueDays: DEFAULT_DUE_DAYS,
-    allowLateSubmission: true,
-    completedThisPeriod: 4 + (hash % 9),
-    activity: activity.reverse(),
-  };
 }
 
 export function emptyOrValue(value: string | null | undefined): string {

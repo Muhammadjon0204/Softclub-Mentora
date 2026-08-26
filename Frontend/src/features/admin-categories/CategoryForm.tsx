@@ -2,10 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import type { CategorySettingsDto } from '../../api/admin/categories';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormSelect, FormTextarea, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
-import { BRANCH_DIRECTORY } from '../admin-preview/branchDirectory';
+import { useBranchContext } from '../branch-context/useBranchContext';
 import { CATEGORY_CREATE_DEFAULTS, categoryCreateSchema, categoryEditSchema } from './categoryForm.schema';
 import type { CategoryCreateFormValues, CategoryEditFormValues } from './categoryForm.schema';
 import { TIMEZONE_OPTIONS } from './categoryPresentation';
@@ -14,15 +15,20 @@ import type { PreviewCategoryDetails } from './categoryPresentation';
 export interface CategoryCreateFormProps {
   formId: string;
   isOrgAdmin: boolean;
-  currentBranchRawName: string | null;
   bannerError: string | null;
   onDirtyChange: (dirty: boolean) => void;
   onSubmit: (values: CategoryCreateFormValues, helpers: { setNameError: (message: string) => void }) => void | Promise<void>;
 }
 
-/** Секции раздела 9 промпта: Основная информация → Руководитель → Настройки задания. */
-export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, bannerError, onDirtyChange, onSubmit }: CategoryCreateFormProps): JSX.Element {
-  const users = useUsersPreview();
+/**
+ * Секции раздела 9 промпта: Основная информация → Руководитель → Настройки задания.
+ * `POST /categories` не принимает `branchId` в теле — выбор в форме реально передаётся как
+ * override заголовка `X-MTF-Branch-Id` на один запрос (см. `api/admin/categories.ts#createCategory`).
+ */
+export function CategoryCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange, onSubmit }: CategoryCreateFormProps): JSX.Element {
+  const branchContext = useBranchContext();
+  const { users } = useUsersQuery();
+  const ownBranchId = branchContext.fixedBranch?.id ?? '';
 
   const {
     register,
@@ -38,7 +44,7 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
     defaultValues: {
       name: '',
       description: '',
-      branchName: isOrgAdmin ? '' : (currentBranchRawName ?? ''),
+      branchId: isOrgAdmin ? '' : ownBranchId,
       leadUserId: '',
       ...CATEGORY_CREATE_DEFAULTS,
     },
@@ -48,13 +54,13 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
     onDirtyChange(isDirty);
   }, [isDirty, onDirtyChange]);
 
-  const branchName = watch('branchName');
-  const leadCandidates = users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchName === branchName);
+  const branchId = watch('branchId');
+  const leadCandidates = users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchId === branchId);
 
   useEffect(() => {
     setValue('leadUserId', '', { shouldValidate: false, shouldDirty: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- сбрасываем именно при смене branchName
-  }, [branchName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- сбрасываем именно при смене branchId
+  }, [branchId]);
 
   const submit = handleSubmit((values) => {
     void onSubmit(values, { setNameError: (message) => { setError('name', { type: 'server', message }); } });
@@ -73,39 +79,39 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
             <FormTextarea id="category-create-description" placeholder="Кратко опишите направление" invalid={errors.description !== undefined} {...register('description')} />
           </FormField>
           {isOrgAdmin ? (
-            <FormField label="Филиал" htmlFor="category-create-branch" required error={errors.branchName?.message}>
+            <FormField label="Филиал" htmlFor="category-create-branch" required error={errors.branchId?.message}>
               <Controller
                 control={control}
-                name="branchName"
+                name="branchId"
                 render={({ field }) => (
                   <FormSelect
                     id="category-create-branch"
-                    invalid={errors.branchName !== undefined}
+                    invalid={errors.branchId !== undefined}
                     value={field.value}
                     onValueChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
                     placeholder="Выберите филиал"
-                    options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+                    options={branchContext.availableBranches.map((branch) => ({ value: branch.id, label: branch.name }))}
                   />
                 )}
               />
             </FormField>
           ) : (
-            <ReadOnlyField label="Филиал" value={BRANCH_DIRECTORY.find((branch) => branch.rawName === currentBranchRawName)?.displayName ?? '—'} hint="Ваш филиал — изменить нельзя" />
+            <ReadOnlyField label="Филиал" value={branchContext.fixedBranch?.name ?? '—'} hint="Ваш филиал — изменить нельзя" />
           )}
         </div>
       </FormSection>
 
       <FormSection title="Руководитель" description="Можно назначить сейчас или отдельным действием позже">
-        <FormField label="Руководитель направления" htmlFor="category-create-lead" hint={branchName.length === 0 ? 'Сначала выберите филиал' : undefined}>
+        <FormField label="Руководитель направления" htmlFor="category-create-lead" hint={branchId.length === 0 ? 'Сначала выберите филиал' : undefined}>
           <Controller
             control={control}
             name="leadUserId"
             render={({ field }) => (
               <SearchSelect
                 id="category-create-lead"
-                disabled={branchName.length === 0}
+                disabled={branchId.length === 0}
                 value={field.value ?? ''}
                 onValueChange={field.onChange}
                 onBlur={field.onBlur}
@@ -159,13 +165,15 @@ export function CategoryCreateForm({ formId, isOrgAdmin, currentBranchRawName, b
 export interface CategoryEditFormProps {
   formId: string;
   category: PreviewCategoryDetails;
+  /** `undefined`, пока `GET /categories/{id}/settings` ещё не ответил — `CategoryFormDrawer` не рендерит форму до этого момента. */
+  settings: CategorySettingsDto;
   bannerError: string | null;
   onDirtyChange: (dirty: boolean) => void;
   onSubmit: (values: CategoryEditFormValues) => void | Promise<void>;
 }
 
-/** Branch/Lead не меняются здесь — отдельные workflows Assign/Change Lead (раздел 9 промпта). */
-export function CategoryEditForm({ formId, category, bannerError, onDirtyChange, onSubmit }: CategoryEditFormProps): JSX.Element {
+/** Branch/Lead не меняются здесь — отдельные workflows Assign/Change Lead (раздел 9 промпта). Настройки задания — из отдельного backend-ресурса (`GET /categories/{id}/settings`), не из `category`. */
+export function CategoryEditForm({ formId, category, settings, bannerError, onDirtyChange, onSubmit }: CategoryEditFormProps): JSX.Element {
   const {
     register,
     handleSubmit,
@@ -177,10 +185,10 @@ export function CategoryEditForm({ formId, category, bannerError, onDirtyChange,
     defaultValues: {
       name: category.name,
       description: category.description ?? '',
-      timezone: category.timezone,
-      defaultDueTimeLocal: category.defaultDueTimeLocal,
-      defaultDueDays: category.defaultDueDays,
-      allowLateSubmission: category.allowLateSubmission,
+      timezone: settings.timeZoneId,
+      defaultDueTimeLocal: settings.defaultDueTimeLocal,
+      defaultDueDays: settings.defaultAssignmentDueDays,
+      allowLateSubmission: settings.allowLateSubmission,
     },
   });
 

@@ -33,9 +33,15 @@ export function formatCategoryDate(timestampMs: number, timeZoneId: string): str
   return `${get('day')}.${get('month')}.${get('year')}`;
 }
 
-/** «Сейчас» детерминированного preview-мира — тот же якорь, что использует остальной mock-слой. */
+/**
+ * «Сейчас» — реальное время. Раньше это был детерминированный preview-якорь (`MOCK_NOW`), пригодный
+ * только пока все даты вокруг тоже были sынтетическими фикстурами; с реальными датами из backend
+ * (`AssignmentDto.currentDueAt` и т.д.) сравнение с застывшим `MOCK_NOW` навсегда сломало бы валидацию
+ * «дедлайн не может быть в прошлом» и все относительные метки времени. `formatRelative()` ниже
+ * получила тот же фикс (свой `Date.now()` по умолчанию вместо `MOCK_NOW`).
+ */
 export function leadNow(): number {
-  return MOCK_NOW;
+  return Date.now();
 }
 
 export interface RelativeMoment {
@@ -45,7 +51,7 @@ export interface RelativeMoment {
 }
 
 /** Относительная метка «через N / N назад» — для дедлайнов и «последней активности». */
-export function formatRelative(timestampMs: number, referenceMs: number = MOCK_NOW): RelativeMoment {
+export function formatRelative(timestampMs: number, referenceMs: number = Date.now()): RelativeMoment {
   const diff = timestampMs - referenceMs;
   const isPast = diff < 0;
   const abs = Math.abs(diff);

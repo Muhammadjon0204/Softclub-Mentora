@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 
-import { DAY_MS, MOCK_NOW } from '../../mocks/domain/reference';
+import { DAY_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord, LeadAssignmentStatus } from '../../mocks/ui-preview/leadAssignments.preview';
-import { formatOffsetHoursAgo, formatRelative } from '../lead/scope/leadDateFormat';
+import { formatOffsetHoursAgo, formatRelative, leadNow } from '../lead/scope/leadDateFormat';
 import { scopedActiveMentors } from '../lead/scope/leadScopedData';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../lead/scope/useScopedLeadAssignments';
@@ -50,16 +50,16 @@ function mentorNameFallback(mentorId: string, mentors: ReturnType<typeof scopedA
   return mentors.find((m) => m.id === mentorId)?.fullName ?? 'Ментор';
 }
 
-function buildActivitySeries(assignments: LeadAssignmentRecord[]): ActivityPoint[] {
+function buildActivitySeries(assignments: LeadAssignmentRecord[], now: number): ActivityPoint[] {
   const days = 14;
   const buckets: ActivityPoint[] = Array.from({ length: days }, (_, index) => {
-    const dayStart = MOCK_NOW - (days - 1 - index) * DAY_MS;
+    const dayStart = now - (days - 1 - index) * DAY_MS;
     const label = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(dayStart);
     return { dateLabel: label, assigned: 0, submitted: 0, approved: 0 };
   });
 
   const bucketIndexOf = (ts: number): number | null => {
-    const diffDays = Math.floor((MOCK_NOW - ts) / DAY_MS);
+    const diffDays = Math.floor((now - ts) / DAY_MS);
     const index = days - 1 - diffDays;
     return index >= 0 && index < days ? index : null;
   };
@@ -95,11 +95,12 @@ export function useLeadDashboard(): {
   const mentors = scopedActiveMentors(scope.categoryId);
 
   return useMemo(() => {
+    const now = leadNow();
     const nonTerminal = assignments.filter((a) => a.status !== 'Draft' && a.status !== 'Suggested' && a.status !== 'Cancelled' && a.status !== 'Approved');
     const awaitingReview = assignments.filter((a) => a.status === 'Submitted' || a.status === 'InReview');
     const rework = assignments.filter((a) => a.status === 'NeedsRework');
     const overdue = assignments.filter((a) => a.status === 'Overdue');
-    const approvedPeriod = assignments.filter((a) => a.status === 'Approved' && a.approvedAt !== null && MOCK_NOW - a.approvedAt <= PERIOD_DAYS * DAY_MS);
+    const approvedPeriod = assignments.filter((a) => a.status === 'Approved' && a.approvedAt !== null && now - a.approvedAt <= PERIOD_DAYS * DAY_MS);
 
     const kpis: LeadDashboardKpis = {
       active: nonTerminal.length,
@@ -121,12 +122,12 @@ export function useLeadDashboard(): {
         reason: 'overdue',
         detailLabel: `Просрочено ${formatRelative(overdueSince).label}`,
         targetPath: `/lead/assignments?assignmentId=${a.id}`,
-        urgencyRank: 1000 + (MOCK_NOW - overdueSince),
+        urgencyRank: 1000 + (now - overdueSince),
       });
     }
 
     for (const a of assignments.filter((x) => x.status === 'Submitted')) {
-      const waitingSince = a.firstSubmittedAt ?? a.assignedAt ?? MOCK_NOW;
+      const waitingSince = a.firstSubmittedAt ?? a.assignedAt ?? now;
       priorityCandidates.push({
         assignmentId: a.id,
         title: a.title,
@@ -135,12 +136,12 @@ export function useLeadDashboard(): {
         reason: 'waiting-review',
         detailLabel: `Ожидает ${formatRelative(waitingSince).label.replace('назад', '').trim()}`,
         targetPath: `/lead/review-queue?assignmentId=${a.id}`,
-        urgencyRank: 800 + (MOCK_NOW - waitingSince) / DAY_MS,
+        urgencyRank: 800 + (now - waitingSince) / DAY_MS,
       });
     }
 
     for (const a of rework) {
-      const dueIn = a.currentDueAt - MOCK_NOW;
+      const dueIn = a.currentDueAt - now;
       if (dueIn <= DAY_MS) {
         priorityCandidates.push({
           assignmentId: a.id,
@@ -156,8 +157,8 @@ export function useLeadDashboard(): {
     }
 
     for (const a of assignments.filter((x) => x.status === 'InReview')) {
-      const reviewingSince = a.reviewStartedAt ?? MOCK_NOW;
-      if (MOCK_NOW - reviewingSince >= DAY_MS) {
+      const reviewingSince = a.reviewStartedAt ?? now;
+      if (now - reviewingSince >= DAY_MS) {
         priorityCandidates.push({
           assignmentId: a.id,
           title: a.title,
@@ -166,7 +167,7 @@ export function useLeadDashboard(): {
           reason: 'in-review-long',
           detailLabel: `На проверке ${formatRelative(reviewingSince).label}`,
           targetPath: `/lead/review-queue?assignmentId=${a.id}`,
-          urgencyRank: 400 + (MOCK_NOW - reviewingSince) / DAY_MS,
+          urgencyRank: 400 + (now - reviewingSince) / DAY_MS,
         });
       }
     }
@@ -185,7 +186,7 @@ export function useLeadDashboard(): {
       };
     });
 
-    const activity = buildActivitySeries(assignments);
+    const activity = buildActivitySeries(assignments, now);
 
     return { kpis, priorityItems, activity, team };
   }, [assignments, mentors]);

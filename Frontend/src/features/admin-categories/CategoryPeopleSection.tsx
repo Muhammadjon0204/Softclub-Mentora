@@ -2,7 +2,7 @@ import { ExternalLink, UserCog } from 'lucide-react';
 
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import { STATUS_META } from '../admin-users/userPresentation';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PreviewCategoryDetails } from './categoryPresentation';
@@ -20,9 +20,9 @@ export interface CategoryPeopleSectionProps {
 
 /** Только пользователи этого Branch/Category — никакого доступа к чужому филиалу (раздел 7 промпта). */
 export function CategoryPeopleSection({ category, canManage, onOpenUser, onChangeLead }: CategoryPeopleSectionProps): JSX.Element {
-  const users = useUsersPreview();
+  const { users } = useUsersQuery();
   const lead = category.leadUserId !== null ? users.find((user) => user.id === category.leadUserId) : undefined;
-  const mentors = users.filter((user) => user.role === 'Mentor' && user.branchName === category.branchName && user.categoryName === category.name);
+  const mentors = users.filter((user) => user.role === 'Mentor' && user.categoryId === category.id);
 
   return (
     <div className="space-y-5">

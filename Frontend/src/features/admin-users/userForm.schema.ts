@@ -13,21 +13,21 @@ const emailField = z.string().trim().min(1, 'Введите email').email('Вв�
 export const ASSIGNABLE_ROLE_VALUES = ['BranchAdmin', 'Lead', 'Mentor'] as const;
 export type AssignableRoleValue = (typeof ASSIGNABLE_ROLE_VALUES)[number];
 
-/** Роль определяет обязательность Branch/Category (раздел 13 промпта) — проверяется в `superRefine`. */
+/** Роль определяет обязательность Category (раздел 13 промпта) — проверяется в `superRefine`. Branch не влияет на обязательность категории напрямую, но выбор категории зависит от выбранного филиала. */
 export const userCreateSchema = z
   .object({
     fullName: fullNameField,
     email: emailField,
     role: z.enum(ASSIGNABLE_ROLE_VALUES, { errorMap: () => ({ message: 'Выберите роль' }) }),
-    branchName: z.string().min(1, 'Выберите филиал'),
-    categoryName: z.string().optional(),
+    branchId: z.string().min(1, 'Выберите филиал'),
+    categoryId: z.string().optional(),
     notificationLanguage: z.enum(NOTIFICATION_LANGUAGES),
     sendInvitationNow: z.boolean(),
   })
   .superRefine((values, ctx) => {
     const needsCategory = values.role === 'Lead' || values.role === 'Mentor';
-    if (needsCategory && (values.categoryName === undefined || values.categoryName.trim().length === 0)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['categoryName'], message: 'Выберите направление' });
+    if (needsCategory && (values.categoryId === undefined || values.categoryId.trim().length === 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['categoryId'], message: 'Выберите направление' });
     }
   });
 

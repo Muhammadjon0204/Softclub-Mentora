@@ -35,6 +35,18 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Proxies the real backend onto this same origin/port for local dev against a real API (as
+    // opposed to MSW, which intercepts at the fetch layer and never reaches the network at all, so
+    // this proxy is inert whenever VITE_USE_MOCKS=true). Same-origin avoids relying on cross-port
+    // cookie handling for the refresh-token/CSRF cookies, which not every HTTP client honors the same
+    // way browsers do. Target is fixed to the docker-compose api service's published port (5000);
+    // point VITE_API_BASE_URL at a different backend instead of editing this for anything else.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     globals: true,

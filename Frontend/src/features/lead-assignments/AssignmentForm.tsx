@@ -4,8 +4,9 @@ import { Controller, useForm } from 'react-hook-form';
 
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { formatCategoryDate, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
-import { scopedActiveMentors, scopedTopics, scopedTopicAssignments } from '../lead/scope/leadScopedData';
+import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../lead/scope/useLeadScope';
+import { useAllTopicAssignments, useScopedLeadTopics } from '../lead/scope/useScopedLeadSchedule';
 import { FormBannerError, FormField, FormInput, FormSelect, FormTextarea, fieldA11yProps } from '../../shared/ui/FormField';
 import { createAssignmentSchema, DEFAULT_DUE_TIME_LOCAL } from './createAssignment.schema';
 import type { CreateAssignmentFormValues } from './createAssignment.schema';
@@ -41,12 +42,13 @@ function toTimeInputValue(ms: number, timeZoneId: string): string {
  */
 export function AssignmentForm({ formId, existing, bannerError, onDirtyChange, onSubmit }: AssignmentFormProps): JSX.Element {
   const scope = useLeadScope();
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
   // TPL-003: архивный TopicAssignment недоступен для создания новых Assignment — только активная тема + активный шаблон.
-  const topics = scopedTopics(scope.categoryId).filter((topic) => topic.isActive);
+  const topics = useScopedLeadTopics().filter((topic) => topic.isActive);
+  const allTemplates = useAllTopicAssignments(topics);
   const topicAssignmentOptions = topics.flatMap((topic) =>
-    scopedTopicAssignments(scope.categoryId, topic.id)
-      .filter((tpa) => tpa.isActive)
+    allTemplates
+      .filter((tpa) => tpa.topicId === topic.id && tpa.isActive)
       .map((tpa) => ({ id: tpa.id, label: `${topic.title} — ${tpa.title}`, title: tpa.title, description: tpa.description })),
   );
 

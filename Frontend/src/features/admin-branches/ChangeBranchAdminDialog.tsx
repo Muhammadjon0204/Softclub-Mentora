@@ -6,9 +6,7 @@ import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
 import { activeCategoriesForBranch } from '../admin-users/userPresentation';
 import { useUsersPreview } from '../admin-users/userPreviewStore';
-import type { PreviousAdminRoleChoice } from './branchPreviewStore';
-import type { ChangeBranchAdminInput } from './branchPreviewStore';
-import type { PreviewBranchDetails } from './branchPresentation';
+import type { ChangeBranchAdminInput, PreviousAdminRoleChoice, PreviewBranchDetails } from './branchPresentation';
 
 const PREVIOUS_ROLE_OPTIONS: { value: PreviousAdminRoleChoice; label: string }[] = [
   { value: 'Lead', label: 'Руководитель направления' },

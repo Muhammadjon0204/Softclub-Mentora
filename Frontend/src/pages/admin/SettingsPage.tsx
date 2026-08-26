@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { updateOrganization } from '../../api/admin/organization';
+import { getGenericErrorMessage } from '../../api/problemDetails';
 import { DisconnectIntegrationDialog } from '../../features/admin-settings/DisconnectIntegrationDialog';
 import type { IntegrationKind } from '../../features/admin-settings/DisconnectIntegrationDialog';
 import { ResetSettingsDialog } from '../../features/admin-settings/ResetSettingsDialog';
-import { updateOrganizationNamePreview, useOrganizationPreview } from '../../features/admin-settings/organizationPreviewStore';
+import { organizationQueryKey, useOrganizationQuery } from '../../features/admin-settings/useOrganizationQuery';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
 import { useAuth } from '../../auth/useAuth';
@@ -12,6 +15,7 @@ import { UnsavedChangesDialog, useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
+import { ErrorState } from '../../shared/ui/ErrorState';
 import { FormField, FormInput, FormSelect, ReadOnlyField } from '../../shared/ui/FormField';
 
 /** Организация/безопасность/уведомления/интеграции — Organization Admin domain (ADR-001 8.1, ORG-024). */
@@ -87,13 +91,38 @@ export function SettingsPage(): JSX.Element {
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
   const TABS = isOrgAdmin ? ORG_ADMIN_TABS : BRANCH_ADMIN_TABS;
+  const organizationId = authUser?.organization.id ?? 'anonymous';
 
   const [tab, setTab] = useState(isOrgAdmin ? 'organization' : 'interface');
   const toast = useToast();
+  const queryClient = useQueryClient();
 
-  const organization = useOrganizationPreview();
-  const [orgNameDraft, setOrgNameDraft] = useState(organization.name);
+  const orgQuery = useOrganizationQuery();
+  const [orgNameDraft, setOrgNameDraft] = useState('');
+  const [orgConcurrencyToken, setOrgConcurrencyToken] = useState<string | null>(null);
   const [orgNameError, setOrgNameError] = useState<string | null>(null);
+
+  // GET /organization приходит асинхронно (в отличие от прежнего синхронного
+  // preview-store) — черновик и скрытый concurrencyToken заполняются один раз,
+  // когда данные приходят, и больше не перезаписываются фоновым refetch поверх
+  // того, что пользователь уже успел напечатать.
+  const orgInitializedRef = useRef(false);
+  useEffect(() => {
+    if (orgQuery.data === undefined || orgInitializedRef.current) return;
+    orgInitializedRef.current = true;
+    setOrgNameDraft(orgQuery.data.name);
+    setOrgConcurrencyToken(orgQuery.data.concurrencyToken);
+    savedRef.current = { ...savedRef.current, orgName: orgQuery.data.name };
+  }, [orgQuery.data]);
+
+  const updateOrganizationMutation = useMutation({
+    mutationFn: updateOrganization,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(organizationQueryKey(organizationId), updated);
+      setOrgConcurrencyToken(updated.concurrencyToken);
+      setOrgNameDraft(updated.name);
+    },
+  });
 
   const [emailEnabled, setEmailEnabled] = useState(true);
   const [telegramEnabled, setTelegramEnabled] = useState(true);
@@ -106,7 +135,8 @@ export function SettingsPage(): JSX.Element {
   const [sidebarDefault, setSidebarDefault] = useState('expanded');
   const [uiLanguage, setUiLanguage] = useState('ru');
 
-  const savedRef = useRef<SettingsSnapshot>({ orgName: organization.name, emailEnabled, telegramEnabled, reminders, compactMode, sidebarDefault, uiLanguage });
+  // orgName стартует пустым и заполняется эффектом выше, когда придёт GET /organization.
+  const savedRef = useRef<SettingsSnapshot>({ orgName: '', emailEnabled, telegramEnabled, reminders, compactMode, sidebarDefault, uiLanguage });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
@@ -144,14 +174,33 @@ export function SettingsPage(): JSX.Element {
         setOrgNameError('Название должно содержать от 2 до 200 символов');
         return;
       }
+      if (orgConcurrencyToken === null) return; // данные ещё не загрузились — Save недоступен
       setOrgNameError(null);
+
+      setIsSubmitting(true);
+      try {
+        const updated = await updateOrganizationMutation.mutateAsync({ name: trimmed, concurrencyToken: orgConcurrencyToken });
+        savedRef.current = { ...current, orgName: updated.name };
+        toast.success('Изменения сохранены');
+      } catch (error) {
+        // CONCURRENCY_CONFLICT и прочие ошибки — тот же toast.error + человекочитаемый
+        // текст, что и в остальном приложении (см. `pages/lead/*`); при конфликте версий
+        // подтягиваем свежие данные, чтобы следующая попытка сохранить уже не била в 409.
+        toast.error(getGenericErrorMessage(error));
+        void orgQuery.refetch();
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
     }
 
+    // Остальные вкладки (Уведомления/Интерфейс) — локальные preview-настройки,
+    // вне скоупа реальной интеграции (Users/Categories/Notifications и т.д. не
+    // подключены). Поведение не меняется — тот же имитационный save с задержкой.
     setIsSubmitting(true);
     try {
       await new Promise((resolve) => { window.setTimeout(resolve, 350); });
-      if (tab === 'organization') updateOrganizationNamePreview(orgNameDraft);
-      savedRef.current = { ...current, orgName: tab === 'organization' ? orgNameDraft.trim() : savedRef.current.orgName };
+      savedRef.current = { ...current };
       toast.success('Изменения сохранены');
     } finally {
       setIsSubmitting(false);
@@ -164,21 +213,40 @@ export function SettingsPage(): JSX.Element {
 
   let content: ReactNode = null;
   if (tab === 'organization') {
-    content = (
-      <div className="space-y-4">
+    if (orgQuery.isPending) {
+      content = (
         <SectionCard title="Профиль организации">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Название" htmlFor="settings-org-name" required error={orgNameError ?? undefined}>
-              <FormInput id="settings-org-name" value={orgNameDraft} invalid={orgNameError !== null} onChange={(event) => { setOrgNameDraft(event.target.value); }} />
-            </FormField>
-            <ReadOnlyField label="Slug" value={organization.slug} hint="Неизменяем после создания" />
-            <ReadOnlyField label="Главный офис" value="Душанбе" hint="Изменяется на странице «Филиалы»" />
+          <div aria-busy="true" aria-live="polite" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <span className="sr-only">Загрузка организации…</span>
+            {Array.from({ length: 3 }, (_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-control bg-surface-muted" />
+            ))}
           </div>
         </SectionCard>
+      );
+    } else if (orgQuery.data === undefined) {
+      content = (
+        <Card>
+          <ErrorState error={orgQuery.error} title="Не удалось загрузить организацию" onRetry={() => { void orgQuery.refetch(); }} />
+        </Card>
+      );
+    } else {
+      content = (
+        <div className="space-y-4">
+          <SectionCard title="Профиль организации">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FormField label="Название" htmlFor="settings-org-name" required error={orgNameError ?? undefined}>
+                <FormInput id="settings-org-name" value={orgNameDraft} invalid={orgNameError !== null} onChange={(event) => { setOrgNameDraft(event.target.value); }} />
+              </FormField>
+              <ReadOnlyField label="Slug" value={orgQuery.data.slug} hint="Неизменяем после создания" />
+              <ReadOnlyField label="Главный офис" value="Душанбе" hint="Изменяется на странице «Филиалы»" />
+            </div>
+          </SectionCard>
 
-        <TabActions isDirty={isDirty} isSubmitting={isSubmitting} onSave={() => { void handleSave(); }} onReset={() => { setResetOpen(true); }} />
-      </div>
-    );
+          <TabActions isDirty={isDirty} isSubmitting={isSubmitting} onSave={() => { void handleSave(); }} onReset={() => { setResetOpen(true); }} />
+        </div>
+      );
+    }
   } else if (tab === 'security') {
     content = (
       <SectionCard title="Безопасность" description="Значения политики безопасности — только для чтения на этом этапе">

@@ -12,7 +12,6 @@ import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignm
 import { formatCategoryDateTime } from '../lead/scope/leadDateFormat';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { assignmentCapabilities, averageVersionsLabel, LEAD_STATUS_META, sourceLabel, taskEventLabel } from '../lead/assignments/leadAssignmentPresentation';
-import { mentorNameOf } from '../lead/scope/leadScopedData';
 
 type Tab = 'overview' | 'submissions' | 'history';
 const TABS: { id: Tab; label: string }[] = [
@@ -33,6 +32,7 @@ export interface LeadAssignmentDetailsDrawerProps {
   onReassign: (a: LeadAssignmentRecord) => void;
   onStartReview: (a: LeadAssignmentRecord) => void;
   onOpenReview: (a: LeadAssignmentRecord) => void;
+  mentorNameOf: (mentorId: string) => string;
 }
 
 function Field({ label, value }: { label: string; value: React.ReactNode }): JSX.Element {
@@ -44,7 +44,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }): JSX
   );
 }
 
-function OverviewTab({ assignment }: { assignment: LeadAssignmentRecord }): JSX.Element {
+function OverviewTab({ assignment, mentorNameOf }: { assignment: LeadAssignmentRecord; mentorNameOf: (mentorId: string) => string }): JSX.Element {
   const scope = useLeadScope();
 
   return (
@@ -56,7 +56,7 @@ function OverviewTab({ assignment }: { assignment: LeadAssignmentRecord }): JSX.
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Ментор" value={mentorNameOf(scope.categoryId, assignment.mentorId)} />
+        <Field label="Ментор" value={mentorNameOf(assignment.mentorId)} />
         <Field label="Источник" value={sourceLabel(assignment.source)} />
         <Field label="Начальный дедлайн" value={formatCategoryDateTime(assignment.initialDueAt, scope.timeZoneId)} />
         <Field label="Текущий дедлайн" value={formatCategoryDateTime(assignment.currentDueAt, scope.timeZoneId)} />
@@ -147,7 +147,7 @@ function HistoryTab({ assignment }: { assignment: LeadAssignmentRecord }): JSX.E
 
 /** Detail-drawer задания Lead: обзор/решения/история + действия, доступные исключительно по текущему статусу (табл. 13.3 ТЗ). */
 export function LeadAssignmentDetailsDrawer(props: LeadAssignmentDetailsDrawerProps): JSX.Element {
-  const { assignment, assignmentId, onClose } = props;
+  const { assignment, assignmentId, onClose, mentorNameOf } = props;
   const [tab, setTab] = useState<Tab>('overview');
   const [previewFile, setPreviewFile] = useState<SubmissionFile | null>(null);
   const [detailsFile, setDetailsFile] = useState<SubmissionFile | null>(null);
@@ -218,7 +218,7 @@ export function LeadAssignmentDetailsDrawer(props: LeadAssignmentDetailsDrawerPr
             </div>
 
             <div role="tabpanel">
-              {tab === 'overview' ? <OverviewTab assignment={assignment} /> : null}
+              {tab === 'overview' ? <OverviewTab assignment={assignment} mentorNameOf={mentorNameOf} /> : null}
               {tab === 'submissions' ? <SubmissionsTab assignment={assignment} onOpenFile={handleOpenFile} /> : null}
               {tab === 'history' ? <HistoryTab assignment={assignment} /> : null}
             </div>

@@ -1,6 +1,9 @@
 import { Download, FileText, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
 
-import { Modal } from '../../shared/overlays';
+import { getSubmissionDownloadUrl } from '../../api/lead/submissions';
+import { getGenericErrorMessage } from '../../api/problemDetails';
+import { Modal, useToast } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import type { SubmissionFile } from './assignmentPresentation';
 
@@ -10,8 +13,29 @@ export interface FileDetailsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** PPTX и прочие неподдерживаемые типы — раздел 17 промпта: без inline preview, без обещания антивируса. */
+/**
+ * SB3: `GET /submissions/{id}/download-url`. `file.id` is the submission's own id (one file per
+ * submission version on the real contract — see `assignmentAdapter.ts`'s `toSubmissionRecord`), which
+ * is exactly what the presigned-URL route needs. PPTX (and anything else without an inline preview)
+ * goes through this modal — no preview affordance, download only (`17.5`).
+ */
 export function FileDetailsModal({ file, open, onOpenChange }: FileDetailsModalProps): JSX.Element {
+  const toast = useToast();
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload(): Promise<void> {
+    if (file === null) return;
+    setDownloading(true);
+    try {
+      const { url } = await getSubmissionDownloadUrl(file.id);
+      window.open(url, '_blank', 'noopener');
+    } catch (error) {
+      toast.error(getGenericErrorMessage(error));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <Modal open={open} onOpenChange={onOpenChange} title="Файл решения" size="sm" ariaLabel={file !== null ? `Файл: ${file.name}` : 'Файл решения'}>
       {file !== null ? (
@@ -41,10 +65,16 @@ export function FileDetailsModal({ file, open, onOpenChange }: FileDetailsModalP
           </dl>
 
           <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[12.5px] leading-[18px] text-ink-secondary">
-            Предпросмотр {file.extension.toUpperCase()} недоступен. Файл можно скачать после проверки.
+            Предпросмотр {file.extension.toUpperCase()} недоступен. Файл можно скачать.
           </p>
 
-          <Button variant="secondary" leadingIcon={<Download className="h-4 w-4" aria-hidden="true" />} className="w-full justify-center" disabled title="Preview-режим — скачивание пока не подключено">
+          <Button
+            variant="secondary"
+            leadingIcon={<Download className="h-4 w-4" aria-hidden="true" />}
+            className="w-full justify-center"
+            isLoading={downloading}
+            onClick={() => { void handleDownload(); }}
+          >
             Скачать файл
           </Button>
         </div>

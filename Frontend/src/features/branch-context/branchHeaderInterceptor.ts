@@ -21,6 +21,13 @@ export function registerBranchHeaderInterceptor(): void {
   registered = true;
 
   apiClient.interceptors.request.use((config) => {
+    // Users/Categories-домены (`api/admin/users.ts#createUser`, `api/admin/categories.ts`) иногда
+    // должны адресовать запрос конкретному филиалу, отличному от того, что сейчас выбран в глобальном
+    // селекторе (например, create-форма со своим выбором филиала, или смена роли/перевод пользователя
+    // в другой филиал) — POST /users и POST /categories не принимают branchId в теле вообще, только
+    // через этот заголовок (см. `UserService.BuildNewUserAsync`/`CategoryService.CreateAsync`).
+    // Явно установленный вызывающим кодом заголовок имеет приоритет над глобальным состоянием.
+    if (config.headers.has(BRANCH_HEADER_NAME)) return config;
     const branchId = resolveBranchHeaderValue();
     if (branchId !== null) config.headers.set(BRANCH_HEADER_NAME, branchId);
     return config;

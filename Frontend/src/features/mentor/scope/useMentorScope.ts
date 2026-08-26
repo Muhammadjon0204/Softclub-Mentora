@@ -1,5 +1,4 @@
 import { useAuth } from '../../../auth/useAuth';
-import { categoryDirectoryEntry } from './mentorWorkspace';
 
 export interface MentorScope {
   mentorId: string;
@@ -22,18 +21,15 @@ export interface MentorScope {
  * scope по-своему.
  *
  * Рендерится только внутри `RequireRole(['Mentor'])`, поэтому `user` здесь
- * всегда `Mentor` с обязательными `branch` и `categoryId`.
+ * всегда `Mentor` с обязательными `branch` и `category`. `category` приходит
+ * от backend уже с именем и часовым поясом (`AuthUserDto.Category`) — тот же
+ * фикс, той же датой, что `useLeadScope` (см. его комментарий).
  */
 export function useMentorScope(): MentorScope {
   const { user } = useAuth();
 
-  if (user === null || user.role !== 'Mentor' || user.branch === null || user.categoryId === null) {
+  if (user === null || user.role !== 'Mentor' || user.branch === null || user.category === null) {
     throw new Error('useMentorScope: доступен только аутентифицированному Mentor с назначенной категорией');
-  }
-
-  const category = categoryDirectoryEntry(user.categoryId);
-  if (category === undefined) {
-    throw new Error(`useMentorScope: категория ${user.categoryId} отсутствует в preview-справочнике`);
   }
 
   return {
@@ -43,9 +39,9 @@ export function useMentorScope(): MentorScope {
     organizationName: user.organization.name,
     branchId: user.branch.id,
     branchRawName: user.branch.name,
-    branchDisplayName: category.branchDisplayName,
-    categoryId: category.id,
-    categoryName: category.name,
-    timeZoneId: category.timeZoneId,
+    branchDisplayName: user.branch.name,
+    categoryId: user.category.id,
+    categoryName: user.category.name,
+    timeZoneId: user.category.timeZoneId,
   };
 }

@@ -1,5 +1,5 @@
 import type { AdminScope, AuthUser, UserRole } from '../api/auth';
-import { branchSummary, ORGANIZATION } from './domain/organization';
+import { branchSummary, categorySummary, ORGANIZATION } from './domain/organization';
 import { seedDb } from './scenarios';
 
 /**
@@ -157,7 +157,7 @@ export function toAuthUser(user: MockUser): AuthUser {
     adminScope: user.adminScope,
     organization: { id: ORGANIZATION.id, name: ORGANIZATION.name },
     branch: branchSummary(user.branchId),
-    categoryId: user.categoryId,
+    category: categorySummary(user.categoryId),
   };
 }
 

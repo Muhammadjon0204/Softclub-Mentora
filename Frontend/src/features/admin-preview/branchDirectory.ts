@@ -36,8 +36,14 @@ export function registerBranchDirectoryEntry(entry: BranchDirectoryEntry): void 
   BRANCH_DIRECTORY = [...BRANCH_DIRECTORY, entry];
 }
 
+/**
+ * Раньше подменяла ровно три preview-фикстуры на городские названия для демо (см. `formatBranchDisplayName`
+ * в `dashboardFormatters.ts` — тот же паттерн, тот же баг, найден и исправлен там же первым: реальный
+ * филиал, буквально названный "Главный офис" администратором, совпадал по строке с `rawName` фикстуры и
+ * подменялся на "Душанбе"). Теперь просто возвращает то, что ввёл администратор.
+ */
 export function branchDisplayName(rawName: string): string {
-  return BRANCH_DIRECTORY.find((entry) => entry.rawName === rawName)?.displayName ?? rawName;
+  return rawName;
 }
 
 export function branchIdFromRawName(rawName: string): string | null {

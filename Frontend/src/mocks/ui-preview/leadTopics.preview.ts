@@ -16,16 +16,25 @@ export interface LeadTopicAssignmentRecord {
   description: string;
   isRequired: boolean;
   isActive: boolean;
+  /** Real `TopicAssignmentDto.concurrencyToken` — required by `update`/`activate`/`deactivate`. Optional so the fixture array below doesn't need a synthetic value. */
+  concurrencyToken?: string;
 }
 
 export interface LeadTopicRecord {
   id: string;
   categoryId: string;
   dayNumber: number;
-  plannedDate: number;
+  /**
+   * Real `TopicDto.plannedDate` is `DateOnly?` — genuinely optional. The old preview fixture always
+   * populated it (never `null`); the real backend does not guarantee that (Phase 1E contract map, TP1
+   * row). Every UI call site that reads this field must handle `null`.
+   */
+  plannedDate: number | null;
   title: string;
   description: string;
   isActive: boolean;
+  /** Real `TopicDto.concurrencyToken` — required by `update`/`activate`/`deactivate`. Optional so the fixture array below doesn't need a synthetic value. */
+  concurrencyToken?: string;
 }
 
 export const TOPIC_ASSIGNMENT_TYPE_LABEL: Record<TopicAssignmentType, string> = {

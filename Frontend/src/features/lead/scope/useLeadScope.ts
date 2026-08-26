@@ -1,5 +1,4 @@
 import { useAuth } from '../../../auth/useAuth';
-import { categoryDirectoryEntry } from './leadWorkspace';
 
 export interface LeadScope {
   leadId: string;
@@ -24,20 +23,18 @@ export interface LeadScope {
  * по-своему (раздел 5 задачи Phase 3).
  *
  * Рендерится только внутри `RequireRole(['Lead'])`, поэтому `user` здесь
- * всегда `Lead` с обязательными `branch` и `categoryId` (CHECK ТЗ 12.2).
- * Отсутствие директории для `categoryId` — дефект конфигурации preview-справочника,
- * а не легитимное состояние, поэтому это исключение, а не тихий fallback.
+ * всегда `Lead` с обязательными `branch` и `category` (CHECK ТЗ 12.2).
+ * `category` приходит от backend уже с именем и часовым поясом
+ * (`AuthUserDto.Category`, `AUTH-038`) — раньше это резолвилось через
+ * захардкоженный preview-справочник (`leadWorkspace.ts`), который падал
+ * `Error` на любой реальной категории с реальным id; найдено и исправлено
+ * при первой живой проверке (2026-08-22).
  */
 export function useLeadScope(): LeadScope {
   const { user } = useAuth();
 
-  if (user === null || user.role !== 'Lead' || user.branch === null || user.categoryId === null) {
+  if (user === null || user.role !== 'Lead' || user.branch === null || user.category === null) {
     throw new Error('useLeadScope: доступен только аутентифицированному Lead с назначенной категорией');
-  }
-
-  const category = categoryDirectoryEntry(user.categoryId);
-  if (category === undefined) {
-    throw new Error(`useLeadScope: категория ${user.categoryId} отсутствует в preview-справочнике`);
   }
 
   return {
@@ -47,9 +44,9 @@ export function useLeadScope(): LeadScope {
     organizationName: user.organization.name,
     branchId: user.branch.id,
     branchRawName: user.branch.name,
-    branchDisplayName: category.branchDisplayName,
-    categoryId: category.id,
-    categoryName: category.name,
-    timeZoneId: category.timeZoneId,
+    branchDisplayName: user.branch.name,
+    categoryId: user.category.id,
+    categoryName: user.category.name,
+    timeZoneId: user.category.timeZoneId,
   };
 }

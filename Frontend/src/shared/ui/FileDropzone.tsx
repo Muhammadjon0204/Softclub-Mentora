@@ -1,5 +1,5 @@
 import { AlertTriangle, FileText, Upload, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { IconButton } from './Button';
 
@@ -7,6 +7,12 @@ export interface PendingFile {
   /** Client-local id (никогда не путается с server-side id — файл ещё не отправлен). */
   id: string;
   file: File;
+  /**
+   * `'ready'` — прошёл клиентскую предпроверку, ждёт «Отправить»; реальная сеть ещё не тронута.
+   * `'uploading'` — идёт настоящий `POST` этого конкретного файла (см. `useSubmitAssignment.ts`),
+   * `progress` — реальные отправленные байты, а не анимация. `'error'` — либо клиентская
+   * предпроверка не прошла, либо реальная загрузка вернула ошибку (`errorMessage` в обоих случаях).
+   */
   status: 'uploading' | 'ready' | 'error';
   progress: number;
   errorMessage?: string;
@@ -34,38 +40,19 @@ export function formatFileSize(bytes: number): string {
 /**
  * Загрузка файла решения (FE-016/017 ТЗ 2.2, раздел 24.6) — drag & drop зона
  * + кнопка выбора, клиентская предпроверка расширения/размера до отправки
- * (не заменяет серверную валидацию, только экономит трафик). Раз в preview
- * нет настоящего backend/хранилища — "загрузка" эмулируется короткой
- * анимацией прогресса, но реального состояния (`Submission`) это не
- * подменяет: файл считается отправленным только после клика «Отправить на
- * проверку», который вызывает настоящую мутацию стора.
+ * (не заменяет серверную валидацию, только экономит трафик). Файл,
+ * прошедший предпроверку, сразу становится `'ready'` — реальная сеть
+ * (настоящий `POST .../submissions`, `SB1`) начинается только по клику
+ * «Отправить на проверку» в `SubmissionForm`, а не при добавлении файла:
+ * каждый успешный `POST` необратимо создаёт новую версию на backend, так
+ * что дропзона не должна отправлять что-либо, пока пользователь явно не
+ * подтвердил намерение (см. `useSubmitAssignment.ts`, которое затем ведёт
+ * `status`/`progress` каждого файла через те же поля `PendingFile` — но уже
+ * настоящими отправленными байтами, а не анимацией).
  */
 export function FileDropzone({ acceptExtensions, maxSizeBytes, files, onFilesChange, disabled = false }: FileDropzoneProps): JSX.Element {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const timersRef = useRef(new Set<ReturnType<typeof setInterval>>());
-  /** Всегда актуальный `files` для колбэков `setInterval` — `files` как проп меняется по кадрам, обычное замыкание читало бы устаревший снимок и затирало бы прогресс параллельно грузящихся файлов. */
-  const filesRef = useRef(files);
-  filesRef.current = files;
-  const onFilesChangeRef = useRef(onFilesChange);
-  onFilesChangeRef.current = onFilesChange;
-
-  useEffect(() => () => { timersRef.current.forEach((t) => { clearInterval(t); }); }, []);
-
-  function simulateUpload(id: string): void {
-    let progress = 0;
-    const timer = setInterval(() => {
-      progress = Math.min(100, progress + 20 + Math.random() * 20);
-      onFilesChangeRef.current(
-        filesRef.current.map((f) => (f.id === id ? { ...f, progress, status: progress >= 100 ? 'ready' : 'uploading' } : f)),
-      );
-      if (progress >= 100) {
-        clearInterval(timer);
-        timersRef.current.delete(timer);
-      }
-    }, 180);
-    timersRef.current.add(timer);
-  }
 
   function addFiles(list: FileList): void {
     if (disabled) return;
@@ -81,22 +68,18 @@ export function FileDropzone({ acceptExtensions, maxSizeBytes, files, onFilesCha
         accepted.push({ id, file: raw, status: 'error', progress: 0, errorMessage: `Файл больше ${formatFileSize(maxSizeBytes)}` });
         continue;
       }
-      accepted.push({ id, file: raw, status: 'uploading', progress: 0 });
+      accepted.push({ id, file: raw, status: 'ready', progress: 100 });
     }
-    const next = [...files, ...accepted];
-    onFilesChange(next);
-    for (const f of accepted) if (f.status === 'uploading') simulateUpload(f.id);
+    onFilesChange([...files, ...accepted]);
   }
 
   function removeFile(id: string): void {
     onFilesChange(files.filter((f) => f.id !== id));
   }
 
+  /** Сбрасывает файл, не прошедший загрузку (клиентскую предпроверку или реальный `POST`), обратно в очередь на отправку. Сама повторная отправка — по следующему клику «Отправить на проверку», не здесь (см. верхний doc comment). */
   function retry(id: string): void {
-    const target = files.find((f) => f.id === id);
-    if (target === undefined) return;
-    onFilesChange(files.map((f) => (f.id === id ? { ...f, status: 'uploading', progress: 0, errorMessage: undefined } : f)));
-    simulateUpload(id);
+    onFilesChange(files.map((f) => (f.id === id ? { ...f, status: 'ready', progress: 100, errorMessage: undefined } : f)));
   }
 
   return (

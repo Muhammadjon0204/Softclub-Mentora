@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 
-import { DAY_MS, HOUR_MS, MOCK_NOW } from '../../mocks/domain/reference';
+import { DAY_MS, HOUR_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
+import { mentorNow } from '../mentor/scope/mentorDateFormat';
 import { useScopedMentorAssignments } from '../mentor/scope/useScopedMentorAssignments';
 
 /**
@@ -28,8 +29,8 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function inPeriod(ts: number | null, fromMs: number): boolean {
-  return ts !== null && ts >= fromMs && ts <= MOCK_NOW;
+function inPeriod(ts: number | null, fromMs: number, now: number): boolean {
+  return ts !== null && ts >= fromMs && ts <= now;
 }
 
 export interface DurationMetric {
@@ -58,16 +59,16 @@ export interface MentorReportsResult {
   activity: ActivityPoint[];
 }
 
-function buildActivitySeries(assignments: LeadAssignmentRecord[]): ActivityPoint[] {
+function buildActivitySeries(assignments: LeadAssignmentRecord[], now: number): ActivityPoint[] {
   const days = 14;
   const buckets: ActivityPoint[] = Array.from({ length: days }, (_, index) => {
-    const dayStart = MOCK_NOW - (days - 1 - index) * DAY_MS;
+    const dayStart = now - (days - 1 - index) * DAY_MS;
     const label = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(dayStart);
     return { dateLabel: label, assigned: 0, submitted: 0, approved: 0 };
   });
 
   const bucketIndexOf = (ts: number): number | null => {
-    const diffDays = Math.floor((MOCK_NOW - ts) / DAY_MS);
+    const diffDays = Math.floor((now - ts) / DAY_MS);
     const index = days - 1 - diffDays;
     return index >= 0 && index < days ? index : null;
   };
@@ -89,7 +90,8 @@ export function useMentorReports(filters: ReportsFilters): MentorReportsResult {
   const all = useScopedMentorAssignments();
 
   return useMemo(() => {
-    const fromMs = filters.periodDays === 'all' ? 0 : MOCK_NOW - filters.periodDays * DAY_MS;
+    const now = mentorNow();
+    const fromMs = filters.periodDays === 'all' ? 0 : now - filters.periodDays * DAY_MS;
 
     const eligible = (a: LeadAssignmentRecord): boolean => {
       if (a.status === 'Cancelled' && !filters.includeCancelled) return false;
@@ -98,8 +100,8 @@ export function useMentorReports(filters: ReportsFilters): MentorReportsResult {
 
     const scoped = all.filter(eligible);
 
-    const totalSet = scoped.filter((a) => inPeriod(a.assignedAt, fromMs));
-    const approvedSet = scoped.filter((a) => a.status === 'Approved' && inPeriod(a.approvedAt, fromMs));
+    const totalSet = scoped.filter((a) => inPeriod(a.assignedAt, fromMs, now));
+    const approvedSet = scoped.filter((a) => a.status === 'Approved' && inPeriod(a.approvedAt, fromMs, now));
 
     const totalAssignments = totalSet.length;
     const approvedAssignments = approvedSet.length;
@@ -110,7 +112,7 @@ export function useMentorReports(filters: ReportsFilters): MentorReportsResult {
     const overdueCount = totalSet.filter((a) => a.overdueAt !== null).length;
     const overdueRate = totalAssignments === 0 ? null : Math.round((overdueCount / totalAssignments) * 1000) / 10;
 
-    const submissionsInPeriod = scoped.flatMap((a) => a.submissions.filter((s) => inPeriod(s.submittedAt, fromMs)));
+    const submissionsInPeriod = scoped.flatMap((a) => a.submissions.filter((s) => inPeriod(s.submittedAt, fromMs, now)));
     const lateCount = submissionsInPeriod.filter((s) => s.isLate).length;
     const lateSubmissionRate = submissionsInPeriod.length === 0 ? null : Math.round((lateCount / submissionsInPeriod.length) * 1000) / 10;
 
@@ -120,7 +122,7 @@ export function useMentorReports(filters: ReportsFilters): MentorReportsResult {
       .map((a) => (a.firstSubmittedAt! - a.assignedAt!) / HOUR_MS);
 
     const firstReviewHours = scoped
-      .filter((a) => inPeriod(a.firstSubmittedAt, fromMs) && a.submissions.length > 0)
+      .filter((a) => inPeriod(a.firstSubmittedAt, fromMs, now) && a.submissions.length > 0)
       .map((a) => {
         const reviewTimes = a.submissions.filter((s) => s.review !== null).map((s) => s.review!.createdAt);
         if (reviewTimes.length === 0 || a.firstSubmittedAt === null) return null;
@@ -152,7 +154,7 @@ export function useMentorReports(filters: ReportsFilters): MentorReportsResult {
       finalReviewTime: { medianHours: median(finalReviewHours), averageHours: average(finalReviewHours) },
       totalCycleTime: { medianHours: median(cycleHours), averageHours: average(cycleHours) },
       averageVersions,
-      activity: buildActivitySeries(scoped),
+      activity: buildActivitySeries(scoped, now),
     };
   }, [all, filters.periodDays, filters.includeCancelled]);
 }

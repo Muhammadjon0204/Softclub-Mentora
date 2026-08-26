@@ -10,16 +10,8 @@ import { AssignmentsKanbanBoard } from '../../features/lead-assignments/Assignme
 import { LeadAssignmentDetailsDrawer } from '../../features/lead-assignments/LeadAssignmentDetailsDrawer';
 import { ReassignAssignmentDialog } from '../../features/lead-assignments/ReassignAssignmentDialog';
 import { assignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
-import {
-  LeadAssignmentPreviewError,
-  acceptSuggestionPreview,
-  cancelPreview,
-  publishPreview,
-  reassignPreview,
-  rejectSuggestionPreview,
-  startReviewPreview,
-} from '../../features/lead/assignments/leadAssignmentPreviewStore';
-import { mentorNameOf, scopedActiveMentors } from '../../features/lead/scope/leadScopedData';
+import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
+import { useActiveLeadMentors, useLeadMentorNameResolver } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useResolvedLeadAssignment, useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
@@ -75,6 +67,8 @@ export function AssignmentsPage(): JSX.Element {
   const navigate = useNavigate();
   const toast = useToast();
   const allOwnAssignments = useScopedLeadAssignments();
+  const mentorNameOf = useLeadMentorNameResolver();
+  const actions = useAssignmentActions();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
@@ -108,7 +102,7 @@ export function AssignmentsPage(): JSX.Element {
     setSearchParams(next);
   }
 
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
   const mentorOptions = [{ value: 'all', label: 'Все менторы' }, ...mentors.map((m) => ({ value: m.id, label: m.fullName }))];
   const filtersActive = search.trim().length > 0 || mentorFilter !== 'all';
 
@@ -116,13 +110,13 @@ export function AssignmentsPage(): JSX.Element {
     const query = search.trim().toLowerCase();
     return allOwnAssignments.filter((a) => {
       if (query.length > 0) {
-        const mentorName = mentorNameOf(scope.categoryId, a.mentorId).toLowerCase();
+        const mentorName = mentorNameOf(a.mentorId).toLowerCase();
         if (!a.title.toLowerCase().includes(query) && !mentorName.includes(query)) return false;
       }
       if (mentorFilter !== 'all' && a.mentorId !== mentorFilter) return false;
       return true;
     });
-  }, [allOwnAssignments, search, mentorFilter, scope.categoryId]);
+  }, [allOwnAssignments, search, mentorFilter, mentorNameOf]);
 
   const kpis = useMemo(() => ({
     active: allOwnAssignments.filter((a) => ['Assigned', 'Submitted', 'InReview', 'NeedsRework', 'Overdue'].includes(a.status)).length,
@@ -132,13 +126,17 @@ export function AssignmentsPage(): JSX.Element {
     approved: allOwnAssignments.filter((a) => a.status === 'Approved').length,
   }), [allOwnAssignments]);
 
-  function runAction(action: () => void, successMessage: string): void {
+  async function runAction(action: () => Promise<unknown>, successMessage: string): Promise<void> {
     try {
-      action();
+      await action();
       toast.success(successMessage);
     } catch (error) {
-      toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось выполнить действие');
+      toast.error(error instanceof Error ? error.message : 'Не удалось выполнить действие');
     }
+  }
+
+  function token(a: LeadAssignmentRecord): string {
+    return a.concurrencyToken ?? '';
   }
 
   /** Единственное место, где строится список действий карточки (раздел I промпта: только реально применимые). */
@@ -147,10 +145,10 @@ export function AssignmentsPage(): JSX.Element {
     return [
       { label: 'Открыть', onClick: () => { openRow(a.id); } },
       ...(caps.canEdit ? [{ label: 'Редактировать', onClick: () => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); } }] : []),
-      ...(caps.canPublish ? [{ label: 'Опубликовать', onClick: () => { runAction(() => publishPreview(scope.categoryId, a.id, scope.leadName), 'Задание опубликовано'); } }] : []),
-      ...(caps.canAcceptSuggestion ? [{ label: 'Принять', onClick: () => { runAction(() => acceptSuggestionPreview(scope.categoryId, a.id, scope.leadName), 'Предложение принято'); } }] : []),
+      ...(caps.canPublish ? [{ label: 'Опубликовать', onClick: () => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); } }] : []),
+      ...(caps.canAcceptSuggestion ? [{ label: 'Принять', onClick: () => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); } }] : []),
       ...(caps.canReassign ? [{ label: 'Переназначить', onClick: () => { setReassignDialog(a); } }] : []),
-      ...(caps.canStartReview ? [{ label: 'Начать проверку', onClick: () => { runAction(() => startReviewPreview(scope.categoryId, a.id, scope.leadName), 'Проверка начата'); navigate(`/lead/review-queue?assignmentId=${a.id}`); } }] : []),
+      ...(caps.canStartReview ? [{ label: 'Начать проверку', onClick: () => { void runAction(() => actions.startReview(a.id, token(a)), 'Проверка начата'); navigate(`/lead/review-queue?assignmentId=${a.id}`); } }] : []),
       ...(caps.canReject ? [{ label: 'Отклонить', destructive: true, onClick: () => { setCancelDialog({ assignment: a, kind: 'reject' }); } }] : []),
       ...(caps.canCancel ? [{ label: 'Отменить', destructive: true, onClick: () => { setCancelDialog({ assignment: a, kind: 'cancel' }); } }] : []),
     ];
@@ -195,24 +193,25 @@ export function AssignmentsPage(): JSX.Element {
 
       <AssignmentsKanbanBoard
         assignments={filtered}
-        categoryId={scope.categoryId}
         timeZoneId={scope.timeZoneId}
         selectedId={assignmentId}
         onOpen={openRow}
         getActionItems={buildActionItems}
+        mentorNameOf={mentorNameOf}
       />
 
       <LeadAssignmentDetailsDrawer
         assignment={selected}
         assignmentId={assignmentId}
         onClose={closeDrawer}
+        mentorNameOf={mentorNameOf}
         onEdit={(a) => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); }}
-        onPublish={(a) => { runAction(() => publishPreview(scope.categoryId, a.id, scope.leadName), 'Задание опубликовано'); }}
-        onAcceptSuggestion={(a) => { runAction(() => acceptSuggestionPreview(scope.categoryId, a.id, scope.leadName), 'Предложение принято'); }}
+        onPublish={(a) => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); }}
+        onAcceptSuggestion={(a) => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); }}
         onReject={(a) => { setCancelDialog({ assignment: a, kind: 'reject' }); }}
         onCancel={(a) => { setCancelDialog({ assignment: a, kind: 'cancel' }); }}
         onReassign={(a) => { setReassignDialog(a); }}
-        onStartReview={(a) => { runAction(() => startReviewPreview(scope.categoryId, a.id, scope.leadName), 'Проверка начата'); navigate(`/lead/review-queue?assignmentId=${a.id}`); }}
+        onStartReview={(a) => { void runAction(() => actions.startReview(a.id, token(a)), 'Проверка начата'); navigate(`/lead/review-queue?assignmentId=${a.id}`); }}
         onOpenReview={(a) => { navigate(`/lead/review-queue?assignmentId=${a.id}`); }}
       />
 
@@ -226,11 +225,10 @@ export function AssignmentsPage(): JSX.Element {
         confirmLabel={cancelDialog?.kind === 'reject' ? 'Отклонить' : 'Отменить задание'}
         onConfirm={(reason) => {
           if (cancelDialog === null) return;
-          runAction(
-            () =>
-              cancelDialog.kind === 'reject'
-                ? rejectSuggestionPreview(scope.categoryId, cancelDialog.assignment.id, scope.leadName, reason)
-                : cancelPreview(scope.categoryId, cancelDialog.assignment.id, scope.leadName, reason),
+          // LA10: и «Отменить», и «Отклонить предложение» — один и тот же POST /assignments/{id}/cancel
+          // (ASN-012: отклонение предложения — это отмена Suggested-статуса с причиной).
+          void runAction(
+            () => actions.cancel(cancelDialog.assignment.id, token(cancelDialog.assignment), reason),
             cancelDialog.kind === 'reject' ? 'Предложение отклонено' : 'Задание отменено',
           );
           setCancelDialog(null);
@@ -244,8 +242,7 @@ export function AssignmentsPage(): JSX.Element {
         currentMentorId={reassignDialog?.mentorId ?? ''}
         onConfirm={(mentorId) => {
           if (reassignDialog === null) return;
-          const mentorName = mentorNameOf(scope.categoryId, mentorId);
-          runAction(() => reassignPreview(scope.categoryId, reassignDialog.id, scope.leadName, mentorId, mentorName), 'Задание переназначено');
+          void runAction(() => actions.reassign(reassignDialog.id, token(reassignDialog), mentorId), 'Задание переназначено');
           setReassignDialog(null);
         }}
       />

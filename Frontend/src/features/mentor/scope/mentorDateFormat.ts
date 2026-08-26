@@ -32,9 +32,13 @@ export function formatCategoryDate(timestampMs: number, timeZoneId: string): str
   return `${get('day')}.${get('month')}.${get('year')}`;
 }
 
-/** «Сейчас» детерминированного preview-мира — тот же якорь, что использует остальной mock-слой. */
+/**
+ * «Сейчас» — реальное время, тот же фикс и по той же причине, что `leadDateFormat.ts`'s `leadNow()`:
+ * с реальными датами из backend сравнение с застывшим `MOCK_NOW` навсегда сломало бы «дедлайн не может
+ * быть в прошлом» и любые относительные метки.
+ */
 export function mentorNow(): number {
-  return MOCK_NOW;
+  return Date.now();
 }
 
 /** Календарный день (YYYY-MM-DD) в часовом поясе категории — ключ для группировки занятий по дате, а не по разнице в часах. */
@@ -64,7 +68,7 @@ export interface RelativeMoment {
 }
 
 /** Относительная метка «через N / N назад» — для дедлайнов, сессий и «последней активности». */
-export function formatRelative(timestampMs: number, referenceMs: number = MOCK_NOW): RelativeMoment {
+export function formatRelative(timestampMs: number, referenceMs: number = Date.now()): RelativeMoment {
   const diff = timestampMs - referenceMs;
   const isPast = diff < 0;
   const abs = Math.abs(diff);

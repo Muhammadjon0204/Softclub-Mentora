@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 
-import { DAY_MS, HOUR_MS, MOCK_NOW } from '../../mocks/domain/reference';
+import { DAY_MS, HOUR_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
+import { leadNow } from '../lead/scope/leadDateFormat';
 import { scopedActiveMentors } from '../lead/scope/leadScopedData';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../lead/scope/useScopedLeadAssignments';
@@ -31,8 +32,8 @@ function average(values: number[]): number | null {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-function inPeriod(ts: number | null, fromMs: number): boolean {
-  return ts !== null && ts >= fromMs && ts <= MOCK_NOW;
+function inPeriod(ts: number | null, fromMs: number, now: number): boolean {
+  return ts !== null && ts >= fromMs && ts <= now;
 }
 
 export interface DurationMetric {
@@ -60,7 +61,8 @@ export function useLeadReports(filters: ReportsFilters): LeadReportsResult {
   const mentors = scopedActiveMentors(scope.categoryId);
 
   return useMemo(() => {
-    const fromMs = filters.periodDays === 'all' ? 0 : MOCK_NOW - filters.periodDays * DAY_MS;
+    const now = leadNow();
+    const fromMs = filters.periodDays === 'all' ? 0 : now - filters.periodDays * DAY_MS;
 
     // ANA-001: Draft/Suggested никогда не включаются; Cancelled — только по фильтру.
     const eligible = (a: LeadAssignmentRecord): boolean => {
@@ -72,8 +74,8 @@ export function useLeadReports(filters: ReportsFilters): LeadReportsResult {
 
     const scoped = all.filter(eligible);
 
-    const totalSet = scoped.filter((a) => inPeriod(a.assignedAt, fromMs));
-    const approvedSet = scoped.filter((a) => a.status === 'Approved' && inPeriod(a.approvedAt, fromMs));
+    const totalSet = scoped.filter((a) => inPeriod(a.assignedAt, fromMs, now));
+    const approvedSet = scoped.filter((a) => a.status === 'Approved' && inPeriod(a.approvedAt, fromMs, now));
 
     const totalAssignments = totalSet.length;
     const approvedAssignments = approvedSet.length;
@@ -87,7 +89,7 @@ export function useLeadReports(filters: ReportsFilters): LeadReportsResult {
     const overdueCount = totalSet.filter((a) => a.overdueAt !== null).length;
     const overdueRate = totalAssignments === 0 ? null : Math.round((overdueCount / totalAssignments) * 1000) / 10;
 
-    const submissionsInPeriod = scoped.flatMap((a) => a.submissions.filter((s) => inPeriod(s.submittedAt, fromMs)));
+    const submissionsInPeriod = scoped.flatMap((a) => a.submissions.filter((s) => inPeriod(s.submittedAt, fromMs, now)));
     const lateCount = submissionsInPeriod.filter((s) => s.isLate).length;
     const lateSubmissionRate = submissionsInPeriod.length === 0 ? null : Math.round((lateCount / submissionsInPeriod.length) * 1000) / 10;
 
@@ -97,7 +99,7 @@ export function useLeadReports(filters: ReportsFilters): LeadReportsResult {
       .map((a) => (a.firstSubmittedAt! - a.assignedAt!) / HOUR_MS);
 
     const firstReviewHours = scoped
-      .filter((a) => inPeriod(a.firstSubmittedAt, fromMs) && a.submissions.length > 0)
+      .filter((a) => inPeriod(a.firstSubmittedAt, fromMs, now) && a.submissions.length > 0)
       .map((a) => {
         const reviewTimes = a.submissions.filter((s) => s.review !== null).map((s) => s.review!.createdAt);
         if (reviewTimes.length === 0 || a.firstSubmittedAt === null) return null;

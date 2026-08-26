@@ -8,7 +8,7 @@ import { FormBannerError, FormField, FormInput, FormTextarea } from '../../../sh
 import type { LeadTopicRecord } from '../../../mocks/ui-preview/leadTopics.preview';
 import { formatCategoryDate, leadNow } from '../scope/leadDateFormat';
 import { useLeadScope } from '../scope/useLeadScope';
-import { LeadSchedulePreviewError, createTopicPreview, updateTopicPreview } from './leadSchedulePreviewStore';
+import { useTopicActions } from './useTopicActions';
 import { topicSchema } from './topicForm.schema';
 import type { TopicFormValues } from './topicForm.schema';
 
@@ -28,14 +28,17 @@ function toDateInputValue(ms: number, timeZoneId: string): string {
 /** TOPIC-011: дата в прошлом допустима (расписание регулярно заполняется задним числом) — только мягкое предупреждение, без блокировки. */
 export function TopicFormDrawer({ open, existing, onClose }: TopicFormDrawerProps): JSX.Element {
   const scope = useLeadScope();
+  const { isSubmitting, createTopic, updateTopic } = useTopicActions();
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [unsavedOpen, setUnsavedOpen] = useState(false);
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isDirty, isSubmitting } } = useForm<TopicFormValues>({
+  const existingPlannedDateInput = existing !== undefined && existing.plannedDate !== null ? toDateInputValue(existing.plannedDate, scope.timeZoneId) : '';
+
+  const { register, handleSubmit, reset, watch, formState: { errors, isDirty } } = useForm<TopicFormValues>({
     resolver: zodResolver(topicSchema),
     defaultValues: {
       dayNumber: existing?.dayNumber ?? 1,
-      plannedDate: existing !== undefined ? toDateInputValue(existing.plannedDate, scope.timeZoneId) : '',
+      plannedDate: existingPlannedDateInput,
       title: existing?.title ?? '',
       description: existing?.description ?? '',
     },
@@ -45,7 +48,7 @@ export function TopicFormDrawer({ open, existing, onClose }: TopicFormDrawerProp
     if (open) {
       reset({
         dayNumber: existing?.dayNumber ?? 1,
-        plannedDate: existing !== undefined ? toDateInputValue(existing.plannedDate, scope.timeZoneId) : '',
+        plannedDate: existing !== undefined && existing.plannedDate !== null ? toDateInputValue(existing.plannedDate, scope.timeZoneId) : '',
         title: existing?.title ?? '',
         description: existing?.description ?? '',
       });
@@ -64,18 +67,21 @@ export function TopicFormDrawer({ open, existing, onClose }: TopicFormDrawerProp
     onClose();
   }
 
-  function submit(values: TopicFormValues): void {
+  async function submit(values: TopicFormValues): Promise<void> {
     setBannerError(null);
     const plannedDateMs = values.plannedDate.length > 0 ? new Date(`${values.plannedDate}T00:00:00Z`).getTime() : null;
     try {
       if (existing !== undefined) {
-        updateTopicPreview(scope.categoryId, existing.id, { dayNumber: values.dayNumber, plannedDate: plannedDateMs, title: values.title, description: values.description ?? '' });
+        await updateTopic(existing.id, existing.concurrencyToken ?? '', { dayNumber: values.dayNumber, plannedDate: plannedDateMs, title: values.title, description: values.description ?? '' });
       } else {
-        createTopicPreview({ categoryId: scope.categoryId, dayNumber: values.dayNumber, plannedDate: plannedDateMs, title: values.title, description: values.description ?? '' });
+        await createTopic({ dayNumber: values.dayNumber, plannedDate: plannedDateMs, title: values.title, description: values.description ?? '' });
       }
       onClose();
     } catch (error) {
-      setBannerError(error instanceof LeadSchedulePreviewError ? error.message : 'Не удалось сохранить тему');
+      // TP3/TP4 fix: a duplicate `plannedDate`/`dayNumber` now surfaces here as a real blocking 409
+      // RESOURCE_ALREADY_EXISTS (see `useTopicActions.ts`) — shown as this banner error, not silently
+      // accepted the way the old preview store's incorrect "soft warning" comment implied.
+      setBannerError(error instanceof Error ? error.message : 'Не удалось сохранить тему');
     }
   }
 

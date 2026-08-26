@@ -449,6 +449,22 @@ components:
         isHeadOffice:
           type: boolean
 
+    CategorySummary:
+      type: object
+      description: |
+        Минимальный состав данных Category для AuthUser — имя и часовой пояс
+        нужны Lead/Mentor-страницам сразу при первом рендере (сайдбар,
+        форматирование дедлайнов), тот же принцип, что у BranchSummary.
+        `timeZoneId` — это `CategorySettings.TimeZoneId`, не `Branch.TimeZoneId`.
+      required: [id, name, timeZoneId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        timeZoneId:
+          type: string
+
     AuthErrorCode:
       type: string
       description: Единственное поле, по которому frontend принимает решения.
@@ -496,10 +512,10 @@ components:
       type: object
       description: |
         Профиль текущего пользователя (ТЗ 2.2, раздел 16.9). Состав
-        organization/branch/adminScope/categoryId зависит от типа пользователя —
+        organization/branch/adminScope/category зависит от типа пользователя —
         см. таблицу AUTH-038: у Organization Admin `branch` всегда `null`,
         у Lead/Mentor `adminScope` всегда `null`.
-      required: [id, fullName, email, role, adminScope, organization, branch, categoryId]
+      required: [id, fullName, email, role, adminScope, organization, branch, category]
       properties:
         id:
           type: string
@@ -520,8 +536,10 @@ components:
           oneOf:
             - $ref: '#/components/schemas/BranchSummary'
             - type: 'null'
-        categoryId:
-          type: ['string', 'null']
+        category:
+          oneOf:
+            - $ref: '#/components/schemas/CategorySummary'
+            - type: 'null'
 
     LoginRequest:
       type: object

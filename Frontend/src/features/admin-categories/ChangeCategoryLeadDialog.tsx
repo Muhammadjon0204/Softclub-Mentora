@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
-import type { PreviousLeadFate } from './categoryPreviewStore';
-import type { ChangeCategoryLeadInput } from './categoryPreviewStore';
-import { useCategoriesPreviewResolved } from './categoryPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
+import type { ChangeCategoryLeadInput, PreviousLeadFate } from './useCategoryActions';
+import { useCategoriesQuery } from './useCategoriesQuery';
 import type { PreviewCategoryDetails } from './categoryPresentation';
 
 const FATE_OPTIONS: { value: PreviousLeadFate; label: string }[] = [
@@ -24,13 +23,18 @@ export interface ChangeCategoryLeadDialogProps {
   onConfirm: (input: ChangeCategoryLeadInput) => Promise<void>;
 }
 
-/** Раздел 11 промпта — судьба предыдущего Lead не угадывается автоматически. */
+/**
+ * Раздел 11 промпта — судьба предыдущего Lead не угадывается автоматически. `reason` для обоих
+ * реальных `change-role`/`deactivate` вызовов генерируется автоматически из контекста — единое
+ * решение «сменить руководителя» уже объясняет оба шага, отдельно переспрашивать причину для
+ * каждого было бы избыточным дублированием одного и того же обоснования (см. `useCategoryActions.changeLead`).
+ */
 export function ChangeCategoryLeadDialog({ category, open, onOpenChange, isSubmitting, onConfirm }: ChangeCategoryLeadDialogProps): JSX.Element {
-  const users = useUsersPreview();
-  const categories = useCategoriesPreviewResolved();
+  const { users } = useUsersQuery();
+  const { categories } = useCategoriesQuery();
   const currentLead = category?.leadUserId !== null && category?.leadUserId !== undefined ? users.find((user) => user.id === category.leadUserId) : undefined;
-  const candidates = category !== null ? users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchName === category.branchName) : [];
-  const otherCategories = category !== null ? categories.filter((entry) => entry.branchName === category.branchName && entry.id !== category.id) : [];
+  const candidates = category !== null ? users.filter((user) => user.role === 'Mentor' && user.status === 'Active' && user.branchId === category.branchId) : [];
+  const otherCategories = category !== null ? categories.filter((entry) => entry.branchId === category.branchId && entry.id !== category.id) : [];
 
   const [newLeadId, setNewLeadId] = useState('');
   const [fate, setFate] = useState<PreviousLeadFate>('Mentor');
@@ -44,7 +48,9 @@ export function ChangeCategoryLeadDialog({ category, open, onOpenChange, isSubmi
   }, [open, category?.id]);
 
   const needsTransferTarget = fate === 'Transfer';
-  const confirmDisabled = category === null || newLeadId.length === 0 || (needsTransferTarget && transferTargetId.length === 0);
+  const newLead = candidates.find((candidate) => candidate.id === newLeadId);
+  const transferTarget = otherCategories.find((entry) => entry.id === transferTargetId);
+  const confirmDisabled = category === null || newLead === undefined || (needsTransferTarget && transferTarget === undefined);
 
   return (
     <ConfirmDialog
@@ -56,8 +62,13 @@ export function ChangeCategoryLeadDialog({ category, open, onOpenChange, isSubmi
       loading={isSubmitting}
       confirmDisabled={confirmDisabled}
       onConfirm={async () => {
-        if (category === null || newLeadId.length === 0) return;
-        await onConfirm({ newLeadUserId: newLeadId, previousLeadFate: fate, transferTargetCategoryId: needsTransferTarget ? transferTargetId : undefined });
+        if (category === null || newLead === undefined) return;
+        await onConfirm({
+          newLead: { id: newLead.id, concurrencyToken: newLead.concurrencyToken ?? '', fullName: newLead.fullName },
+          previousLead: currentLead !== undefined ? { id: currentLead.id, concurrencyToken: currentLead.concurrencyToken ?? '', fullName: currentLead.fullName } : null,
+          previousLeadFate: fate,
+          transferTarget: needsTransferTarget && transferTarget !== undefined ? { id: transferTarget.id, branchId: transferTarget.branchId, name: transferTarget.name } : undefined,
+        });
         onOpenChange(false);
       }}
       description={

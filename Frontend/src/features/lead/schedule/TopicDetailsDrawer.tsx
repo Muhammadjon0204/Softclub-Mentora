@@ -7,10 +7,11 @@ import { Button } from '../../../shared/ui/Button';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import type { LeadTopicAssignmentRecord, LeadTopicRecord } from '../../../mocks/ui-preview/leadTopics.preview';
 import { TOPIC_ASSIGNMENT_TYPE_LABEL } from '../../../mocks/ui-preview/leadTopics.preview';
+import { useToast } from '../../../shared/overlays';
 import { formatCategoryDate } from '../scope/leadDateFormat';
 import { useLeadScope } from '../scope/useLeadScope';
 import { useTopicAssignmentsOf } from '../scope/useScopedLeadSchedule';
-import { createTopicAssignmentPreview, setTopicAssignmentActivePreview, updateTopicAssignmentPreview } from './leadSchedulePreviewStore';
+import { useTopicAssignmentActions } from './useTopicAssignmentActions';
 import { TopicAssignmentFormModal } from './TopicAssignmentFormModal';
 import type { TopicAssignmentFormValues } from './topicForm.schema';
 
@@ -23,7 +24,9 @@ export interface TopicDetailsDrawerProps {
 
 export function TopicDetailsDrawer({ topic, topicId, onClose, onEditTopic }: TopicDetailsDrawerProps): JSX.Element {
   const scope = useLeadScope();
+  const toast = useToast();
   const templates = useTopicAssignmentsOf(topicId);
+  const { createTopicAssignment, updateTopicAssignment, setActive } = useTopicAssignmentActions();
   const [tpaModal, setTpaModal] = useState<{ mode: 'create' } | { mode: 'edit'; item: LeadTopicAssignmentRecord } | null>(null);
 
   const open = topicId !== null;
@@ -31,11 +34,19 @@ export function TopicDetailsDrawer({ topic, topicId, onClose, onEditTopic }: Top
   function handleTpaSubmit(values: TopicAssignmentFormValues): void {
     if (topic === undefined) return;
     const normalized = { ...values, description: values.description ?? '' };
-    if (tpaModal?.mode === 'edit') {
-      updateTopicAssignmentPreview(tpaModal.item.id, normalized);
-    } else {
-      createTopicAssignmentPreview(scope.categoryId, topic.id, normalized);
-    }
+    const promise = tpaModal?.mode === 'edit'
+      ? updateTopicAssignment(topic.id, tpaModal.item.id, tpaModal.item.concurrencyToken ?? '', normalized)
+      : createTopicAssignment(topic.id, normalized);
+    promise
+      .then(() => { toast.success(tpaModal?.mode === 'edit' ? 'Шаблон обновлён' : 'Шаблон добавлен'); })
+      .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось выполнить действие'); });
+  }
+
+  function handleToggleActive(item: LeadTopicAssignmentRecord): void {
+    if (topic === undefined) return;
+    setActive(topic.id, item.id, item.concurrencyToken ?? '', !item.isActive)
+      .then(() => { toast.success(item.isActive ? 'Шаблон архивирован' : 'Шаблон восстановлен'); })
+      .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось выполнить действие'); });
   }
 
   return (
@@ -44,7 +55,7 @@ export function TopicDetailsDrawer({ topic, topicId, onClose, onEditTopic }: Top
         open={open}
         onOpenChange={(next) => { if (!next) onClose(); }}
         title={topic?.title ?? 'Тема'}
-        description={topic !== undefined ? `День ${String(topic.dayNumber)} · ${formatCategoryDate(topic.plannedDate, scope.timeZoneId)}` : undefined}
+        description={topic !== undefined ? `День ${String(topic.dayNumber)}${topic.plannedDate !== null ? ` · ${formatCategoryDate(topic.plannedDate, scope.timeZoneId)}` : ''}` : undefined}
         size="lg"
         headerActions={
           topic !== undefined ? (
@@ -93,7 +104,7 @@ export function TopicDetailsDrawer({ topic, topicId, onClose, onEditTopic }: Top
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => { setTopicAssignmentActivePreview(item.id, !item.isActive); }}
+                            onClick={() => { handleToggleActive(item); }}
                             title={item.isActive ? 'Архивировать' : 'Восстановить'}
                           >
                             {item.isActive ? <Archive className="h-3.5 w-3.5" aria-hidden="true" /> : <ArchiveRestore className="h-3.5 w-3.5" aria-hidden="true" />}

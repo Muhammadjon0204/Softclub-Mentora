@@ -8,9 +8,9 @@ import { AssignmentCancelDialog } from '../../features/lead-assignments/Assignme
 import { AssignmentFormDrawer } from '../../features/lead-assignments/AssignmentFormDrawer';
 import type { AssignmentFormDrawerState } from '../../features/lead-assignments/AssignmentFormDrawer';
 import { sourceLabel } from '../../features/lead/assignments/leadAssignmentPresentation';
-import { LeadAssignmentPreviewError, acceptSuggestionPreview, rejectSuggestionPreview } from '../../features/lead/assignments/leadAssignmentPreviewStore';
+import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
 import { formatCategoryDateTime } from '../../features/lead/scope/leadDateFormat';
-import { mentorNameOf } from '../../features/lead/scope/leadScopedData';
+import { useLeadMentorNameResolver } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
 import { useToast } from '../../shared/overlays';
@@ -33,18 +33,17 @@ export function SuggestionsPage(): JSX.Element {
   const scope = useLeadScope();
   const toast = useToast();
   const assignments = useScopedLeadAssignments();
+  const mentorNameOf = useLeadMentorNameResolver();
+  const actions = useAssignmentActions();
   const suggestions = assignments.filter((a) => a.status === 'Suggested');
 
   const [formDrawer, setFormDrawer] = useState<AssignmentFormDrawerState | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeadAssignmentRecord | null>(null);
 
   function accept(a: LeadAssignmentRecord): void {
-    try {
-      acceptSuggestionPreview(scope.categoryId, a.id, scope.leadName);
-      toast.success('Предложение принято, задание опубликовано');
-    } catch (error) {
-      toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось принять предложение');
-    }
+    actions.acceptSuggestion(a.id, a.concurrencyToken ?? '')
+      .then(() => { toast.success('Предложение принято, задание опубликовано'); })
+      .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось принять предложение'); });
   }
 
   /** Тот же паттерн, что у карточек Kanban `/lead/assignments` (`buildActionItems` в `AssignmentsPage`) — все действия строки, включая «Принять», в одном ⋯-меню, без отдельных кнопок. */
@@ -85,7 +84,7 @@ export function SuggestionsPage(): JSX.Element {
 
               {/* Ряд 1 (шапка) — аватар фиксированного размера, высота ряда не варьируется. */}
               <span className="mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-semibold text-brand">
-                {initialsOf(mentorNameOf(scope.categoryId, a.mentorId))}
+                {initialsOf(mentorNameOf(a.mentorId))}
               </span>
 
               {/* Ряд 2 (заголовок) — `min-h` резервирует высоту ровно под 2 строки (leading-5 = 20px × 2) независимо
@@ -97,7 +96,7 @@ export function SuggestionsPage(): JSX.Element {
 
               {/* Ряд 3 (автор) — одна строка, длинное имя обрезается многоточием, а не переносится. */}
               <p className="mb-2 truncate text-[12.5px] font-medium text-ink-secondary">
-                {mentorNameOf(scope.categoryId, a.mentorId)}
+                {mentorNameOf(a.mentorId)}
               </p>
 
               {/* Ряд 4 (тег источника) — `Badge` сам гарантирует `whitespace-nowrap`/`w-fit` (тот же фикс, что и для статусов на «Расписании»/«Команде»). */}
@@ -130,12 +129,10 @@ export function SuggestionsPage(): JSX.Element {
         confirmLabel="Отклонить"
         onConfirm={(reason) => {
           if (rejectTarget === null) return;
-          try {
-            rejectSuggestionPreview(scope.categoryId, rejectTarget.id, scope.leadName, reason);
-            toast.success('Предложение отклонено');
-          } catch (error) {
-            toast.error(error instanceof LeadAssignmentPreviewError ? error.message : 'Не удалось отклонить предложение');
-          }
+          // ASN-012: отклонить предложение — это отменить его тем же POST /assignments/{id}/cancel.
+          actions.cancel(rejectTarget.id, rejectTarget.concurrencyToken ?? '', reason)
+            .then(() => { toast.success('Предложение отклонено'); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось отклонить предложение'); });
           setRejectTarget(null);
         }}
       />

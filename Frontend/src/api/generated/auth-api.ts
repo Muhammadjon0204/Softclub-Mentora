@@ -211,6 +211,17 @@ export interface components {
             isHeadOffice: boolean;
         };
         /**
+         * @description Минимальный состав данных Category для AuthUser — имя и часовой пояс
+         *     нужны Lead/Mentor-страницам сразу при первом рендере (сайдбар,
+         *     форматирование дедлайнов), тот же принцип, что у BranchSummary.
+         *     `timeZoneId` — это `CategorySettings.TimeZoneId`, не `Branch.TimeZoneId`.
+         */
+        CategorySummary: {
+            id: string;
+            name: string;
+            timeZoneId: string;
+        };
+        /**
          * @description Единственное поле, по которому frontend принимает решения.
          * @enum {string}
          */
@@ -231,7 +242,7 @@ export interface components {
         };
         /**
          * @description Профиль текущего пользователя (ТЗ 2.2, раздел 16.9). Состав
-         *     organization/branch/adminScope/categoryId зависит от типа пользователя —
+         *     organization/branch/adminScope/category зависит от типа пользователя —
          *     см. таблицу AUTH-038: у Organization Admin `branch` всегда `null`,
          *     у Lead/Mentor `adminScope` всегда `null`.
          */
@@ -244,7 +255,7 @@ export interface components {
             adminScope: components["schemas"]["AdminScope"] | null;
             organization: components["schemas"]["OrganizationSummary"];
             branch: components["schemas"]["BranchSummary"] | null;
-            categoryId: string | null;
+            category: components["schemas"]["CategorySummary"] | null;
         };
         LoginRequest: {
             /** Format: email */

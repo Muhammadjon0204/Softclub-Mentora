@@ -7,7 +7,6 @@ import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCar
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewActionCell, PreviewActionTh, PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
-import { BRANCH_DIRECTORY } from '../../features/admin-preview/branchDirectory';
 import { BlockUserDialog } from '../../features/admin-users/BlockUserDialog';
 import { ChangeUserRoleDialog } from '../../features/admin-users/ChangeUserRoleDialog';
 import { DeactivateUserDialog } from '../../features/admin-users/DeactivateUserDialog';
@@ -19,15 +18,17 @@ import { UserActionMenu } from '../../features/admin-users/UserActionMenu';
 import { UserDetailsDrawer } from '../../features/admin-users/UserDetailsDrawer';
 import { UserFormDrawer } from '../../features/admin-users/UserFormDrawer';
 import type { UserFormDrawerState } from '../../features/admin-users/UserFormDrawer';
-import { useUserPreviewActions } from '../../features/admin-users/useUserPreviewActions';
+import { useUserActions } from '../../features/admin-users/useUserActions';
+import { useUsersQuery } from '../../features/admin-users/useUsersQuery';
 import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../features/admin-users/userPresentation';
 import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
-import { useUsersPreview } from '../../features/admin-users/userPreviewStore';
 import { ROLE_LABEL, STATUS_LABEL, PREVIEW_NEW_USERS_SERIES } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
 import { useAuth } from '../../auth/useAuth';
+import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
+import { ErrorState } from '../../shared/ui/ErrorState';
 
 const ROLE_OPTIONS = [
   { value: 'all', label: 'Все роли' },
@@ -35,11 +36,6 @@ const ROLE_OPTIONS = [
   { value: 'BranchAdmin', label: ROLE_LABEL.BranchAdmin },
   { value: 'Lead', label: ROLE_LABEL.Lead },
   { value: 'Mentor', label: ROLE_LABEL.Mentor },
-];
-
-const BRANCH_OPTIONS = [
-  { value: 'all', label: 'Все филиалы' },
-  ...BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName })),
 ];
 
 const STATUS_OPTIONS = [
@@ -137,19 +133,25 @@ type ActionDialogState =
   | { type: 'deactivate'; user: PreviewUserDetails };
 
 /**
- * /admin/users — этап 2: реальные Drawer/Dialog поверх shared overlay system
- * (раздел 45 промпта). Branch Admin видит и создаёт пользователей только
- * своего филиала (раздел 24 acceptance criteria — branch isolation).
+ * /admin/users — подключено к реальному API (`GET/POST /users` + `change-role`/`change-branch`/
+ * `activate`/`deactivate`/`resend-invitation`). Branch Admin видит и создаёт пользователей только
+ * своего филиала — сервер сам сужает список (`UserService.ApplyVisibility`), клиентский фильтр
+ * по филиалу — для Organization Admin, который видит всю организацию сразу.
  */
 export function UsersPage(): JSX.Element {
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
-  const currentBranchRawName = authUser?.branch?.name ?? null;
+  const branchContext = useBranchContext();
 
-  const allUsers = useUsersPreview();
-  const scopedUsers = useMemo(
-    () => (isOrgAdmin ? allUsers : allUsers.filter((candidate) => candidate.branchName === currentBranchRawName)),
-    [allUsers, isOrgAdmin, currentBranchRawName],
+  const usersQuery = useUsersQuery();
+  const allUsers = usersQuery.users;
+
+  const branchOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Все филиалы' },
+      ...branchContext.availableBranches.map((branch) => ({ value: branch.name, label: branch.name })),
+    ],
+    [branchContext.availableBranches],
   );
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -184,14 +186,14 @@ export function UsersPage(): JSX.Element {
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return scopedUsers.filter((candidate) => {
+    return allUsers.filter((candidate) => {
       if (query.length > 0 && !candidate.fullName.toLowerCase().includes(query) && !candidate.email.toLowerCase().includes(query)) return false;
       if (role !== 'all' && candidate.role !== role) return false;
       if (branch !== 'all' && candidate.branchName !== branch) return false;
       if (status !== 'all' && candidate.status !== status) return false;
       return true;
     });
-  }, [scopedUsers, search, role, branch, status]);
+  }, [allUsers, search, role, branch, status]);
 
   useEffect(() => {
     setPage(1);
@@ -205,15 +207,15 @@ export function UsersPage(): JSX.Element {
 
   const summary = useMemo(
     () => ({
-      total: scopedUsers.length,
-      admins: scopedUsers.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
-      leads: scopedUsers.filter((candidate) => candidate.role === 'Lead').length,
-      mentors: scopedUsers.filter((candidate) => candidate.role === 'Mentor').length,
+      total: allUsers.length,
+      admins: allUsers.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
+      leads: allUsers.filter((candidate) => candidate.role === 'Lead').length,
+      mentors: allUsers.filter((candidate) => candidate.role === 'Mentor').length,
     }),
-    [scopedUsers],
+    [allUsers],
   );
 
-  const actions = useUserPreviewActions();
+  const actions = useUserActions();
 
   return (
     <div className="space-y-6">
@@ -263,7 +265,7 @@ export function UsersPage(): JSX.Element {
         <PreviewToolbar>
           <span className="basis-full text-[13px] font-medium text-ink-secondary">{rows.length} пользователей</span>
           <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} />
-          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={BRANCH_OPTIONS} width="lg" /> : null}
+          {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={branchOptions} width="lg" /> : null}
           <PreviewSelect label="Роль" value={role} onChange={setRole} options={ROLE_OPTIONS} width="md" />
           <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
           <PreviewResetButton
@@ -282,7 +284,20 @@ export function UsersPage(): JSX.Element {
             <PreviewActionTh />
           </PreviewTableHead>
           <tbody>
-            {pageRows.map((rowUser) => (
+            {usersQuery.isPending ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-10 text-center text-[13px] text-ink-muted sm:px-6">
+                  Загрузка пользователей…
+                </td>
+              </tr>
+            ) : usersQuery.error !== null ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-2 sm:px-6">
+                  <ErrorState error={usersQuery.error} title="Не удалось загрузить пользователей" onRetry={usersQuery.refetch} />
+                </td>
+              </tr>
+            ) : (
+              pageRows.map((rowUser) => (
               <tr
                 key={rowUser.id}
                 ref={(node) => {
@@ -327,7 +342,8 @@ export function UsersPage(): JSX.Element {
                   />
                 </PreviewActionCell>
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </PreviewTable>
 
@@ -336,7 +352,7 @@ export function UsersPage(): JSX.Element {
 
       <UserDetailsDrawer
         userId={userId}
-        users={scopedUsers}
+        users={allUsers}
         onClose={closeUserDetails}
         isOrgAdmin={isOrgAdmin}
         onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}
@@ -349,17 +365,16 @@ export function UsersPage(): JSX.Element {
         onDeactivate={(target) => { setActionDialog({ type: 'deactivate', user: target }); }}
       />
 
-      <UserFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} isOrgAdmin={isOrgAdmin} currentBranchRawName={currentBranchRawName} />
+      <UserFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} isOrgAdmin={isOrgAdmin} />
 
       <ChangeUserRoleDialog
         user={actionDialog?.type === 'changeRole' ? actionDialog.user : null}
         open={actionDialog?.type === 'changeRole'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isOrgAdmin={isOrgAdmin}
-        currentBranchRawName={currentBranchRawName}
         isSubmitting={actions.isSubmitting}
         onConfirm={async (input) => {
-          if (actionDialog?.type === 'changeRole') await actions.changeRole(actionDialog.user.id, input);
+          if (actionDialog?.type === 'changeRole') await actions.changeRole(actionDialog.user.id, actionDialog.user.concurrencyToken ?? '', input);
         }}
       />
 
@@ -369,7 +384,7 @@ export function UsersPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async (input) => {
-          if (actionDialog?.type === 'transfer') await actions.transferUser(actionDialog.user.id, input);
+          if (actionDialog?.type === 'transfer') await actions.transferUser(actionDialog.user.id, actionDialog.user.concurrencyToken ?? '', input);
         }}
       />
 
@@ -398,8 +413,8 @@ export function UsersPage(): JSX.Element {
         open={actionDialog?.type === 'block'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (input) => {
-          if (actionDialog?.type === 'block') await actions.blockUser(actionDialog.user.id, input);
+        onConfirm={async () => {
+          if (actionDialog?.type === 'block') await actions.blockUser(actionDialog.user.id);
         }}
       />
 
@@ -419,7 +434,7 @@ export function UsersPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async () => {
-          if (actionDialog?.type === 'deactivate') await actions.deactivateUser(actionDialog.user.id);
+          if (actionDialog?.type === 'deactivate') await actions.deactivateUser(actionDialog.user.id, actionDialog.user.concurrencyToken ?? '');
         }}
       />
     </div>

@@ -6,15 +6,19 @@ import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeade
 import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { TopicDetailsDrawer } from '../../features/lead/schedule/TopicDetailsDrawer';
 import { TopicFormDrawer } from '../../features/lead/schedule/TopicFormDrawer';
-import { useLeadTopicAssignmentsPreview } from '../../features/lead/schedule/leadSchedulePreviewStore';
 import { formatCategoryDate } from '../../features/lead/scope/leadDateFormat';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
-import { useResolvedLeadTopic, useScopedLeadTopics } from '../../features/lead/scope/useScopedLeadSchedule';
+import { useAllTopicAssignments, useResolvedLeadTopic, useScopedLeadTopics } from '../../features/lead/scope/useScopedLeadSchedule';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { LeadTopicRecord } from '../../mocks/ui-preview/leadTopics.preview';
+
+/** Real `TopicDto.plannedDate` (`DateOnly?`) is genuinely optional — unlike the old preview fixture, which always populated it. */
+function plannedDateLabel(plannedDate: number | null, timeZoneId: string): string {
+  return plannedDate === null ? '—' : formatCategoryDate(plannedDate, timeZoneId);
+}
 
 function pluralizeTasks(n: number): string {
   const mod100 = n % 100;
@@ -29,7 +33,7 @@ function pluralizeTasks(n: number): string {
 export function SchedulePage(): JSX.Element {
   const scope = useLeadScope();
   const topics = useScopedLeadTopics();
-  const topicAssignments = useLeadTopicAssignmentsPreview();
+  const topicAssignments = useAllTopicAssignments(topics);
   const [searchParams, setSearchParams] = useSearchParams();
   const [formState, setFormState] = useState<{ mode: 'create' } | { mode: 'edit'; topic: LeadTopicRecord } | null>(null);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
@@ -106,7 +110,7 @@ export function SchedulePage(): JSX.Element {
                           {topic.dayNumber}
                         </span>
                         <span className="whitespace-nowrap text-[11.5px] tabular-nums text-ink-muted">
-                          {formatCategoryDate(topic.plannedDate, scope.timeZoneId)}
+                          {plannedDateLabel(topic.plannedDate, scope.timeZoneId)}
                         </span>
                       </div>
                     </PreviewTd>

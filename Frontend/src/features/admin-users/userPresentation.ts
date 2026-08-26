@@ -54,6 +54,17 @@ export interface PreviewUserDetails extends PreviewUser {
   lockComment: string | null;
   deactivatedAtLabel: string | null;
   activeAssignmentsCount: number;
+  /**
+   * Реальные GUID для мутаций — добавлены поверх preview-модели при интеграции Users с backend
+   * (`useUsersQuery.ts`). `branchName`/`categoryName` остаются для отображения/фильтров и обратной
+   * совместимости с уже существующими Branches-компонентами, которые их читают. `null` для
+   * Organization Admin (нет ни филиала, ни категории) и для preview-фикстур (`undefined`-эквивалент
+   * не используется, чтобы не потребовать `?` у всех текущих читателей).
+   */
+  branchId: string | null;
+  categoryId: string | null;
+  /** `undefined` у preview-фикстур (мутаций не будет), реальная строка у данных с backend. */
+  concurrencyToken?: string;
   activity: UserActivityEntry[];
 }
 
@@ -143,6 +154,10 @@ export function enrichUser(user: PreviewUser): PreviewUserDetails {
     lockComment: null,
     deactivatedAtLabel: user.status === 'Deactivated' ? user.lastLoginLabel : null,
     activeAssignmentsCount,
+    // Preview-фикстуры не несут реальных GUID — только данные с backend (`useUsersQuery.ts`)
+    // заполняют `branchId`/`categoryId`/`concurrencyToken`.
+    branchId: null,
+    categoryId: null,
     activity: buildInitialActivity(user),
   };
 }

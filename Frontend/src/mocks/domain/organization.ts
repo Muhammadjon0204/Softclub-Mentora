@@ -200,6 +200,13 @@ export function categoriesOfBranch(branchId: string): MockCategory[] {
   return CATEGORIES.filter((category) => category.branchId === branchId);
 }
 
+export function categorySummary(categoryId: string | null): { id: string; name: string; timeZoneId: string } | null {
+  if (categoryId === null) return null;
+  const category = findCategory(categoryId);
+  if (category === undefined) return null;
+  return { id: category.id, name: category.name, timeZoneId: category.timeZoneId };
+}
+
 export function findCategory(id: string): MockCategory | undefined {
   return CATEGORIES.find((category) => category.id === id);
 }

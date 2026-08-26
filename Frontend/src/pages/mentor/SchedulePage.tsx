@@ -5,13 +5,17 @@ import { useSearchParams } from 'react-router-dom';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { MentorTopicDetailsDrawer } from '../../features/mentor-schedule/MentorTopicDetailsDrawer';
-import { useLeadTopicAssignmentsPreview } from '../../features/lead/schedule/leadSchedulePreviewStore';
 import { formatCategoryDate } from '../../features/mentor/scope/mentorDateFormat';
 import { useMentorScope } from '../../features/mentor/scope/useMentorScope';
-import { useResolvedMentorTopic, useScopedMentorTopics } from '../../features/mentor/scope/useScopedMentorTopics';
+import { useAllTopicAssignmentsForMentor, useResolvedMentorTopic, useScopedMentorTopics } from '../../features/mentor/scope/useScopedMentorTopics';
 import { Badge } from '../../shared/ui/Badge';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
+
+/** Real `TopicDto.plannedDate` (`DateOnly?`) is genuinely optional — unlike the old preview fixture, which always populated it. */
+function plannedDateLabel(plannedDate: number | null, timeZoneId: string): string {
+  return plannedDate === null ? '—' : formatCategoryDate(plannedDate, timeZoneId);
+}
 
 function pluralizeTasks(n: number): string {
   const mod100 = n % 100;
@@ -24,14 +28,14 @@ function pluralizeTasks(n: number): string {
 
 /**
  * `/mentor/schedule` (ТЗ 2.2, раздел 24.5) — расписание категории в режиме
- * только чтения: тот же Topic/TopicAssignment стор, что видит Lead
- * (`useLeadTopicAssignmentsPreview`, отфильтрован по своей категории через
- * `useScopedMentorTopics`), но без единой кнопки создания/редактирования.
+ * только чтения: тот же реальный `GET /topics`/`GET /topics/{id}/assignments`, что видит Lead,
+ * отфильтрованный по своей категории сервером и `useScopedMentorTopics`/`useAllTopicAssignmentsForMentor`,
+ * но без единой кнопки создания/редактирования.
  */
 export function SchedulePage(): JSX.Element {
   const scope = useMentorScope();
   const topics = useScopedMentorTopics();
-  const topicAssignments = useLeadTopicAssignmentsPreview();
+  const topicAssignments = useAllTopicAssignmentsForMentor(topics);
   const [searchParams, setSearchParams] = useSearchParams();
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
@@ -99,7 +103,7 @@ export function SchedulePage(): JSX.Element {
                           {topic.dayNumber}
                         </span>
                         <span className="whitespace-nowrap text-[11.5px] tabular-nums text-ink-muted">
-                          {formatCategoryDate(topic.plannedDate, scope.timeZoneId)}
+                          {plannedDateLabel(topic.plannedDate, scope.timeZoneId)}
                         </span>
                       </div>
                     </PreviewTd>

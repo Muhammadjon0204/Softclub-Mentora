@@ -74,6 +74,11 @@ describe('LoginPage', () => {
     expect(noPasswordText).toBe(wrongPasswordText);
   });
 
+  // Таймаут поднят с дефолтных 5000ms: тест делает 6 полных проходов реального
+  // ввода (user.type посимвольно) через submitLogin, и с ростом бандла за счёт
+  // подключения реального backend (больше interceptor'ов/providers на каждый
+  // рендер) уже упирался в дефолтный лимит на этой машине, хотя логика теста
+  // не изменилась и не сломана.
   it('пять неудачных попыток включают lockout учётной записи', async () => {
     const { user } = renderApp('/login');
 
@@ -90,7 +95,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Неверный email или пароль');
     });
-  });
+  }, 15000);
 
   // 5
   it('429 показывает countdown по Retry-After и блокирует кнопку', async () => {

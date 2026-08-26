@@ -6,13 +6,13 @@ import { Badge } from '../../../shared/ui/Badge';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../../mocks/ui-preview/leadAssignments.preview';
 import { LEAD_STATUS_META } from '../assignments/leadAssignmentPresentation';
-import { formatOffsetHoursAgo } from '../scope/leadDateFormat';
+import type { MentorDirectoryEntry } from '../scope/leadWorkspace';
 import { useLeadScope } from '../scope/useLeadScope';
 import { useScopedLeadAssignments } from '../scope/useScopedLeadAssignments';
-import type { MentorDirectoryEntry } from '../scope/leadWorkspace';
+import type { RealLeadMentor } from '../scope/useScopedLeadMentors';
 
 export interface MentorDetailsDrawerProps {
-  mentor: MentorDirectoryEntry | undefined;
+  mentor: RealLeadMentor | undefined;
   mentorId: string | null;
   onClose: () => void;
 }
@@ -75,8 +75,8 @@ export function MentorDetailsDrawer({ mentor, mentorId, onClose }: MentorDetails
               <p className="mt-0.5 text-[13px] font-medium text-ink">{approved.length}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Последняя активность</p>
-              <p className="mt-0.5 text-[13px] font-medium text-ink">{formatOffsetHoursAgo(mentor.lastActiveOffsetHours)}</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Последний вход</p>
+              <p className="mt-0.5 text-[13px] font-medium text-ink">{mentor.lastLoginLabel}</p>
             </div>
           </div>
 

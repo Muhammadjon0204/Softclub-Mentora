@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
-import { BRANCH_DIRECTORY, branchDisplayName } from '../../features/admin-preview/branchDirectory';
+import { branchDisplayName } from '../../features/admin-preview/branchDirectory';
 import { ActivateCategoryDialog } from '../../features/admin-categories/ActivateCategoryDialog';
 import { AssignCategoryLeadDialog } from '../../features/admin-categories/AssignCategoryLeadDialog';
 import { CategoryActionMenu } from '../../features/admin-categories/CategoryActionMenu';
@@ -14,14 +14,16 @@ import { CategoryFormDrawer } from '../../features/admin-categories/CategoryForm
 import type { CategoryFormDrawerState } from '../../features/admin-categories/CategoryFormDrawer';
 import { ChangeCategoryLeadDialog } from '../../features/admin-categories/ChangeCategoryLeadDialog';
 import { DeactivateCategoryDialog } from '../../features/admin-categories/DeactivateCategoryDialog';
-import { useCategoryPreviewActions } from '../../features/admin-categories/useCategoryPreviewActions';
+import { useCategoryActions } from '../../features/admin-categories/useCategoryActions';
 import { CATEGORY_COLOR_TILE, healthTone } from '../../features/admin-categories/categoryPresentation';
 import type { PreviewCategoryDetails } from '../../features/admin-categories/categoryPresentation';
-import { useCategoriesPreviewResolved } from '../../features/admin-categories/categoryPreviewStore';
+import { useCategoriesQuery } from '../../features/admin-categories/useCategoriesQuery';
 import { useAuth } from '../../auth/useAuth';
+import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
+import { ErrorState } from '../../shared/ui/ErrorState';
 
 const LEAD_OPTIONS = [
   { value: 'all', label: 'Lead: все' },
@@ -36,25 +38,23 @@ type ActionDialogState =
   | { type: 'deactivate'; category: PreviewCategoryDetails };
 
 /**
- * /admin/categories — этап 3: реальные Drawer/Dialog поверх shared overlay
- * system. Branch Admin видит и создаёт направления только своего филиала
- * (раздел 39 промпта — branch isolation).
+ * /admin/categories — подключено к реальному API (`GET/POST /categories` + `activate`/
+ * `deactivate`/settings). Список зависит от текущего branch-context (см. `useCategoriesQuery.ts`):
+ * конкретный выбранный филиал сужает результат сервера, «Все филиалы» — вся организация.
+ * Branch Admin видит и создаёт направления только своего филиала — сервер сам сужает (CAT-025).
  */
 export function CategoriesPage(): JSX.Element {
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
-  const currentBranchRawName = authUser?.branch?.name ?? null;
+  const branchContext = useBranchContext();
   const navigate = useNavigate();
 
-  const allCategories = useCategoriesPreviewResolved();
-  const scopedCategories = useMemo(
-    () => (isOrgAdmin ? allCategories : allCategories.filter((candidate) => candidate.branchName === currentBranchRawName)),
-    [allCategories, isOrgAdmin, currentBranchRawName],
-  );
+  const categoriesQuery = useCategoriesQuery();
+  const scopedCategories = categoriesQuery.categories;
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get('category') ?? '');
-  const [branch, setBranch] = useState(() => searchParams.get('branch') ?? 'all');
+  const [branch, setBranch] = useState('all');
   const [leadFilter, setLeadFilter] = useState('all');
   const [formDrawer, setFormDrawer] = useState<CategoryFormDrawerState | null>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
@@ -83,7 +83,7 @@ export function CategoriesPage(): JSX.Element {
     const query = search.trim().toLowerCase();
     return scopedCategories.filter((category) => {
       if (query.length > 0 && !category.name.toLowerCase().includes(query)) return false;
-      if (branch !== 'all' && category.branchName !== branch) return false;
+      if (branch !== 'all' && category.branchId !== branch) return false;
       if (leadFilter === 'assigned' && category.leadName === null) return false;
       if (leadFilter === 'unassigned' && category.leadName !== null) return false;
       return true;
@@ -94,7 +94,7 @@ export function CategoriesPage(): JSX.Element {
   const totalMentors = scopedCategories.reduce((sum, c) => sum + c.mentorsCount, 0);
   const needsAttention = scopedCategories.filter((c) => c.leadName === null).length;
 
-  const actions = useCategoryPreviewActions();
+  const actions = useCategoryActions();
 
   return (
     <div className="space-y-6">
@@ -128,7 +128,7 @@ export function CategoriesPage(): JSX.Element {
               label="Филиал"
               value={branch}
               onChange={setBranch}
-              options={[{ value: 'all', label: 'Все филиалы' }, ...BRANCH_DIRECTORY.map((b) => ({ value: b.rawName, label: b.displayName }))]}
+              options={[{ value: 'all', label: 'Все филиалы' }, ...branchContext.availableBranches.map((b) => ({ value: b.id, label: b.name }))]}
               width="lg"
             />
           ) : null}
@@ -142,6 +142,13 @@ export function CategoriesPage(): JSX.Element {
           />
         </PreviewToolbar>
 
+        {categoriesQuery.isPending ? (
+          <p className="px-5 py-10 text-center text-[13px] text-ink-muted sm:px-6">Загрузка направлений…</p>
+        ) : categoriesQuery.error !== null ? (
+          <div className="px-5 py-2 sm:px-6">
+            <ErrorState error={categoriesQuery.error} title="Не удалось загрузить направления" onRetry={categoriesQuery.refetch} />
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-2">
           {cards.map((category) => {
             const isUnassigned = category.leadName === null;
@@ -224,6 +231,7 @@ export function CategoriesPage(): JSX.Element {
             );
           })}
         </div>
+        )}
       </Card>
 
       <CategoryDetailsDrawer
@@ -239,15 +247,15 @@ export function CategoriesPage(): JSX.Element {
         onDeactivate={(target) => { setActionDialog({ type: 'deactivate', category: target }); }}
       />
 
-      <CategoryFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} isOrgAdmin={isOrgAdmin} currentBranchRawName={currentBranchRawName} />
+      <CategoryFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} isOrgAdmin={isOrgAdmin} />
 
       <AssignCategoryLeadDialog
         category={actionDialog?.type === 'assignLead' ? actionDialog.category : null}
         open={actionDialog?.type === 'assignLead'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (leadUserId) => {
-          if (actionDialog?.type === 'assignLead') await actions.assignLead(actionDialog.category.id, leadUserId);
+        onConfirm={async (lead) => {
+          if (actionDialog?.type === 'assignLead') await actions.assignLead(actionDialog.category, lead);
         }}
       />
 
@@ -257,7 +265,7 @@ export function CategoriesPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async (input) => {
-          if (actionDialog?.type === 'changeLead') await actions.changeLead(actionDialog.category.id, input);
+          if (actionDialog?.type === 'changeLead') await actions.changeLead(actionDialog.category, input);
         }}
       />
 
@@ -267,7 +275,7 @@ export function CategoriesPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async () => {
-          if (actionDialog?.type === 'activate') await actions.activateCategory(actionDialog.category.id);
+          if (actionDialog?.type === 'activate') await actions.activateCategory(actionDialog.category.id, actionDialog.category.concurrencyToken ?? '');
         }}
       />
 
@@ -277,7 +285,7 @@ export function CategoriesPage(): JSX.Element {
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
         onConfirm={async () => {
-          if (actionDialog?.type === 'deactivate') await actions.deactivateCategory(actionDialog.category.id);
+          if (actionDialog?.type === 'deactivate') await actions.deactivateCategory(actionDialog.category.id, actionDialog.category.concurrencyToken ?? '');
         }}
       />
     </div>

@@ -4,7 +4,6 @@ import { useMemo } from 'react';
 import { KANBAN_LANES, getAssignmentKanbanLane } from '../lead/assignments/leadAssignmentKanban';
 import { LEAD_STATUS_META, pluralizeRu, sourceLabel } from '../lead/assignments/leadAssignmentPresentation';
 import { formatCategoryDateTime, formatRelative, leadNow } from '../lead/scope/leadDateFormat';
-import { mentorNameOf } from '../lead/scope/leadScopedData';
 import { DAY_MS, HOUR_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
@@ -33,23 +32,23 @@ function overdueLabel(a: LeadAssignmentRecord): string {
 
 interface AssignmentsKanbanBoardProps {
   assignments: LeadAssignmentRecord[];
-  categoryId: string;
   timeZoneId: string;
   selectedId: string | null;
   onOpen: (id: string) => void;
   getActionItems: (assignment: LeadAssignmentRecord) => PreviewActionMenuItem[];
+  mentorNameOf: (mentorId: string) => string;
 }
 
 interface KanbanCardProps {
   assignment: LeadAssignmentRecord;
-  categoryId: string;
   timeZoneId: string;
   selected: boolean;
   onOpen: (id: string) => void;
   actionItems: PreviewActionMenuItem[];
+  mentorNameOf: (mentorId: string) => string;
 }
 
-function KanbanCard({ assignment: a, categoryId, timeZoneId, selected, onOpen, actionItems }: KanbanCardProps): JSX.Element {
+function KanbanCard({ assignment: a, timeZoneId, selected, onOpen, actionItems, mentorNameOf }: KanbanCardProps): JSX.Element {
   const latest = a.submissions[a.submissions.length - 1];
   const isOverdue = a.status === 'Overdue';
   const statusMeta = LEAD_STATUS_META[a.status];
@@ -80,9 +79,9 @@ function KanbanCard({ assignment: a, categoryId, timeZoneId, selected, onOpen, a
 
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[9px] font-semibold text-brand">
-          {initialsOf(mentorNameOf(categoryId, a.mentorId))}
+          {initialsOf(mentorNameOf(a.mentorId))}
         </span>
-        <span className="truncate text-[12px] font-medium text-ink-secondary">{mentorNameOf(categoryId, a.mentorId)}</span>
+        <span className="truncate text-[12px] font-medium text-ink-secondary">{mentorNameOf(a.mentorId)}</span>
       </div>
 
       {latest?.isLate === true ? (
@@ -126,11 +125,11 @@ function KanbanCard({ assignment: a, categoryId, timeZoneId, selected, onOpen, a
  */
 export function AssignmentsKanbanBoard({
   assignments,
-  categoryId,
   timeZoneId,
   selectedId,
   onOpen,
   getActionItems,
+  mentorNameOf,
 }: AssignmentsKanbanBoardProps): JSX.Element {
   const byLane = useMemo(() => {
     const map = new Map<string, LeadAssignmentRecord[]>();
@@ -163,11 +162,11 @@ export function AssignmentsKanbanBoard({
                   <KanbanCard
                     key={a.id}
                     assignment={a}
-                    categoryId={categoryId}
                     timeZoneId={timeZoneId}
                     selected={a.id === selectedId}
                     onOpen={onOpen}
                     actionItems={getActionItems(a)}
+                    mentorNameOf={mentorNameOf}
                   />
                 ))
               )}

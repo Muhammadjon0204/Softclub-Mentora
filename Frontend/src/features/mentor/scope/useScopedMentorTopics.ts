@@ -1,22 +1,32 @@
-import { useMemo } from 'react';
+import { useQueries, useQuery } from '@tanstack/react-query';
 
-import { useLeadTopicAssignmentsPreview, useLeadTopicsPreview } from '../../lead/schedule/leadSchedulePreviewStore';
+import { listTopicAssignmentsOfTopic, listTopics } from '../../../api/lead/topics';
 import type { LeadTopicAssignmentRecord, LeadTopicRecord } from '../../../mocks/ui-preview/leadTopics.preview';
+import { toTopicAssignmentRecord, toTopicRecord } from '../../lead/schedule/topicAdapter';
 import { useMentorScope } from './useMentorScope';
 
+const MAX_PAGE_SIZE = 100;
+
+export function mentorTopicsListQueryKey(organizationId: string, categoryId: string): readonly unknown[] {
+  return ['mentor-topics', 'list', organizationId, categoryId] as const;
+}
+
+export function mentorTopicAssignmentsOfTopicQueryKey(topicId: string): readonly unknown[] {
+  return ['mentor-topic-assignments-of-topic', topicId] as const;
+}
+
 /**
- * Расписание (Topic/TopicAssignment) — та же категория, тот же стор, что
- * читает Lead (`features/lead/scope/useScopedLeadSchedule.ts`), но Mentor
- * никогда не мутирует его: ТЗ 8.4/Приложение A — «Просмотр расписания
- * категории: Mentor — Да (своя, чтение)», CRUD Topic/TopicAssignment
- * Mentor недоступен ни в каком виде. Нельзя переиспользовать
- * `useScopedLeadTopics()` напрямую — она вызывает `useLeadScope()`, который
- * бросает исключение вне роли Lead.
+ * TP1: `GET /topics`, real replacement for the shared `useLeadTopicsPreview()` store filtered by
+ * category. Mentor is read-only across this whole domain (`EnsureMayWriteSchedule` 403s any write
+ * server-side even if one were reachable client-side) — this hook never exposes a mutation, only reads.
  */
 export function useScopedMentorTopics(): LeadTopicRecord[] {
   const scope = useMentorScope();
-  const all = useLeadTopicsPreview();
-  return useMemo(() => all.filter((topic) => topic.categoryId === scope.categoryId), [all, scope.categoryId]);
+  const listQuery = useQuery({
+    queryKey: mentorTopicsListQueryKey(scope.organizationId, scope.categoryId),
+    queryFn: () => listTopics({ pageSize: MAX_PAGE_SIZE }),
+  });
+  return (listQuery.data?.items ?? []).map(toTopicRecord);
 }
 
 export function useResolvedMentorTopic(topicId: string | null): LeadTopicRecord | undefined {
@@ -25,8 +35,24 @@ export function useResolvedMentorTopic(topicId: string | null): LeadTopicRecord 
   return scoped.find((topic) => topic.id === topicId);
 }
 
+/** TP8: `GET /topics/{topicId}/assignments`. */
 export function useTopicAssignmentsOfMentor(topicId: string | null): LeadTopicAssignmentRecord[] {
-  const topic = useResolvedMentorTopic(topicId);
-  const all = useLeadTopicAssignmentsPreview();
-  return useMemo(() => (topic === undefined ? [] : all.filter((tpa) => tpa.topicId === topic.id)), [all, topic]);
+  const listQuery = useQuery({
+    queryKey: mentorTopicAssignmentsOfTopicQueryKey(topicId ?? 'none'),
+    queryFn: () => listTopicAssignmentsOfTopic(topicId as string),
+    enabled: topicId !== null,
+  });
+  return (listQuery.data ?? []).map(toTopicAssignmentRecord);
+}
+
+/** Same fan-out as `useScopedLeadSchedule.ts`'s `useAllTopicAssignments` — no "all templates of my category" endpoint exists, only per-topic. Used by `/mentor/schedule` for the "N заданий по теме" counter. */
+export function useAllTopicAssignmentsForMentor(topics: LeadTopicRecord[]): LeadTopicAssignmentRecord[] {
+  const results = useQueries({
+    queries: topics.map((topic) => ({
+      queryKey: mentorTopicAssignmentsOfTopicQueryKey(topic.id),
+      queryFn: () => listTopicAssignmentsOfTopic(topic.id),
+      staleTime: 30_000,
+    })),
+  });
+  return results.flatMap((result) => (result.data ?? []).map(toTopicAssignmentRecord));
 }

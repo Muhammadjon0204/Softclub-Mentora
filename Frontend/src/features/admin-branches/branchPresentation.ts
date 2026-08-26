@@ -30,63 +30,21 @@ export interface PreviewBranchDetails extends PreviewBranch {
   createdLabel: string;
   adminUserId: string | null;
   activity: BranchActivityEntry[];
+  /**
+   * Скрытое поле для реальных mutate-вызовов (PUT/activate/deactivate/make-head-office) —
+   * нигде не отображается. `undefined` у филиалов, полученных как `BranchSummaryDto`
+   * (Lead/Mentor/Branch Admin про свой филиал — там мутаций и так нет, кнопки скрыты
+   * для не-Organization-Admin в `BranchActionMenu`).
+   */
+  concurrencyToken?: string;
 }
 
-const SEED_EMAIL: Record<string, string | null> = {
-  'branch-hq': 'dushanbe@softclub-academy.test',
-  'branch-khu': 'khujand@softclub-academy.test',
-  'branch-bok': null,
-};
+export type PreviousAdminRoleChoice = 'Lead' | 'Mentor' | 'Deactivate';
 
-const SEED_PHONE: Record<string, string | null> = {
-  'branch-hq': '+992 37 221-00-11',
-  'branch-khu': '+992 34 222-00-22',
-  'branch-bok': null,
-};
-
-const SEED_ADMIN_USER_ID: Record<string, string | null> = {
-  'branch-hq': 'usr-01',
-  'branch-khu': 'usr-02',
-  'branch-bok': null,
-};
-
-const SEED_CREATED_LABEL: Record<string, string> = {
-  'branch-hq': '02.02.2023',
-  'branch-khu': '14.03.2023',
-  'branch-bok': '21.06.2023',
-};
-
-function buildInitialActivity(branch: PreviewBranch): BranchActivityEntry[] {
-  const createdLabel = SEED_CREATED_LABEL[branch.id] ?? branch.id;
-  const entries: BranchActivityEntry[] = [
-    { id: `${branch.id}-ev-created`, kind: 'created', label: 'Филиал создан', actorName: 'Администратор организации', relativeTime: createdLabel, absoluteLabel: createdLabel },
-  ];
-  if (branch.adminName !== null) {
-    entries.push({
-      id: `${branch.id}-ev-admin`,
-      kind: 'admin_assigned',
-      label: 'Назначен администратор',
-      detail: branch.adminName,
-      actorName: 'Администратор организации',
-      relativeTime: createdLabel,
-      absoluteLabel: createdLabel,
-    });
-  }
-  return entries.reverse();
-}
-
-/** Достраивает preview-филиал контактами/таймзоной/активностью, не трогая `branches.preview.ts`. */
-export function enrichBranch(branch: PreviewBranch): PreviewBranchDetails {
-  return {
-    ...branch,
-    city: branch.name,
-    timezone: DEFAULT_TIMEZONE,
-    email: SEED_EMAIL[branch.id] ?? null,
-    phone: SEED_PHONE[branch.id] ?? null,
-    createdLabel: SEED_CREATED_LABEL[branch.id] ?? '—',
-    adminUserId: SEED_ADMIN_USER_ID[branch.id] ?? null,
-    activity: buildInitialActivity(branch),
-  };
+export interface ChangeBranchAdminInput {
+  newAdminUserId: string;
+  previousAdminRoleChoice: PreviousAdminRoleChoice;
+  previousAdminCategoryName: string | null;
 }
 
 export function emptyOrValue(value: string | null | undefined): string {

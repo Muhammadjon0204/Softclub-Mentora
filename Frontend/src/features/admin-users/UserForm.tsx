@@ -4,10 +4,11 @@ import { Controller, useForm } from 'react-hook-form';
 
 import { ROLE_LABEL } from '../../mocks/ui-preview/users.preview';
 import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormSelect, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
-import { BRANCH_DIRECTORY } from '../admin-preview/branchDirectory';
+import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
+import { useBranchContext } from '../branch-context/useBranchContext';
 import { ASSIGNABLE_ROLE_VALUES, userCreateSchema, userEditSchema } from './userForm.schema';
 import type { UserCreateFormValues, UserEditFormValues } from './userForm.schema';
-import { NOTIFICATION_LANGUAGES, NOTIFICATION_LANGUAGE_LABEL, activeCategoriesForBranch } from './userPresentation';
+import { NOTIFICATION_LANGUAGES, NOTIFICATION_LANGUAGE_LABEL } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
 
 const ROLE_SELECT_OPTIONS = ASSIGNABLE_ROLE_VALUES.map((value) => ({ value, label: ROLE_LABEL[value] }));
@@ -15,16 +16,21 @@ const ROLE_SELECT_OPTIONS = ASSIGNABLE_ROLE_VALUES.map((value) => ({ value, labe
 export interface UserCreateFormProps {
   formId: string;
   isOrgAdmin: boolean;
-  /** Raw branch name (`branchName`) фиксированного филиала Branch Admin. */
-  currentBranchRawName: string | null;
   bannerError: string | null;
   onDirtyChange: (dirty: boolean) => void;
   onSubmit: (values: UserCreateFormValues, helpers: { setEmailError: (message: string) => void }) => void | Promise<void>;
 }
 
-/** Секции 1–3 из раздела 12/13 промпта: Основная информация → Роль и доступ → Приглашение. */
-export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, bannerError, onDirtyChange, onSubmit }: UserCreateFormProps): JSX.Element {
-  const defaultRole = isOrgAdmin ? 'Mentor' : 'Mentor';
+/**
+ * Секции 1–3 из раздела 12/13 промпта: Основная информация → Роль и доступ → Приглашение.
+ * `POST /users` не принимает `branchId` в теле — сервер решает по `X-MTF-Branch-Id`
+ * (Organization Admin) или claims (Branch Admin), см. `api/admin/users.ts#createUser`. Выбор
+ * филиала в форме реально передаётся как override этого заголовка на один запрос — не декорация.
+ */
+export function UserCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange, onSubmit }: UserCreateFormProps): JSX.Element {
+  const branchContext = useBranchContext();
+  const ownBranchId = branchContext.fixedBranch?.id ?? '';
+
   const {
     register,
     handleSubmit,
@@ -39,9 +45,9 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
     defaultValues: {
       fullName: '',
       email: '',
-      role: defaultRole,
-      branchName: isOrgAdmin ? '' : (currentBranchRawName ?? ''),
-      categoryName: '',
+      role: 'Mentor',
+      branchId: isOrgAdmin ? '' : ownBranchId,
+      categoryId: '',
       notificationLanguage: 'ru',
       sendInvitationNow: true,
     },
@@ -52,15 +58,15 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
   }, [isDirty, onDirtyChange]);
 
   const role = watch('role');
-  const branchName = watch('branchName');
+  const branchId = watch('branchId');
   const needsCategory = role === 'Lead' || role === 'Mentor';
-  const categoryOptions = branchName.length > 0 ? activeCategoriesForBranch(branchName) : [];
+  const categoriesForBranch = useCategoriesForBranch(branchId.length > 0 ? branchId : null, isOrgAdmin);
 
   // Раздел 13 промпта: смена Branch сбрасывает несовместимую Category, не оставляя скрытое значение.
   useEffect(() => {
-    setValue('categoryName', '', { shouldValidate: false, shouldDirty: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- сбрасываем именно при смене branchName, не на каждый ре-рендер
-  }, [branchName]);
+    setValue('categoryId', '', { shouldValidate: false, shouldDirty: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- сбрасываем именно при смене branchId, не на каждый ре-рендер
+  }, [branchId]);
 
   const submit = handleSubmit((values) => {
     void onSubmit(values, {
@@ -113,44 +119,44 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
           </FormField>
 
           {isOrgAdmin ? (
-            <FormField label="Филиал" htmlFor="user-create-branch" required error={errors.branchName?.message}>
+            <FormField label="Филиал" htmlFor="user-create-branch" required error={errors.branchId?.message}>
               <Controller
                 control={control}
-                name="branchName"
+                name="branchId"
                 render={({ field }) => (
                   <FormSelect
                     id="user-create-branch"
-                    invalid={errors.branchName !== undefined}
+                    invalid={errors.branchId !== undefined}
                     value={field.value}
                     onValueChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
                     placeholder="Выберите филиал"
-                    options={BRANCH_DIRECTORY.map((branch) => ({ value: branch.rawName, label: branch.displayName }))}
+                    options={branchContext.availableBranches.map((option) => ({ value: option.id, label: option.name }))}
                   />
                 )}
               />
             </FormField>
           ) : (
-            <ReadOnlyField label="Филиал" value={BRANCH_DIRECTORY.find((branch) => branch.rawName === currentBranchRawName)?.displayName ?? '—'} hint="Ваш филиал — изменить нельзя" />
+            <ReadOnlyField label="Филиал" value={branchContext.fixedBranch?.name ?? '—'} hint="Ваш филиал — изменить нельзя" />
           )}
 
           {needsCategory ? (
-            <FormField label="Направление" htmlFor="user-create-category" required error={errors.categoryName?.message} hint={branchName.length === 0 ? 'Сначала выберите филиал' : undefined}>
+            <FormField label="Направление" htmlFor="user-create-category" required error={errors.categoryId?.message} hint={branchId.length === 0 ? 'Сначала выберите филиал' : undefined}>
               <Controller
                 control={control}
-                name="categoryName"
+                name="categoryId"
                 render={({ field }) => (
                   <FormSelect
                     id="user-create-category"
-                    disabled={branchName.length === 0}
-                    invalid={errors.categoryName !== undefined}
+                    disabled={branchId.length === 0}
+                    invalid={errors.categoryId !== undefined}
                     value={field.value ?? ''}
                     onValueChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
-                    placeholder="Выберите направление"
-                    options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+                    placeholder={categoriesForBranch.isPending ? 'Загрузка…' : 'Выберите направление'}
+                    options={categoriesForBranch.categories.map((category) => ({ value: category.id, label: category.name }))}
                   />
                 )}
               />
@@ -177,7 +183,11 @@ export function UserCreateForm({ formId, isOrgAdmin, currentBranchRawName, banne
               )}
             />
           </FormField>
-          <FormCheckbox label="Отправить приглашение сразу" {...register('sendInvitationNow')} />
+          <FormCheckbox
+            label="Отправить приглашение сразу"
+            description="Backend отправляет приглашение сразу в любом случае — см. docs/INTEGRATION_UI_ISSUES.md"
+            {...register('sendInvitationNow')}
+          />
         </div>
       </FormSection>
     </form>
