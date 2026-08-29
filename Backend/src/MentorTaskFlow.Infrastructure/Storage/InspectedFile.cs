@@ -18,7 +18,7 @@ public sealed class InspectedFile : IAsyncDisposable
     {
         _backingStream = backingStream;
         Content = backingStream;
-        FileSizeBytes = sizeBytes;
+        SizeBytes = sizeBytes;
         Sha256Hash = sha256Hash;
         Extension = extension;
     }
@@ -27,7 +27,7 @@ public sealed class InspectedFile : IAsyncDisposable
     public Stream Content { get; }
 
     /// <summary>Exact byte count after spooling.</summary>
-    public long FileSizeBytes { get; }
+    public long SizeBytes { get; }
 
     /// <summary>Lower-case hex SHA-256 of the whole file.</summary>
     public string Sha256Hash { get; }

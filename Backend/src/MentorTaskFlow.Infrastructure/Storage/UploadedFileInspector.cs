@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace MentorTaskFlow.Infrastructure.Storage;
 
 /// <summary>
-/// Validates an uploaded file against the limits of Приложение L before it reaches the bucket.
+/// Validates an uploaded file against the limits before it reaches the bucket.
 /// </summary>
 /// <remarks>
 /// The order follows TZ 17.2 steps 8–9: size → magic bytes → archive safety. A rejected file never
@@ -38,7 +38,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
             {
                 "application/pdf" => FileExtension.Pdf,
                 "application/vnd.openxmlformats-officedocument.presentationml.presentation" => FileExtension.Pptx,
-                _ => throw new ValidationException("Допустимы только PDF и PPTX файлы."),
+                _ => throw new ValidationAppException("file", "Допустимы только PDF и PPTX файлы."),
             },
         };
     }
@@ -55,7 +55,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
         // Step 8: reject obviously oversized uploads before reading the body.
         if (declaredLength > _options.MaxFileBytes)
         {
-            throw new ValidationException(
+            throw new ValidationAppException("file",
                 $"Размер файла не должен превышать {_options.MaxFileBytes / (1024 * 1024)} МБ.");
         }
 
@@ -87,7 +87,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
                 if (totalBytes > _options.MaxFileBytes)
                 {
-                    throw new ValidationException(
+                    throw new ValidationAppException("file",
                         $"Размер файла не должен превышать {_options.MaxFileBytes / (1024 * 1024)} МБ.");
                 }
 
@@ -97,7 +97,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
             if (totalBytes == 0)
             {
-                throw new ValidationException("Файл пуст.");
+                throw new ValidationAppException("file", "Файл пуст.");
             }
 
             var hash = Convert.ToHexStringLower(sha256.GetHashAndReset());
@@ -134,7 +134,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
         if (read < expected.Length || !header.AsSpan(0, expected.Length).SequenceEqual(expected))
         {
             var label = extension is FileExtension.Pdf ? "PDF" : "PPTX";
-            throw new ValidationException($"Файл не является допустимым {label}.");
+            throw new ValidationAppException("file", $"Файл не является допустимым {label}.");
         }
     }
 
@@ -148,7 +148,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
             if (archive.Entries.Count > _options.ZipMaxEntries)
             {
-                throw new ValidationException(
+                throw new ValidationAppException("file",
                     $"Архив содержит больше {_options.ZipMaxEntries} файлов.");
             }
 
@@ -162,23 +162,23 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
                 if (totalUncompressed > _options.ZipMaxUncompressedBytes)
                 {
-                    throw new ValidationException("Архив превышает допустимый размер после распаковки.");
+                    throw new ValidationAppException("file", "Архив превышает допустимый размер после распаковки.");
                 }
 
                 if (entry.CompressedLength > 0
                     && entry.Length / entry.CompressedLength > _options.ZipMaxRatio)
                 {
-                    throw new ValidationException("Подозрительная степень сжатия (возможная zip-бомба).");
+                    throw new ValidationAppException("file", "Подозрительная степень сжатия (возможная zip-бомба).");
                 }
             }
         }
         catch (InvalidDataException)
         {
-            throw new ValidationException("Файл PPTX повреждён или не является валидным ZIP-архивом.");
+            throw new ValidationAppException("file", "Файл PPTX повреждён или не является валидным ZIP-архивом.");
         }
         catch (OperationCanceledException)
         {
-            throw new ValidationException("Проверка архива превысила допустимое время.");
+            throw new ValidationAppException("file", "Проверка архива превысила допустимое время.");
         }
     }
 }
