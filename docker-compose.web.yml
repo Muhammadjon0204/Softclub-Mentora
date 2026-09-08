@@ -1,0 +1,34 @@
+# =============================================================================
+# MentorTaskFlow — фронтенд (production).
+#
+#   nano .env.web      # указать адрес API
+#   docker compose --env-file .env.web -f docker-compose.web.yml up -d --build
+#
+# Отдельный compose-проект, ничем не связанный с бэкендом: контейнер раздаёт
+# статику и больше ничего не делает. К API браузер ходит напрямую по адресу
+# api.<домен>, который разводит хостовый nginx, — поэтому ни общей сети, ни
+# depends_on, ни порядка запуска здесь не нужно.
+#
+#   хостовый nginx ──▶ 127.0.0.1:8092 ─▶ mentora-web      <домен>
+#
+# ВАЖНО. VITE_API_BASE_URL вшивается в JavaScript на этапе СБОРКИ образа, а не
+# читается при запуске. Смена адреса API требует пересборки — флаг --build в
+# команде выше обязателен. Перезапуска контейнера с новым .env.web
+# недостаточно.
+# =============================================================================
+
+name: mentora-web
+
+services:
+
+  mentora-web:
+    image: ${DOCKERHUB_USERNAME}/${WEB_IMAGE_NAME}:${IMAGE_TAG:-latest}
+    container_name: ${WEB_CONTAINER_NAME}
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+    restart: unless-stopped
+    ports:
+      - "${WEB_EXTERNAL_PORT}:80"

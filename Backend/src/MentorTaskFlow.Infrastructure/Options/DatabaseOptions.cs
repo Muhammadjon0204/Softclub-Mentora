@@ -18,6 +18,19 @@ public sealed class DatabaseOptions
     /// </summary>
     public bool MigrateOnStartup { get; init; }
 
+    /// <summary>
+    /// Database role the API and the worker connect as — the one the migrator grants the scheduler
+    /// schema to (<c>DEPLOY-017</c>).
+    /// </summary>
+    /// <remarks>
+    /// Read only by the migrator, and only to build a <c>GRANT</c>. It is a role name, so it is
+    /// interpolated into DDL that cannot be parameterised; the pattern keeps it to what PostgreSQL
+    /// accepts unquoted, which is also what makes the interpolation safe.
+    /// </remarks>
+    [Required(AllowEmptyStrings = false)]
+    [RegularExpression("^[A-Za-z_][A-Za-z0-9_]*$")]
+    public string ApplicationRole { get; init; } = "mentortaskflow_app";
+
     [Range(1, 300)]
     public int CommandTimeoutSeconds { get; init; } = 30;
 

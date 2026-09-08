@@ -1,4 +1,4 @@
-# Development stack (TZ 32.1). Not for production — see docker-compose.prod.yml.
+# Development stack (TZ 32.1). Not for production — see docker-compose.api.yml в корне репозитория.
 #
 # Credentials here are local-only fixtures. Production secrets come from a secret manager and are
 # never committed (SEC-010).
@@ -17,7 +17,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # Creates the three non-overlapping database roles of TZ 12.6: app, migrator, retention.
-      - ./scripts/db/01-roles.sql:/docker-entrypoint-initdb.d/01-roles.sql:ro
+      - ./scripts/db/01-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d mentortaskflow"]
       interval: 5s

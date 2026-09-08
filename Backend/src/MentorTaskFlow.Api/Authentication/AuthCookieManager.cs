@@ -29,10 +29,26 @@ public sealed class AuthCookieManager
     public const string CsrfHeaderName = "X-CSRF-Token";
 
     /// <summary>
-    /// Restricts both cookies to the auth endpoints, so no other request carries them
+    /// Restricts the refresh cookie to the auth endpoints, so no other request carries it
     /// (<c>AUTH-010</c>, <c>AUTH-011</c>).
     /// </summary>
     public const string CookiePath = "/api/v1/auth";
+
+    /// <summary>
+    /// Scope of the CSRF cookie: the whole origin, deliberately wider than <see cref="CookiePath"/>.
+    /// </summary>
+    /// <remarks>
+    /// The double-submit token is worth nothing unless script can read it, and a cookie scoped to
+    /// <c>/api/v1/auth</c> is invisible to <c>document.cookie</c> on every page the SPA actually
+    /// renders — <c>/login</c>, <c>/dashboard</c> and the rest. Sharing one path between the two
+    /// cookies left the client unable to build <c>X-CSRF-Token</c> at all, so the refresh answered
+    /// 403 CSRF_VALIDATION_FAILED and the session ended when the access token expired. Приложение D.1
+    /// specifies the two paths separately for this reason.
+    ///
+    /// Widening it costs nothing: the value is an opaque random token that only ever proves the
+    /// caller could read a cookie from this origin.
+    /// </remarks>
+    public const string CsrfCookiePath = "/";
 
     /// <summary>
     /// Issues the refresh cookie and a matching CSRF pair.
@@ -62,7 +78,7 @@ public sealed class AuthCookieManager
             HttpOnly = false,
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
-            Path = CookiePath,
+            Path = CsrfCookiePath,
             Expires = expiresAt,
             IsEssential = true,
         });
@@ -86,7 +102,7 @@ public sealed class AuthCookieManager
             HttpOnly = false,
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
-            Path = CookiePath,
+            Path = CsrfCookiePath,
         });
     }
 

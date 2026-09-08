@@ -64,6 +64,20 @@ public sealed class AuthOptions
     [Required(AllowEmptyStrings = false)]
     public string AppBaseUrl { get; init; } = "http://localhost:5173";
 
+    /// <summary>
+    /// Marks <c>mtf_rt</c> and <c>mtf_csrf</c> <c>Secure</c>, so the browser stores them over HTTPS
+    /// only (<c>SEC-008</c>). Default true.
+    /// </summary>
+    /// <remarks>
+    /// A deployment genuinely served over plain HTTP has to turn this off, because a browser
+    /// discards a <c>Secure</c> cookie on an <c>http://</c> origin without saying so: the login
+    /// answers 200, the session appears to work, and fifteen minutes later the refresh finds no
+    /// cookie and the user is signed out with no way back in. Making it a setting keeps that a
+    /// property of the deployment rather than of the environment name — running Development just to
+    /// get usable cookies would also switch on Swagger and relax everything else.
+    /// </remarks>
+    public bool RequireSecureCookies { get; init; } = true;
+
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenMinutes);
 
     public TimeSpan RefreshTokenLifetime => TimeSpan.FromDays(RefreshTokenDays);
