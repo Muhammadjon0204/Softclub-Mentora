@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import type { UseFormSetError, UseFormSetFocus } from 'react-hook-form';
 
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormField, FormInput, FormSection, FormSelect, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { ADMIN_OPTION_VALUES, branchCreateSchema, branchEditSchema } from './branchForm.schema';
@@ -25,7 +25,7 @@ export interface BranchCreateFormProps {
 
 /** Секции 1–4 из раздела 28 промпта: Основная информация → Контакты → Региональные настройки → Администратор. */
 export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit }: BranchCreateFormProps): JSX.Element {
-  const users = useUsersPreview();
+  const { users } = useUsersQuery();
   const adminCandidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin');
 
   const {

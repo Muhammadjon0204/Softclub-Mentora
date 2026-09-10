@@ -39,12 +39,21 @@ export interface PreviewBranchDetails extends PreviewBranch {
   concurrencyToken?: string;
 }
 
+/** Минимум, нужный для `POST /users/{id}/change-role` — тот же набор, что `LeadCandidateRef` у Categories. */
+export interface BranchAdminCandidateRef {
+  id: string;
+  concurrencyToken: string;
+  fullName: string;
+}
+
 export type PreviousAdminRoleChoice = 'Lead' | 'Mentor' | 'Deactivate';
 
 export interface ChangeBranchAdminInput {
-  newAdminUserId: string;
+  newAdmin: BranchAdminCandidateRef;
+  previousAdmin: BranchAdminCandidateRef | null;
   previousAdminRoleChoice: PreviousAdminRoleChoice;
-  previousAdminCategoryName: string | null;
+  /** Обязательно при `previousAdminRoleChoice` = `Lead`/`Mentor` — реальный `CategoryDto.id`. */
+  previousAdminCategoryId: string | null;
 }
 
 export function emptyOrValue(value: string | null | undefined): string {

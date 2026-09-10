@@ -1,6 +1,7 @@
 import { DestructiveConfirmDialog } from '../../shared/overlays';
-import { PREVIEW_CATEGORIES } from '../../mocks/ui-preview/categories.preview';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useAuth } from '../../auth/useAuth';
+import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import type { PreviewBranchDetails } from './branchPresentation';
 
 export interface DeactivateBranchDialogProps {
@@ -13,9 +14,12 @@ export interface DeactivateBranchDialogProps {
 
 /** DestructiveConfirmDialog — раздел 34 промпта: не удаление, восстановление возможно через активацию. */
 export function DeactivateBranchDialog({ branch, open, onOpenChange, isSubmitting, onConfirm }: DeactivateBranchDialogProps): JSX.Element {
-  const users = useUsersPreview();
-  const usersCount = branch !== null ? users.filter((user) => user.branchName === branch.name && user.status !== 'Deactivated').length : 0;
-  const categoriesCount = branch !== null ? PREVIEW_CATEGORIES.filter((category) => category.branchName === branch.name).length : 0;
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const { users } = useUsersQuery();
+  const { categories } = useCategoriesForBranch(branch?.id ?? null, isOrgAdmin);
+  const usersCount = branch !== null ? users.filter((user) => user.branchId === branch.id && user.status !== 'Deactivated').length : 0;
+  const categoriesCount = branch !== null ? categories.length : 0;
 
   return (
     <DestructiveConfirmDialog

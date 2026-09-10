@@ -22,7 +22,7 @@ import { useUserActions } from '../../features/admin-users/useUserActions';
 import { useUsersQuery } from '../../features/admin-users/useUsersQuery';
 import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../features/admin-users/userPresentation';
 import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
-import { ROLE_LABEL, STATUS_LABEL, PREVIEW_NEW_USERS_SERIES } from '../../mocks/ui-preview/users.preview';
+import { ROLE_LABEL, STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
 import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
@@ -60,6 +60,21 @@ function formatLastLogin(label: string): { primary: string; secondary?: string }
 
 function initialsOf(fullName: string): string {
   return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
+}
+
+function buildNewUsersSeries(users: readonly PreviewUserDetails[]): { label: string; value: number }[] {
+  const now = new Date();
+  return Array.from({ length: 5 }, (_, index) => {
+    const end = new Date(now);
+    end.setDate(now.getDate() - (4 - index) * 7);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    const value = users.filter((user) => {
+      const created = new Date(user.createdLabel.split('.').reverse().join('-'));
+      return created >= start && created <= end;
+    }).length;
+    return { label: `${String(start.getDate()).padStart(2, '0')}.${String(start.getMonth() + 1).padStart(2, '0')}`, value };
+  });
 }
 
 function getAccessScope(user: PreviewUserDetails): { primary: string; secondary?: string } {
@@ -158,7 +173,7 @@ export function UsersPage(): JSX.Element {
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [role, setRole] = useState('all');
   const [branch, setBranch] = useState('all');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState('Active');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(14);
   const [formDrawer, setFormDrawer] = useState<UserFormDrawerState | null>(null);
@@ -203,7 +218,8 @@ export function UsersPage(): JSX.Element {
   const currentPage = Math.min(page, totalPages);
   const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const filtersActive = search.trim().length > 0 || role !== 'all' || branch !== 'all' || status !== 'all';
-  const newThisWeek = PREVIEW_NEW_USERS_SERIES[PREVIEW_NEW_USERS_SERIES.length - 1]?.value ?? 0;
+  const newUsersSeries = useMemo(() => buildNewUsersSeries(allUsers), [allUsers]);
+  const newThisWeek = newUsersSeries[newUsersSeries.length - 1]?.value ?? 0;
 
   const summary = useMemo(
     () => ({
@@ -251,7 +267,7 @@ export function UsersPage(): JSX.Element {
         </div>
         <div className="px-2 pb-3 pt-2 sm:px-3" style={{ height: 116 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={PREVIEW_NEW_USERS_SERIES} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
+            <AreaChart data={newUsersSeries} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--divider)" />
               <XAxis dataKey="label" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
               <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 12 }} />
@@ -270,7 +286,7 @@ export function UsersPage(): JSX.Element {
           <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
           <PreviewResetButton
             disabled={!filtersActive}
-            onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('all'); }}
+            onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('Active'); }}
           />
         </PreviewToolbar>
 

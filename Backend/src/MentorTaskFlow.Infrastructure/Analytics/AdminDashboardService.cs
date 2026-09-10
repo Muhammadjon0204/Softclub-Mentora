@@ -125,12 +125,14 @@ public sealed class AdminDashboardService(
             .AsNoTracking()
             .Where(u => u.OrganizationId == organizationId)
             .Where(u => branchId == null || u.BranchId == branchId)
+            .Where(u => u.IsActive)
             .ToListAsync(cancellationToken);
 
         var branches = await dbContext.Branches
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(b => b.OrganizationId == organizationId)
+            .Where(b => b.IsActive)
             .ToListAsync(cancellationToken);
 
         var categories = await dbContext.Categories
@@ -138,6 +140,7 @@ public sealed class AdminDashboardService(
             .AsNoTracking()
             .Where(c => c.OrganizationId == organizationId)
             .Where(c => branchId == null || c.BranchId == branchId)
+            .Where(c => c.IsActive)
             .ToListAsync(cancellationToken);
 
         var submissions = await dbContext.Submissions

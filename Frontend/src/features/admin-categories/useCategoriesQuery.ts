@@ -102,7 +102,7 @@ export function useCategoriesQuery(): UseCategoriesQueryResult {
 
   const categoriesQuery = useQuery({
     queryKey: categoriesListQueryKey(organizationId, branchContext.selectedBranchId),
-    queryFn: () => listCategories({ page: 1, pageSize: MAX_PAGE_SIZE }),
+    queryFn: () => listCategories({ page: 1, pageSize: MAX_PAGE_SIZE, isActive: true }),
     enabled: user !== null,
   });
 

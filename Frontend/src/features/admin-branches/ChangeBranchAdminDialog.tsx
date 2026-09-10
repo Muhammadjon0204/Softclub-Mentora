@@ -1,11 +1,12 @@
 import { UserCog } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { useAuth } from '../../auth/useAuth';
 import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
-import { activeCategoriesForBranch } from '../admin-users/userPresentation';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import type { ChangeBranchAdminInput, PreviousAdminRoleChoice, PreviewBranchDetails } from './branchPresentation';
 
 const PREVIOUS_ROLE_OPTIONS: { value: PreviousAdminRoleChoice; label: string }[] = [
@@ -24,24 +25,27 @@ export interface ChangeBranchAdminDialogProps {
 
 /** Раздел 33 промпта — не угадывает автоматически новую роль старого администратора, спрашивает явно. */
 export function ChangeBranchAdminDialog({ branch, open, onOpenChange, isSubmitting, onConfirm }: ChangeBranchAdminDialogProps): JSX.Element {
-  const users = useUsersPreview();
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const { users } = useUsersQuery();
+  const { categories: categoryOptions } = useCategoriesForBranch(branch?.id ?? null, isOrgAdmin);
   const currentAdmin = branch?.adminUserId !== null && branch?.adminUserId !== undefined ? users.find((user) => user.id === branch.adminUserId) : undefined;
   const candidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin' && user.role !== 'BranchAdmin');
 
   const [newAdminId, setNewAdminId] = useState('');
   const [previousRole, setPreviousRole] = useState<PreviousAdminRoleChoice>('Lead');
-  const [previousCategory, setPreviousCategory] = useState('');
+  const [previousCategoryId, setPreviousCategoryId] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setNewAdminId('');
     setPreviousRole('Lead');
-    setPreviousCategory('');
+    setPreviousCategoryId('');
   }, [open, branch?.id]);
 
   const needsCategory = previousRole === 'Lead' || previousRole === 'Mentor';
-  const categoryOptions = branch !== null ? activeCategoriesForBranch(branch.name) : [];
-  const confirmDisabled = branch === null || newAdminId.length === 0 || (needsCategory && previousCategory.length === 0);
+  const newAdmin = candidates.find((candidate) => candidate.id === newAdminId);
+  const confirmDisabled = branch === null || newAdmin === undefined || (needsCategory && previousCategoryId.length === 0);
 
   return (
     <ConfirmDialog
@@ -53,8 +57,16 @@ export function ChangeBranchAdminDialog({ branch, open, onOpenChange, isSubmitti
       loading={isSubmitting}
       confirmDisabled={confirmDisabled}
       onConfirm={async () => {
-        if (branch === null || newAdminId.length === 0) return;
-        await onConfirm({ newAdminUserId: newAdminId, previousAdminRoleChoice: previousRole, previousAdminCategoryName: needsCategory ? previousCategory : null });
+        if (branch === null || newAdmin === undefined) return;
+        await onConfirm({
+          newAdmin: { id: newAdmin.id, concurrencyToken: newAdmin.concurrencyToken ?? '', fullName: newAdmin.fullName },
+          previousAdmin:
+            currentAdmin !== undefined
+              ? { id: currentAdmin.id, concurrencyToken: currentAdmin.concurrencyToken ?? '', fullName: currentAdmin.fullName }
+              : null,
+          previousAdminRoleChoice: previousRole,
+          previousAdminCategoryId: needsCategory ? previousCategoryId : null,
+        });
         onOpenChange(false);
       }}
       description={
@@ -81,21 +93,21 @@ export function ChangeBranchAdminDialog({ branch, open, onOpenChange, isSubmitti
               <FormSelect
                 id="change-admin-prev-role"
                 value={previousRole}
-                onValueChange={(next) => { setPreviousRole(next as PreviousAdminRoleChoice); setPreviousCategory(''); }}
+                onValueChange={(next) => { setPreviousRole(next as PreviousAdminRoleChoice); setPreviousCategoryId(''); }}
                 options={PREVIOUS_ROLE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
               />
             </FormField>
           ) : null}
 
           {currentAdmin !== undefined && needsCategory ? (
-            <FormField label="Направление" htmlFor="change-admin-prev-category" required error={previousCategory.length === 0 ? 'Выберите направление' : undefined}>
+            <FormField label="Направление" htmlFor="change-admin-prev-category" required error={previousCategoryId.length === 0 ? 'Выберите направление' : undefined}>
               <FormSelect
                 id="change-admin-prev-category"
-                value={previousCategory}
-                onValueChange={setPreviousCategory}
+                value={previousCategoryId}
+                onValueChange={setPreviousCategoryId}
                 placeholder="Выберите направление"
-                invalid={previousCategory.length === 0}
-                options={categoryOptions.map((category) => ({ value: category.name, label: category.name }))}
+                invalid={previousCategoryId.length === 0}
+                options={categoryOptions.map((category) => ({ value: category.id, label: category.name }))}
               />
             </FormField>
           ) : null}
