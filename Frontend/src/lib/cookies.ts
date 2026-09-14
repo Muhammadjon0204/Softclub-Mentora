@@ -3,7 +3,10 @@
  *
  * Приложение читает отсюда РОВНО одну cookie — `mtf_csrf`
  * (`Secure; SameSite=Strict; Path=/; non-HttpOnly; host-only`), потому что её
- * значение обязано попасть в заголовок `X-CSRF-Token` (double submit).
+ * значение обязано попасть в заголовок `X-CSRF-Token` (double submit). `Path=/`
+ * обязателен: `document.cookie` видит cookie только если текущий путь документа
+ * матчится с её `Path` — уже её на `/api/v1/auth` делало `readCsrfToken()` всегда
+ * `null` на любой реальной странице SPA (см. `AuthCookieManager.CsrfCookiePath`).
  *
  * Refresh-cookie — HttpOnly с `Path=/api/v1/auth`, читать её из JS невозможно
  * и не нужно. Её имени в коде приложения нет вообще: оно живёт только внутри mock-слоя.

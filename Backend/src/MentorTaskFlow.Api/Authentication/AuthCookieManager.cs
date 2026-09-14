@@ -29,10 +29,23 @@ public sealed class AuthCookieManager
     public const string CsrfHeaderName = "X-CSRF-Token";
 
     /// <summary>
-    /// Restricts both cookies to the auth endpoints, so no other request carries them
-    /// (<c>AUTH-010</c>, <c>AUTH-011</c>).
+    /// Restricts the HttpOnly refresh cookie to the auth endpoints, so no other request carries it
+    /// (<c>AUTH-010</c>, <c>AUTH-011</c>). Only affects which requests the browser attaches the cookie
+    /// to — irrelevant to script readability, since it's HttpOnly anyway.
     /// </summary>
     public const string CookiePath = "/api/v1/auth";
+
+    /// <summary>
+    /// The CSRF cookie must be readable by <c>document.cookie</c> from every SPA route (<c>/dashboard</c>,
+    /// <c>/login</c>, ...), not just <c>/api/v1/auth/*</c>: a cookie's <c>Path</c> scopes both when the
+    /// browser sends it AND which documents may read it via script, using the same prefix match. Scoping
+    /// this cookie to <see cref="CookiePath"/> made <c>readCsrfToken()</c> (<c>lib/cookies.ts</c>) return
+    /// <c>null</c> on every real page, so <c>X-CSRF-Token</c> was never attached and every
+    /// <c>/auth/refresh</c> call failed <c>CSRF_VALIDATION_FAILED</c> — the root cause of "refresh logs
+    /// the user out". The value itself carries no secrecy (double-submit), so widening its Path to every
+    /// route costs nothing.
+    /// </summary>
+    public const string CsrfCookiePath = "/";
 
     /// <summary>
     /// Issues the refresh cookie and a matching CSRF pair.
@@ -62,7 +75,7 @@ public sealed class AuthCookieManager
             HttpOnly = false,
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
-            Path = CookiePath,
+            Path = CsrfCookiePath,
             Expires = expiresAt,
             IsEssential = true,
         });
@@ -86,7 +99,7 @@ public sealed class AuthCookieManager
             HttpOnly = false,
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
-            Path = CookiePath,
+            Path = CsrfCookiePath,
         });
     }
 

@@ -77,6 +77,9 @@ export function BranchProvider({ children }: BranchProviderProps): JSX.Element {
       availableBranches: branchesQuery.data ?? [],
       isLoadingBranches: branchesQuery.isLoading,
       branchesError: branchesQuery.error,
+      refetchBranches: () => {
+        void branchesQuery.refetch();
+      },
       fixedBranch: isOrgAdmin ? null : (user?.branch ?? null),
       setSelectedBranch,
       clearBranchContext,
@@ -88,6 +91,7 @@ export function BranchProvider({ children }: BranchProviderProps): JSX.Element {
       branchesQuery.data,
       branchesQuery.isLoading,
       branchesQuery.error,
+      branchesQuery.refetch,
       setSelectedBranch,
       clearBranchContext,
     ],

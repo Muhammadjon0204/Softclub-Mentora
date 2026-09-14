@@ -24,7 +24,6 @@ import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../feat
 import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
 import { ROLE_LABEL, STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
-import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
@@ -154,9 +153,14 @@ type ActionDialogState =
  * по филиалу — для Organization Admin, который видит всю организацию сразу.
  */
 export function UsersPage(): JSX.Element {
-  const { user: authUser } = useAuth();
-  const isOrgAdmin = authUser?.adminScope === 'Organization';
   const branchContext = useBranchContext();
+  // Единственный источник правды для «это Organization Admin?» — `BranchContext.tsx` уже вычисляет
+  // это с полной проверкой (`role === 'Admin' && adminScope === 'Organization'`), которая же решает,
+  // запускать ли `GET /branches` вообще (`enabled: isOrgAdmin` там же). Использовать здесь локально
+  // упрощённую проверку (`adminScope === 'Organization'` без `role`) означало бы, что при расхождении
+  // форма показала бы редактируемый выбор филиала, для которого сам провайдер списка так и не сделал
+  // запрос — пустой dropdown без объяснения причины.
+  const isOrgAdmin = branchContext.canOverrideBranch;
 
   const usersQuery = useUsersQuery();
   const allUsers = usersQuery.users;

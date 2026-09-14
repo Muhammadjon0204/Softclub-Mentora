@@ -23,66 +23,14 @@ export interface PreviewNotificationDetails extends PreviewNotification {
   deliveryAttempts: DeliveryAttemptEntry[];
 }
 
-const SMTP_ERRORS = [
-  'Провайдер вернул временную ошибку (4xx) — будет повторная попытка',
-  'Превышено время ожидания ответа провайдера',
-  'Получатель временно недоступен (mailbox full)',
-];
-const TELEGRAM_ERRORS = ['Bot заблокирован пользователем', 'Chat ID недействителен', 'Превышен лимит запросов Telegram API'];
-
-function stableHash(id: string): number {
-  let hash = 0;
-  for (let index = 0; index < id.length; index += 1) hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
-  return hash;
-}
-
-function contactFor(notification: PreviewNotification, hash: number): string {
-  if (notification.channel === 'Telegram') return `@user_${1000 + (hash % 8999)}`;
-  const slug = notification.recipientName
-    .toLowerCase()
-    .split(' ')
-    .map((part) => part.replace(/[^a-zа-яё]/gi, ''))
-    .join('.');
-  return `${slug}@softclub-academy.test`;
-}
-
-/** Достраивает preview-уведомление безопасными деталями доставки — raw JSON нигде не хранится. */
-export function enrichNotification(notification: PreviewNotification): PreviewNotificationDetails {
-  const hash = stableHash(notification.id);
-  const isDeadLetter = notification.status === 'DeadLetter';
-  const isSent = notification.status === 'Sent';
-  const errorPool = notification.channel === 'Telegram' ? TELEGRAM_ERRORS : SMTP_ERRORS;
-  const errorSummary = isDeadLetter ? errorPool[hash % errorPool.length] : null;
-
-  const deliveryAttempts: DeliveryAttemptEntry[] = [];
-  const attemptCount = Math.max(notification.attempts, isSent || isDeadLetter ? 1 : 0);
-  for (let attemptNumber = 1; attemptNumber <= attemptCount; attemptNumber += 1) {
-    const isLastAttempt = attemptNumber === attemptCount;
-    const outcome: DeliveryOutcome = isLastAttempt ? (isSent ? 'sent' : isDeadLetter ? 'failed' : 'pending') : 'failed';
-    deliveryAttempts.push({
-      id: `${notification.id}-attempt-${attemptNumber}`,
-      attemptNumber,
-      atLabel: notification.createdLabel,
-      outcome,
-      errorSummary: outcome === 'failed' ? errorPool[(hash + attemptNumber) % errorPool.length] : undefined,
-    });
-  }
-
-  return {
-    ...notification,
-    recipientContact: contactFor(notification, hash),
-    processedAtLabel: notification.status === 'Processing' || isSent || isDeadLetter ? notification.createdLabel : null,
-    sentAtLabel: isSent ? notification.createdLabel : null,
-    errorSummary,
-    correlationId: `corr-${notification.id}-${(hash % 90000) + 10000}`,
-    payload: [
-      { label: 'Событие', value: notification.eventLabel },
-      { label: 'Получатель', value: notification.recipientName },
-      { label: 'Канал', value: notification.channel },
-    ],
-    deliveryAttempts,
-  };
-}
+/*
+ * `enrichNotification()` used to live here — it fabricated `recipientContact` (a fake email like
+ * `имя.фамилия@softclub-academy.test`, or a fake `@user_NNNN` Telegram handle) and other delivery
+ * detail fields from a hash of the notification id, for `NotificationDetailsDrawer.tsx` and its
+ * children. That whole detail-drawer sub-feature has zero callers from any routed page (confirmed:
+ * `pages/admin/NotificationsPage.tsx` does not render it) — deleted outright rather than left as
+ * fabricated data one accidental import away from reaching a real page.
+ */
 
 export const NOTIFICATION_RETRYABLE_STATUSES: PreviewNotificationStatus[] = ['DeadLetter'];
 

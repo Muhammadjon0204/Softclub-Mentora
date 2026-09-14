@@ -86,7 +86,7 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
       <FormSection title="Контакты">
         <div className="space-y-4">
           <FormField label="Email" htmlFor="branch-create-email" error={errors.email?.message}>
-            <FormInput id="branch-create-email" type="email" placeholder="branch@softclub-academy.test" invalid={errors.email !== undefined} {...fieldA11yProps('branch-create-email', errors.email?.message)} {...register('email')} />
+            <FormInput id="branch-create-email" type="email" placeholder="branch@example.com" invalid={errors.email !== undefined} {...fieldA11yProps('branch-create-email', errors.email?.message)} {...register('email')} />
           </FormField>
           <FormField label="Телефон" htmlFor="branch-create-phone" error={errors.phone?.message}>
             <FormInput id="branch-create-phone" placeholder="+992 37 000-00-00" invalid={errors.phone !== undefined} {...fieldA11yProps('branch-create-phone', errors.phone?.message)} {...register('phone')} />

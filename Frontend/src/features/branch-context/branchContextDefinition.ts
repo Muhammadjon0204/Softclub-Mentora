@@ -12,6 +12,7 @@ export interface BranchContextValue {
   availableBranches: BranchListItemDto[];
   isLoadingBranches: boolean;
   branchesError: unknown;
+  refetchBranches: () => void;
   /** Фиксированный филиал Branch Admin / Lead / Mentor — для неизменяемого badge. */
   fixedBranch: BranchSummary | null;
   setSelectedBranch: (branchId: string | null) => void;

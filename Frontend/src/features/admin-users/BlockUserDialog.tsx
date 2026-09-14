@@ -3,7 +3,11 @@ import { useEffect, useState } from 'react';
 import { DestructiveConfirmDialog } from '../../shared/overlays';
 import { FormField, FormSelect, FormTextarea } from '../../shared/ui/FormField';
 import type { PreviewUserDetails } from './userPresentation';
-import type { BlockUserInput } from './userPreviewStore';
+
+export interface BlockUserInput {
+  reason: string;
+  comment: string | null;
+}
 
 const BLOCK_REASONS = [
   { value: 'suspicious', label: 'Подозрительная активность' },
