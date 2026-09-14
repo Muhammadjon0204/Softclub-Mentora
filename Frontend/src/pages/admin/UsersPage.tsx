@@ -24,8 +24,11 @@ import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../feat
 import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
 import { ROLE_LABEL, STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
+import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Button } from '../../shared/ui/Button';
+import { getGenericErrorMessage } from '../../api/problemDetails';
+import { useToast } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 
@@ -153,6 +156,8 @@ type ActionDialogState =
  * по филиалу — для Organization Admin, который видит всю организацию сразу.
  */
 export function UsersPage(): JSX.Element {
+  const { user: authUser } = useAuth();
+  const currentUserId = authUser?.id ?? null;
   const branchContext = useBranchContext();
   // Единственный источник правды для «это Organization Admin?» — `BranchContext.tsx` уже вычисляет
   // это с полной проверкой (`role === 'Admin' && adminScope === 'Organization'`), которая же решает,
@@ -236,6 +241,15 @@ export function UsersPage(): JSX.Element {
   );
 
   const actions = useUserActions();
+  const toast = useToast();
+
+  async function handleActivate(target: PreviewUserDetails): Promise<void> {
+    try {
+      await actions.activateUser(target.id, target.concurrencyToken ?? '');
+    } catch (error) {
+      toast.error(getGenericErrorMessage(error));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -350,8 +364,10 @@ export function UsersPage(): JSX.Element {
                     user={rowUser}
                     context="row"
                     isOrgAdmin={isOrgAdmin}
+                    isSelf={rowUser.id === currentUserId}
                     onOpenProfile={() => { openUserDetails(rowUser.id); }}
                     onEdit={() => { setFormDrawer({ mode: 'edit', userId: rowUser.id }); }}
+                    onActivate={() => { void handleActivate(rowUser); }}
                     onChangeRole={() => { setActionDialog({ type: 'changeRole', user: rowUser }); }}
                     onTransfer={() => { setActionDialog({ type: 'transfer', user: rowUser }); }}
                     onResendInvitation={() => { setActionDialog({ type: 'resendInvitation', user: rowUser }); }}
@@ -375,7 +391,9 @@ export function UsersPage(): JSX.Element {
         users={allUsers}
         onClose={closeUserDetails}
         isOrgAdmin={isOrgAdmin}
+        currentUserId={currentUserId}
         onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}
+        onActivate={(target) => { void handleActivate(target); }}
         onChangeRole={(target) => { setActionDialog({ type: 'changeRole', user: target }); }}
         onTransfer={(target) => { setActionDialog({ type: 'transfer', user: target }); }}
         onResendInvitation={(target) => { setActionDialog({ type: 'resendInvitation', user: target }); }}

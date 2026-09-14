@@ -1,4 +1,4 @@
-import { KeyRound, Lock, Mail, ShieldOff, UserX } from 'lucide-react';
+import { KeyRound, Lock, Mail, ShieldOff, UserCheck, UserX } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
@@ -17,6 +17,9 @@ function SecurityRow({ label, value }: { label: string; value: ReactNode }): JSX
 
 export interface UserSecuritySectionProps {
   user: PreviewUserDetails;
+  /** `true`, если `user` — это сам вошедший администратор. */
+  isSelf: boolean;
+  onActivate: () => void;
   onResendInvitation: () => void;
   onRequestPasswordReset: () => void;
   onBlock: () => void;
@@ -31,6 +34,8 @@ export interface UserSecuritySectionProps {
  */
 export function UserSecuritySection({
   user,
+  isSelf,
+  onActivate,
   onResendInvitation,
   onRequestPasswordReset,
   onBlock,
@@ -54,40 +59,51 @@ export function UserSecuritySection({
         {isDeactivated ? <SecurityRow label="Дата деактивации" value={emptyOrValue(user.deactivatedAtLabel)} /> : null}
       </dl>
 
-      <div>
-        <h4 className="mb-2.5 text-[12.5px] font-semibold text-ink-secondary">Действия</h4>
-        <div className="flex flex-col gap-2">
-          {!user.passwordSet && user.status === 'Invited' ? (
-            <Button variant="secondary" size="sm" leadingIcon={<Mail className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onResendInvitation}>
-              Повторно отправить приглашение
-            </Button>
-          ) : null}
-          {user.passwordSet && !isDeactivated ? (
-            <Button variant="secondary" size="sm" leadingIcon={<KeyRound className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onRequestPasswordReset}>
-              Отправить ссылку сброса пароля
-            </Button>
-          ) : null}
-          {user.status === 'Active' ? (
-            <Button variant="secondary" size="sm" leadingIcon={<Lock className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onBlock}>
-              Заблокировать
-            </Button>
-          ) : null}
-          {user.status === 'Locked' ? (
-            <Button variant="secondary" size="sm" leadingIcon={<ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onUnblock}>
-              Разблокировать
-            </Button>
-          ) : null}
-          {!isDeactivated ? (
-            <Button variant="danger" size="sm" leadingIcon={<UserX className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onDeactivate}>
-              Деактивировать
-            </Button>
-          ) : (
-            <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[12.5px] text-ink-muted">
-              Статус: {STATUS_LABEL.Deactivated} — действия недоступны.
-            </p>
-          )}
+      {isSelf ? (
+        <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[12.5px] text-ink-muted">
+          Это ваша учётная запись — блокировка, деактивация и смена роли самому себе недоступны.
+        </p>
+      ) : (
+        <div>
+          <h4 className="mb-2.5 text-[12.5px] font-semibold text-ink-secondary">Действия</h4>
+          <div className="flex flex-col gap-2">
+            {isDeactivated ? (
+              <Button variant="secondary" size="sm" leadingIcon={<UserCheck className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onActivate}>
+                Активировать
+              </Button>
+            ) : null}
+            {!user.passwordSet && user.status === 'Invited' ? (
+              <Button variant="secondary" size="sm" leadingIcon={<Mail className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onResendInvitation}>
+                Повторно отправить приглашение
+              </Button>
+            ) : null}
+            {user.passwordSet && !isDeactivated ? (
+              <Button variant="secondary" size="sm" leadingIcon={<KeyRound className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onRequestPasswordReset}>
+                Отправить ссылку сброса пароля
+              </Button>
+            ) : null}
+            {user.status === 'Active' ? (
+              <Button variant="secondary" size="sm" leadingIcon={<Lock className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onBlock}>
+                Заблокировать
+              </Button>
+            ) : null}
+            {user.status === 'Locked' ? (
+              <Button variant="secondary" size="sm" leadingIcon={<ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onUnblock}>
+                Разблокировать
+              </Button>
+            ) : null}
+            {!isDeactivated ? (
+              <Button variant="danger" size="sm" leadingIcon={<UserX className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onDeactivate}>
+                Деактивировать
+              </Button>
+            ) : (
+              <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[12.5px] text-ink-muted">
+                Статус: {STATUS_LABEL.Deactivated} — остальные действия недоступны.
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
