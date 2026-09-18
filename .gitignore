@@ -547,3 +547,7 @@ docs/**/*.backup.json
 
 # MSW development worker must remain in Git
 !Frontend/public/mockServiceWorker.js
+# Конфиги проекта отслеживаются: они хранятся в репозитории, а не создаются
+# копированием из шаблона (см. DEPLOY.md).
+!.env.api
+!.env.web

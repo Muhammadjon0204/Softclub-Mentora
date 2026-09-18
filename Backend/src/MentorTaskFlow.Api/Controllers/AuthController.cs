@@ -3,9 +3,11 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Tenancy;
 using MentorTaskFlow.Contracts.Auth;
+using MentorTaskFlow.Infrastructure.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace MentorTaskFlow.Api.Controllers;
 
@@ -23,6 +25,7 @@ public sealed class AuthController(
     IAuthService authService,
     AuthCookieManager cookieManager,
     ICurrentUserAccessor currentUser,
+    IOptions<AuthOptions> authOptions,
     IWebHostEnvironment environment) : ControllerBase
 {
     /// <summary>
@@ -168,8 +171,16 @@ public sealed class AuthController(
         return Ok(result.Response);
     }
 
-    /// <summary>Secure cookies everywhere but Development, where the API is served over plain HTTP.</summary>
-    private bool RequireSecureCookies => !environment.IsDevelopment();
+    /// <summary>
+    /// Secure cookies everywhere but Development, where the API is served over plain HTTP, and
+    /// wherever <see cref="AuthOptions.RequireSecureCookies"/> says the deployment is too.
+    /// </summary>
+    /// <remarks>
+    /// The setting can only relax this, never tighten it: Development is served over HTTP by
+    /// definition, and a Secure cookie there is silently dropped by the browser.
+    /// </remarks>
+    private bool RequireSecureCookies =>
+        !environment.IsDevelopment() && authOptions.Value.RequireSecureCookies;
 
     private string? RemoteIp => HttpContext.Connection.RemoteIpAddress?.ToString();
 

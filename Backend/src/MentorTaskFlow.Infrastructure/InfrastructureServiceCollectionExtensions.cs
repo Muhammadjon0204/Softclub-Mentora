@@ -329,7 +329,12 @@ public static class InfrastructureServiceCollectionExtensions
             return new MinioClient()
                 .WithEndpoint(endpoint.Host, endpoint.Port)
                 .WithCredentials(options.AccessKey, options.SecretKey)
-                .WithSSL(options.UseSsl)
+
+                // The public scheme is its own setting, defaulting to the internal one. Behind a
+                // TLS-terminating proxy the two genuinely differ, and the scheme is signed into the
+                // URL — getting it from UseSsl would emit an http:// link that an https:// page is
+                // not allowed to follow.
+                .WithSSL(options.PublicUseSsl ?? options.UseSsl)
                 .Build();
         });
 

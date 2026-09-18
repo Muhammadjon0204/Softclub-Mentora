@@ -57,6 +57,18 @@ public sealed class StorageOptions
     /// </remarks>
     public bool UseSsl { get; init; }
 
+    /// <summary>
+    /// Scheme of the presigned URL, when it differs from <see cref="UseSsl"/>. Falls back to it.
+    /// </summary>
+    /// <remarks>
+    /// Needed wherever <see cref="PublicEndpoint"/> is: the two addresses can differ in scheme as
+    /// easily as in host. A deployment that terminates TLS at a reverse proxy reaches MinIO over
+    /// plain HTTP on the container network while the browser must be sent an <c>https</c> link —
+    /// one flag for both would either break the internal connection or emit a link the page cannot
+    /// follow, since a page served over HTTPS may not load an HTTP resource.
+    /// </remarks>
+    public bool? PublicUseSsl { get; init; }
+
     /// <summary>Creates the bucket at startup when missing. Development and Test only.</summary>
     public bool EnsureBucketOnStartup { get; init; }
 

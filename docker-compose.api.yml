@@ -1,0 +1,170 @@
+# =============================================================================
+# MentorTaskFlow — бэкенд (production).
+#
+#   nano .env.api      # заполнить пароли и домен
+#   docker compose --env-file .env.api -f docker-compose.api.yml up -d
+#
+# Фронт живёт отдельно: docker-compose.web.yml. Общей сети им не нужно —
+# маршрутизацию между api.<домен> и <домен> делает хостовый nginx, поэтому
+# контейнеры друг о друге не знают и деплоятся независимо.
+#
+# Схема:
+#
+#   хостовый nginx ──▶ 127.0.0.1:8093 ─▶ mentora-api      api.<домен>
+#   браузер ───────────▶ :9092 ───────▶ mentora-minio     presigned-ссылки
+#
+#   mentora-worker    — Hangfire, почта, Telegram. HTTP не обслуживает.
+#   mentora-migrator  — миграции и bootstrap, отрабатывает один раз и выходит.
+#   mentora-db        — наружу не публикуется вообще.
+#
+# Обновление по одному сервису (остальные не перезапускаются):
+#   docker compose --env-file .env.api -f docker-compose.api.yml up -d --no-deps mentora-api
+# =============================================================================
+
+name: mentora
+
+x-api-image: &api-image ${DOCKERHUB_USERNAME}/${API_IMAGE_NAME}:${IMAGE_TAG:-latest}
+
+x-api-build: &api-build
+  context: ./Backend
+  dockerfile: Dockerfile
+
+# Собирается из паролей .env.api, чтобы каждый из них был записан ровно в одном месте:
+# строка подключения и ключи доступа к хранилищу — производные, а не отдельные
+# настройки, которые надо держать в синхроне руками.
+x-app-env: &app-env
+  ConnectionStrings__DefaultConnection: "Host=mentora-db;Port=5432;Database=${POSTGRES_DB};Username=mentortaskflow_app;Password=${APP_DB_PASSWORD}"
+  # Адрес, по которому в MinIO ходит сам процесс, — внутренний. Тот, что попадает
+  # в presigned-ссылку, задаётся отдельно в .env.api: его открывает браузер,
+  # которому имя compose-сервиса не разрешить.
+  Storage__Endpoint: http://mentora-minio:9000
+  Storage__AccessKey: ${MINIO_ROOT_USER}
+  Storage__SecretKey: ${MINIO_ROOT_PASSWORD}
+
+services:
+
+  # ── База данных ────────────────────────────────────────────────────────────
+  mentora-db:
+    image: postgres:16-alpine
+    container_name: ${DB_CONTAINER_NAME}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      # Читает 01-roles.sh при инициализации пустого тома.
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      MIGRATOR_DB_PASSWORD: ${MIGRATOR_DB_PASSWORD}
+      RETENTION_DB_PASSWORD: ${RETENTION_DB_PASSWORD}
+    volumes:
+      - mentora_db_data:/var/lib/postgresql/data
+      - ./Backend/scripts/db/01-roles.sh:/docker-entrypoint-initdb.d/01-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [mentora-network]
+
+  # ── Объектное хранилище ────────────────────────────────────────────────────
+  mentora-minio:
+    image: minio/minio:latest
+    container_name: ${MINIO_CONTAINER_NAME}
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      # Только S3 API (9000). Консоль (9001) наружу не выставлена намеренно.
+      - "${MINIO_EXTERNAL_PORT}:9000"
+    volumes:
+      - mentora_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [mentora-network]
+
+  # ── Миграции и bootstrap (отрабатывает один раз) ───────────────────────────
+  mentora-migrator:
+    image: *api-image
+    container_name: ${MIGRATOR_CONTAINER_NAME}
+    build: *api-build
+    command: ["--migrate"]
+    restart: "no"
+    env_file: [.env.api]
+    environment:
+      <<: *app-env
+      # Единственный контейнер, который подключается ролью с правами DDL.
+      ConnectionStrings__DefaultConnection: "Host=mentora-db;Port=5432;Database=${POSTGRES_DB};Username=mentortaskflow_migrator;Password=${MIGRATOR_DB_PASSWORD}"
+    depends_on:
+      mentora-db:
+        condition: service_healthy
+    networks: [mentora-network]
+
+  # ── API ────────────────────────────────────────────────────────────────────
+  mentora-api:
+    image: *api-image
+    container_name: ${API_CONTAINER_NAME}
+    build: *api-build
+    restart: unless-stopped
+    env_file: [.env.api]
+    environment:
+      <<: *app-env
+      # Роль процесса: обслуживает HTTP и не выполняет фоновых задач, поэтому
+      # масштабирование API никогда не задваивает запуск джобы (DEPLOY-013).
+      Scheduler__Enabled: "false"
+      Scheduler__EnableServer: "false"
+      Notifications__EnableWorker: "false"
+    ports:
+      - "${API_EXTERNAL_PORT}:8080"
+    depends_on:
+      mentora-db:
+        condition: service_healthy
+      mentora-minio:
+        condition: service_healthy
+      mentora-migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health/live || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [mentora-network]
+
+  # ── Фоновый обработчик ─────────────────────────────────────────────────────
+  mentora-worker:
+    image: *api-image
+    container_name: ${WORKER_CONTAINER_NAME}
+    build: *api-build
+    restart: unless-stopped
+    env_file: [.env.api]
+    environment:
+      <<: *app-env
+      # Очередь разбирается здесь и больше нигде. Несколько реплик ничего бы не
+      # испортили — за этим следит SKIP LOCKED, — но задублировали бы нагрузку
+      # на почтового провайдера без всякой пользы (DEPLOY-013).
+      Scheduler__Enabled: "true"
+      Scheduler__EnableServer: "true"
+      Notifications__EnableWorker: "true"
+      # Процесс не обслуживает HTTP, собирать с него /metrics нечего.
+      Metrics__Enabled: "false"
+    depends_on:
+      mentora-db:
+        condition: service_healthy
+      mentora-minio:
+        condition: service_healthy
+      mentora-migrator:
+        condition: service_completed_successfully
+    networks: [mentora-network]
+
+networks:
+  mentora-network:
+    driver: bridge
+
+volumes:
+  mentora_db_data:
+  mentora_minio_data:

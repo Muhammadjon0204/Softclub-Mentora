@@ -36,15 +36,20 @@ public sealed class AuthCookieManager
     public const string CookiePath = "/api/v1/auth";
 
     /// <summary>
-    /// The CSRF cookie must be readable by <c>document.cookie</c> from every SPA route (<c>/dashboard</c>,
-    /// <c>/login</c>, ...), not just <c>/api/v1/auth/*</c>: a cookie's <c>Path</c> scopes both when the
-    /// browser sends it AND which documents may read it via script, using the same prefix match. Scoping
-    /// this cookie to <see cref="CookiePath"/> made <c>readCsrfToken()</c> (<c>lib/cookies.ts</c>) return
-    /// <c>null</c> on every real page, so <c>X-CSRF-Token</c> was never attached and every
-    /// <c>/auth/refresh</c> call failed <c>CSRF_VALIDATION_FAILED</c> — the root cause of "refresh logs
-    /// the user out". The value itself carries no secrecy (double-submit), so widening its Path to every
-    /// route costs nothing.
+    /// Scope of the CSRF cookie: the whole origin, deliberately wider than <see cref="CookiePath"/>.
     /// </summary>
+    /// <remarks>
+    /// A cookie's <c>Path</c> scopes both when the browser sends it AND which documents may read it
+    /// via script, using the same prefix match. Scoping this cookie to <see cref="CookiePath"/> made
+    /// <c>readCsrfToken()</c> (<c>lib/cookies.ts</c>) return <c>null</c> on every real page the SPA
+    /// renders — <c>/login</c>, <c>/dashboard</c> and the rest — so <c>X-CSRF-Token</c> was never
+    /// attached and every <c>/auth/refresh</c> call failed <c>CSRF_VALIDATION_FAILED</c>, the root
+    /// cause of "refresh logs the user out". Приложение D.1 specifies the two paths separately for
+    /// this reason.
+    ///
+    /// Widening it costs nothing: the value is an opaque random token that only ever proves the
+    /// caller could read a cookie from this origin.
+    /// </remarks>
     public const string CsrfCookiePath = "/";
 
     /// <summary>

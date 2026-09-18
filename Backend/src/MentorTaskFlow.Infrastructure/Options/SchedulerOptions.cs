@@ -28,7 +28,12 @@ public sealed class SchedulerOptions
     /// ADR-002: the scheduler's schema is not part of the domain model and must not appear in EF
     /// migrations, where it would be diffed and eventually dropped by a scaffolded migration.
     /// </remarks>
+    /// <remarks>
+    /// The pattern is what makes the name safe to interpolate into the <c>CREATE SCHEMA</c> the
+    /// migrator issues: a schema name cannot be a query parameter.
+    /// </remarks>
     [Required]
+    [RegularExpression("^[A-Za-z_][A-Za-z0-9_]*$")]
     public string Schema { get; init; } = "hangfire";
 
     /// <summary>Overdue and reminder passes, in minutes (20.1).</summary>

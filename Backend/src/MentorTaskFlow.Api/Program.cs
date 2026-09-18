@@ -20,6 +20,7 @@ using MentorTaskFlow.Infrastructure.Identity;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -146,6 +147,41 @@ builder.Services.AddSingleton<AuthCookieManager>();
 builder.Services.AddMentorTaskFlowRateLimiting();
 
 // ---------------------------------------------------------------------------
+// Reverse proxy (SEC-007, AUD). Without this the caller's address is the proxy's
+// and the scheme is always http — see ProxyOptions for what that breaks.
+// ---------------------------------------------------------------------------
+builder.Services.AddOptions<ProxyOptions>()
+    .Bind(builder.Configuration.GetSection(ProxyOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    var proxy = builder.Configuration.GetSection(ProxyOptions.SectionName).Get<ProxyOptions>()
+        ?? new ProxyOptions();
+
+    options.ForwardedHeaders = proxy.Enabled
+        ? ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+        : ForwardedHeaders.None;
+
+    options.ForwardLimit = proxy.ForwardLimit;
+
+    // The defaults trust only the loopback, which a container network is not. Cleared and rebuilt
+    // from configuration so the trusted set is stated in one place rather than being half framework
+    // default and half addition.
+    //
+    // KnownIPNetworks, not the obsolete KnownNetworks: the latter takes the deprecated
+    // Microsoft.AspNetCore.HttpOverrides.IPNetwork rather than System.Net.IPNetwork (ASPDEPR005).
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+
+    foreach (var network in TrustedProxyNetworks.Parse(proxy.TrustedNetworks))
+    {
+        options.KnownIPNetworks.Add(network);
+    }
+});
+
+// ---------------------------------------------------------------------------
 // HSTS (SEC-008) — max-age 31536000, includeSubDomains.
 // ---------------------------------------------------------------------------
 builder.Services.AddHsts(options =>
@@ -195,8 +231,38 @@ if (args.Contains("--migrate"))
     var services = migrationScope.ServiceProvider;
     var migratorLogger = services.GetRequiredService<ILogger<Program>>();
 
-    await services.GetRequiredService<MentorTaskFlowDbContext>().Database.MigrateAsync();
+    var migrationDb = services.GetRequiredService<MentorTaskFlowDbContext>();
+
+    await migrationDb.Database.MigrateAsync();
     migratorLogger.LogInformation("Migrations applied.");
+
+    // Hangfire keeps its tables in a schema of its own (ADR-002) and installs them on first start,
+    // from mtf-worker. The worker connects as the application role, which has no DDL rights on the
+    // database at all (DEPLOY-017), so that install failed with "permission denied for database" in
+    // a retry loop that never let the process come up. The container that does hold those rights
+    // creates the schema here instead, and grants the worker exactly what it needs to fill it —
+    // CREATE inside one schema, not DDL on the database. Runs on every deploy and is idempotent, so
+    // it also repairs an installation whose database predates this step.
+    var schedulerSchema = services.GetRequiredService<IOptions<SchedulerOptions>>().Value.Schema;
+    var applicationRole = services.GetRequiredService<IOptions<DatabaseOptions>>().Value.ApplicationRole;
+
+    // EF1002 is suppressed rather than avoided: a schema name and a role name are identifiers, and
+    // PostgreSQL takes no parameter in their place — ExecuteSqlAsync would send them as literals and
+    // the DDL would not parse. What makes the interpolation safe is upstream: both options carry
+    // [RegularExpression("^[A-Za-z_][A-Za-z0-9_]*$")] and are validated at startup, so neither can
+    // hold a quote, a semicolon or whitespace by the time it reaches here.
+#pragma warning disable EF1002
+    await migrationDb.Database.ExecuteSqlRawAsync(
+        $"""
+         CREATE SCHEMA IF NOT EXISTS "{schedulerSchema}";
+         GRANT USAGE, CREATE ON SCHEMA "{schedulerSchema}" TO "{applicationRole}";
+         """);
+#pragma warning restore EF1002
+
+    migratorLogger.LogInformation(
+        "Scheduler schema {Schema} ready, granted to {Role}.",
+        schedulerSchema,
+        applicationRole);
 
     var bootstrap = await services.GetRequiredService<BootstrapProvisioner>().ProvisionAsync(CancellationToken.None);
 
@@ -239,9 +305,15 @@ if (app.Services.GetRequiredService<IOptions<StorageOptions>>().Value is { Ensur
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline. Order matters: correlation first, so every later log line and every
-// ProblemDetails traceId carries the same identifier.
+// Pipeline. Forwarded headers first of all: everything below reads the caller's
+// address or the scheme, and both are the proxy's until this has run — the rate
+// limits would partition every visitor into one bucket, the audit trail would
+// record the proxy, and HSTS would never be emitted (see ProxyOptions).
+//
+// Correlation comes next, so every later log line and every ProblemDetails
+// traceId carries the same identifier.
 // ---------------------------------------------------------------------------
+app.UseForwardedHeaders();
 app.UseCorrelationId();
 app.UseSerilogRequestLogging(options =>
 {
@@ -275,6 +347,16 @@ app.UseCors(CorsOptions.PolicyName);
 // tenant filter fail-closed, which is the correct behaviour for an API with no data endpoints yet.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// SEC-007. AddMentorTaskFlowRateLimiting registers the policies, but an [EnableRateLimiting]
+// attribute does nothing until this middleware runs — without it every limit of Приложение L.2 was
+// configured and inert, and /auth/login accepted unlimited attempts.
+//
+// After authentication, because the authenticated policy partitions by user id and would otherwise
+// see no principal; after routing, because the policy is chosen from endpoint metadata. Rejections
+// throw TooManyRequestsException, which the exception middleware above turns into the same
+// ProblemDetails shape as every other failure.
+app.UseRateLimiter();
 
 // After authentication: the effective scope is derived from validated claims, never from the raw
 // request (TEN-030a).

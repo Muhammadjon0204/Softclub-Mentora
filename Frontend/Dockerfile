@@ -14,7 +14,7 @@ COPY . .
 
 # VITE_API_BASE_URL is baked into the bundle at build time.
 # In production the SPA and the API live behind the same nginx, so /api/v1 is correct.
-ARG VITE_API_BASE_URL=/api/v1
+ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ARG VITE_USE_MOCKS=false
 ENV VITE_USE_MOCKS=${VITE_USE_MOCKS}
