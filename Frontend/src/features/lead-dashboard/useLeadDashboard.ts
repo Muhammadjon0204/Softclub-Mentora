@@ -2,9 +2,8 @@ import { useMemo } from 'react';
 
 import { DAY_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord, LeadAssignmentStatus } from '../../mocks/ui-preview/leadAssignments.preview';
-import { formatOffsetHoursAgo, formatRelative, leadNow } from '../lead/scope/leadDateFormat';
-import { scopedActiveMentors } from '../lead/scope/leadScopedData';
-import { useLeadScope } from '../lead/scope/useLeadScope';
+import { formatRelative, leadNow } from '../lead/scope/leadDateFormat';
+import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useScopedLeadAssignments } from '../lead/scope/useScopedLeadAssignments';
 
 export interface LeadDashboardKpis {
@@ -46,7 +45,7 @@ export interface ActivityPoint {
 
 const PERIOD_DAYS = 30;
 
-function mentorNameFallback(mentorId: string, mentors: ReturnType<typeof scopedActiveMentors>): string {
+function mentorNameFallback(mentorId: string, mentors: ReturnType<typeof useActiveLeadMentors>): string {
   return mentors.find((m) => m.id === mentorId)?.fullName ?? 'Ментор';
 }
 
@@ -90,9 +89,8 @@ export function useLeadDashboard(): {
   activity: ActivityPoint[];
   team: TeamSummaryRow[];
 } {
-  const scope = useLeadScope();
   const assignments = useScopedLeadAssignments();
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
 
   return useMemo(() => {
     const now = leadNow();
@@ -182,7 +180,7 @@ export function useLeadDashboard(): {
         status: mentor.status,
         activeCount: ownAssignments.filter((a) => ['Assigned', 'Submitted', 'InReview', 'NeedsRework', 'Overdue'].includes(a.status)).length,
         reworkCount: ownAssignments.filter((a) => a.status === 'NeedsRework').length,
-        lastActiveLabel: formatOffsetHoursAgo(mentor.lastActiveOffsetHours),
+        lastActiveLabel: mentor.lastLoginLabel,
       };
     });
 

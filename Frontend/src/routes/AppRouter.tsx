@@ -77,10 +77,11 @@ export function AppRouter(): JSX.Element {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/set-password" element={<SetPasswordPage />} />
 
-      {/* Admin-панель: layout + branch context общие для всех разделов. Разделы ниже —
-          визуальные UI-прототипы (сессия быстрых превью): без реального backend,
-          CRUD и валидации — см. src/mocks/ui-preview. Detail-роуты (/admin/users/:id
-          и т.п.) сознательно не создаются на этом этапе. */}
+      {/* Admin-панель: layout + branch context общие для всех разделов. Все разделы ниже
+          подключены к реальному backend (GET/POST через api/admin/*, useUsersQuery и т.д.) —
+          src/mocks/ui-preview держит только общие shape-типы и label-словари, не данные.
+          Detail-роуты (/admin/users/:id и т.п.) сознательно не создаются: детали открываются
+          через ?entityId= + Drawer. */}
       <Route
         path="/admin"
         element={

@@ -442,7 +442,6 @@ Backend/wwwroot/generated/
 
 uploads/
 storage/
-!Backend/src/MentorTaskFlow.Infrastructure/Storage/
 local-storage/
 object-storage/
 generated-files/

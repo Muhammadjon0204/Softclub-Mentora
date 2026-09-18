@@ -30,7 +30,10 @@ export interface UserDetailsDrawerProps {
   users: PreviewUserDetails[];
   onClose: () => void;
   isOrgAdmin: boolean;
+  /** id вошедшего администратора — сравнивается с `user.id`, чтобы скрыть опасные действия на себе. */
+  currentUserId: string | null;
   onEdit: (user: PreviewUserDetails) => void;
+  onActivate: (user: PreviewUserDetails) => void;
   onChangeRole: (user: PreviewUserDetails) => void;
   onTransfer: (user: PreviewUserDetails) => void;
   onResendInvitation: (user: PreviewUserDetails) => void;
@@ -51,7 +54,9 @@ export function UserDetailsDrawer({
   users,
   onClose,
   isOrgAdmin,
+  currentUserId,
   onEdit,
+  onActivate,
   onChangeRole,
   onTransfer,
   onResendInvitation,
@@ -61,6 +66,7 @@ export function UserDetailsDrawer({
   onDeactivate,
 }: UserDetailsDrawerProps): JSX.Element {
   const user = userId !== null ? users.find((candidate) => candidate.id === userId) : undefined;
+  const isSelf = user !== undefined && user.id === currentUserId;
   const [tab, setTab] = useState<UserDetailsTab>('overview');
 
   useEffect(() => {
@@ -90,7 +96,9 @@ export function UserDetailsDrawer({
               user={user}
               context="drawer"
               isOrgAdmin={isOrgAdmin}
+              isSelf={isSelf}
               onEdit={() => onEdit(user)}
+              onActivate={() => onActivate(user)}
               onChangeRole={() => onChangeRole(user)}
               onTransfer={() => onTransfer(user)}
               onResendInvitation={() => onResendInvitation(user)}
@@ -132,6 +140,8 @@ export function UserDetailsDrawer({
             {tab === 'security' ? (
               <UserSecuritySection
                 user={user}
+                isSelf={isSelf}
+                onActivate={() => onActivate(user)}
                 onResendInvitation={() => onResendInvitation(user)}
                 onRequestPasswordReset={() => onRequestPasswordReset(user)}
                 onBlock={() => onBlock(user)}

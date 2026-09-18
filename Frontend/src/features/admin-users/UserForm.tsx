@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
 import { ROLE_LABEL } from '../../mocks/ui-preview/users.preview';
+import { getGenericErrorMessage } from '../../api/problemDetails';
+import { Button } from '../../shared/ui/Button';
 import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormSelect, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
 import { useBranchContext } from '../branch-context/useBranchContext';
@@ -89,7 +91,7 @@ export function UserCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange,
             <FormInput
               id="user-create-email"
               type="email"
-              placeholder="name@softclub-academy.test"
+              placeholder="name@example.com"
               invalid={errors.email !== undefined}
               {...fieldA11yProps('user-create-email', errors.email?.message)}
               {...register('email')}
@@ -119,30 +121,49 @@ export function UserCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange,
           </FormField>
 
           {isOrgAdmin ? (
-            <FormField label="Филиал" htmlFor="user-create-branch" required error={errors.branchId?.message}>
+            <FormField
+              label="Филиал"
+              htmlFor="user-create-branch"
+              required
+              error={errors.branchId?.message ?? (branchContext.branchesError !== null ? `Не удалось загрузить филиалы: ${getGenericErrorMessage(branchContext.branchesError)}` : undefined)}
+            >
               <Controller
                 control={control}
                 name="branchId"
                 render={({ field }) => (
                   <FormSelect
                     id="user-create-branch"
-                    invalid={errors.branchId !== undefined}
+                    invalid={errors.branchId !== undefined || branchContext.branchesError !== null}
                     value={field.value}
                     onValueChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
-                    placeholder="Выберите филиал"
+                    placeholder={branchContext.isLoadingBranches ? 'Загрузка…' : 'Выберите филиал'}
                     options={branchContext.availableBranches.map((option) => ({ value: option.id, label: option.name }))}
                   />
                 )}
               />
+              {branchContext.branchesError !== null ? (
+                <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={branchContext.refetchBranches}>
+                  Повторить загрузку
+                </Button>
+              ) : null}
             </FormField>
           ) : (
             <ReadOnlyField label="Филиал" value={branchContext.fixedBranch?.name ?? '—'} hint="Ваш филиал — изменить нельзя" />
           )}
 
           {needsCategory ? (
-            <FormField label="Направление" htmlFor="user-create-category" required error={errors.categoryId?.message} hint={branchId.length === 0 ? 'Сначала выберите филиал' : undefined}>
+            <FormField
+              label="Направление"
+              htmlFor="user-create-category"
+              required
+              error={
+                errors.categoryId?.message ??
+                (categoriesForBranch.error !== null ? `Не удалось загрузить направления: ${getGenericErrorMessage(categoriesForBranch.error)}` : undefined)
+              }
+              hint={branchId.length === 0 ? 'Сначала выберите филиал' : undefined}
+            >
               <Controller
                 control={control}
                 name="categoryId"
@@ -150,16 +171,29 @@ export function UserCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange,
                   <FormSelect
                     id="user-create-category"
                     disabled={branchId.length === 0}
-                    invalid={errors.categoryId !== undefined}
+                    invalid={errors.categoryId !== undefined || categoriesForBranch.error !== null}
                     value={field.value ?? ''}
                     onValueChange={field.onChange}
                     onBlur={field.onBlur}
                     ref={field.ref}
-                    placeholder={categoriesForBranch.isPending ? 'Загрузка…' : 'Выберите направление'}
+                    placeholder={
+                      branchId.length === 0
+                        ? 'Сначала выберите филиал'
+                        : categoriesForBranch.isPending
+                          ? 'Загрузка…'
+                          : categoriesForBranch.categories.length === 0 && categoriesForBranch.error === null
+                            ? 'В этом филиале нет направлений'
+                            : 'Выберите направление'
+                    }
                     options={categoriesForBranch.categories.map((category) => ({ value: category.id, label: category.name }))}
                   />
                 )}
               />
+              {categoriesForBranch.error !== null ? (
+                <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={categoriesForBranch.refetch}>
+                  Повторить загрузку
+                </Button>
+              ) : null}
             </FormField>
           ) : null}
         </div>

@@ -3,8 +3,7 @@ import { useMemo } from 'react';
 import { DAY_MS, HOUR_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { leadNow } from '../lead/scope/leadDateFormat';
-import { scopedActiveMentors } from '../lead/scope/leadScopedData';
-import { useLeadScope } from '../lead/scope/useLeadScope';
+import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useScopedLeadAssignments } from '../lead/scope/useScopedLeadAssignments';
 
 /**
@@ -56,9 +55,8 @@ export interface LeadReportsResult {
 }
 
 export function useLeadReports(filters: ReportsFilters): LeadReportsResult {
-  const scope = useLeadScope();
   const all = useScopedLeadAssignments();
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
 
   return useMemo(() => {
     const now = leadNow();

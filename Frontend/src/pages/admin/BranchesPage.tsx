@@ -6,7 +6,6 @@ import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCar
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewActionCell, PreviewActionTh, PreviewCellStack, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
 import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
-import { PREVIEW_BRANCH_USER_DISTRIBUTION } from '../../mocks/ui-preview/branches.preview';
 import { ActivateBranchDialog } from '../../features/admin-branches/ActivateBranchDialog';
 import { AssignBranchAdminDialog } from '../../features/admin-branches/AssignBranchAdminDialog';
 import { BranchActionMenu } from '../../features/admin-branches/BranchActionMenu';
@@ -16,6 +15,7 @@ import type { BranchFormDrawerState } from '../../features/admin-branches/Branch
 import { ChangeBranchAdminDialog } from '../../features/admin-branches/ChangeBranchAdminDialog';
 import { DeactivateBranchDialog } from '../../features/admin-branches/DeactivateBranchDialog';
 import { useBranchActions } from '../../features/admin-branches/useBranchActions';
+import { useUsersQuery } from '../../features/admin-users/useUsersQuery';
 import type { PreviewBranchDetails } from '../../features/admin-branches/branchPresentation';
 import { useBranchesQuery } from '../../features/admin-branches/useBranchesQuery';
 import { useAuth } from '../../auth/useAuth';
@@ -71,7 +71,31 @@ export function BranchesPage(): JSX.Element {
   const realBranchContext = useBranchContext();
 
   const branchesQuery = useBranchesQuery();
-  const allBranches = branchesQuery.branches;
+  const usersQuery = useUsersQuery();
+  // Backend `BranchDto`/`BranchSummaryDto` не отдают администратора филиала напрямую
+  // (см. комментарий в `toBranchDetails`) — `adminUserId`/`adminName` там всегда `null`.
+  // Реальный источник — список пользователей: администратор филиала это пользователь с
+  // ролью `BranchAdmin`, чей `branchId` совпадает с этим филиалом. Без этого сопоставления
+  // таблица/карточка "Администратор" всегда показывали "Не назначен", даже если
+  // пользователь с ролью "Администратор филиала" уже назначен и виден на /admin/users.
+  const branchAdminByBranchId = useMemo(() => {
+    const map = new Map<string, { id: string; fullName: string }>();
+    usersQuery.users.forEach((user) => {
+      if (user.role === 'BranchAdmin' && user.branchId !== null) {
+        map.set(user.branchId, { id: user.id, fullName: user.fullName });
+      }
+    });
+    return map;
+  }, [usersQuery.users]);
+
+  const allBranches = useMemo(
+    () =>
+      branchesQuery.branches.map((branch) => {
+        const admin = branchAdminByBranchId.get(branch.id);
+        return admin === undefined ? branch : { ...branch, adminUserId: admin.id, adminName: admin.fullName };
+      }),
+    [branchesQuery.branches, branchAdminByBranchId],
+  );
   // `PreviewBranch.name` — городское display-имя ("Худжанд"), а `authUser.branch.name` —
   // институциональное («Филиал Худжанд», см. branchDirectory.ts) — сравнивать нужно по `id`.
   const scopedBranches = useMemo(
@@ -80,7 +104,7 @@ export function BranchesPage(): JSX.Element {
   );
 
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState('active');
   const [formDrawer, setFormDrawer] = useState<BranchFormDrawerState | null>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
 
@@ -121,11 +145,18 @@ export function BranchesPage(): JSX.Element {
   const activeCount = scopedBranches.filter((b) => b.isActive).length;
   const withoutAdmin = scopedBranches.filter((b) => b.adminUserId === null).length;
 
-  const distributionTotal = PREVIEW_BRANCH_USER_DISTRIBUTION.reduce((sum, entry) => sum + entry.count, 0);
-  const userDistribution = PREVIEW_BRANCH_USER_DISTRIBUTION.map((entry) => ({
-    ...entry,
-    pct: distributionTotal === 0 ? 0 : Math.round((entry.count / distributionTotal) * 100),
-  }));
+  const userDistribution = useMemo(() => {
+    const counts = new Map<string, number>();
+    usersQuery.users.forEach((user) => {
+      if (user.status === 'Deactivated' || user.branchName.length === 0) return;
+      counts.set(user.branchName, (counts.get(user.branchName) ?? 0) + 1);
+    });
+    const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+    return [...counts.entries()]
+      .sort(([, left], [, right]) => right - left)
+      .map(([label, count]) => ({ label, count, pct: total === 0 ? 0 : Math.round((count / total) * 100) }));
+  }, [usersQuery.users]);
+  const distributionTotal = userDistribution.reduce((sum, entry) => sum + entry.count, 0);
 
   const actions = useBranchActions();
 
@@ -164,7 +195,7 @@ export function BranchesPage(): JSX.Element {
           <PreviewToolbar>
             <PreviewSearchInput placeholder="Поиск по названию или коду…" value={search} onChange={setSearch} />
             <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
-            <PreviewResetButton disabled={!filtersActive} onClick={() => { setSearch(''); setStatus('all'); }} />
+            <PreviewResetButton disabled={!filtersActive} onClick={() => { setSearch(''); setStatus('active'); }} />
           </PreviewToolbar>
 
           <PreviewTable>
@@ -313,10 +344,8 @@ export function BranchesPage(): JSX.Element {
         open={actionDialog?.type === 'assignAdmin'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (_adminUserId) => {
-          // TODO(users-domain): назначение администратора филиала — POST /users/{id}/change-role,
-          // вне скоупа этой интеграции. `useBranchActions.assignAdmin` — информационный no-op.
-          if (actionDialog?.type === 'assignAdmin') await actions.assignAdmin(actionDialog.branch.id);
+        onConfirm={async (admin) => {
+          if (actionDialog?.type === 'assignAdmin') await actions.assignAdmin(actionDialog.branch, admin);
         }}
       />
 
@@ -325,10 +354,8 @@ export function BranchesPage(): JSX.Element {
         open={actionDialog?.type === 'changeAdmin'}
         onOpenChange={(next) => { if (!next) setActionDialog(null); }}
         isSubmitting={actions.isSubmitting}
-        onConfirm={async (_input) => {
-          // TODO(users-domain): смена администратора филиала — POST /users/{id}/change-role,
-          // вне скоупа этой интеграции. `useBranchActions.changeAdmin` — информационный no-op.
-          if (actionDialog?.type === 'changeAdmin') await actions.changeAdmin(actionDialog.branch.id);
+        onConfirm={async (input) => {
+          if (actionDialog?.type === 'changeAdmin') await actions.changeAdmin(actionDialog.branch, input);
         }}
       />
 

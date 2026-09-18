@@ -2,7 +2,7 @@ import { ExternalLink, UserCog, UserPlus } from 'lucide-react';
 
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import { STATUS_META } from '../../features/admin-users/userPresentation';
-import { getUserPreview } from '../admin-users/userPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PreviewBranchDetails } from './branchPresentation';
@@ -21,7 +21,8 @@ export interface BranchAdminSectionProps {
 
 /** Компактный EmptyState вместо огромной warning-карточки при отсутствии администратора (раздел 25 промпта). */
 export function BranchAdminSection({ branch, isOrgAdmin, onOpenUser, onAssignAdmin, onChangeAdmin }: BranchAdminSectionProps): JSX.Element {
-  const admin = branch.adminUserId !== null ? getUserPreview(branch.adminUserId) : undefined;
+  const { users } = useUsersQuery();
+  const admin = branch.adminUserId !== null ? users.find((user) => user.id === branch.adminUserId) : undefined;
 
   if (admin === undefined) {
     return (

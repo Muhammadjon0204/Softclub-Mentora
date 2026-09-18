@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import type { UseFormSetError, UseFormSetFocus } from 'react-hook-form';
 
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormField, FormInput, FormSection, FormSelect, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { ADMIN_OPTION_VALUES, branchCreateSchema, branchEditSchema } from './branchForm.schema';
@@ -25,7 +25,7 @@ export interface BranchCreateFormProps {
 
 /** Секции 1–4 из раздела 28 промпта: Основная информация → Контакты → Региональные настройки → Администратор. */
 export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit }: BranchCreateFormProps): JSX.Element {
-  const users = useUsersPreview();
+  const { users } = useUsersQuery();
   const adminCandidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin');
 
   const {
@@ -86,7 +86,7 @@ export function BranchCreateForm({ formId, bannerError, onDirtyChange, onSubmit 
       <FormSection title="Контакты">
         <div className="space-y-4">
           <FormField label="Email" htmlFor="branch-create-email" error={errors.email?.message}>
-            <FormInput id="branch-create-email" type="email" placeholder="branch@softclub-academy.test" invalid={errors.email !== undefined} {...fieldA11yProps('branch-create-email', errors.email?.message)} {...register('email')} />
+            <FormInput id="branch-create-email" type="email" placeholder="branch@example.com" invalid={errors.email !== undefined} {...fieldA11yProps('branch-create-email', errors.email?.message)} {...register('email')} />
           </FormField>
           <FormField label="Телефон" htmlFor="branch-create-phone" error={errors.phone?.message}>
             <FormInput id="branch-create-phone" placeholder="+992 37 000-00-00" invalid={errors.phone !== undefined} {...fieldA11yProps('branch-create-phone', errors.phone?.message)} {...register('phone')} />

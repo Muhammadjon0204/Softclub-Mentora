@@ -29,8 +29,9 @@ public sealed class AuthCookieManager
     public const string CsrfHeaderName = "X-CSRF-Token";
 
     /// <summary>
-    /// Restricts the refresh cookie to the auth endpoints, so no other request carries it
-    /// (<c>AUTH-010</c>, <c>AUTH-011</c>).
+    /// Restricts the HttpOnly refresh cookie to the auth endpoints, so no other request carries it
+    /// (<c>AUTH-010</c>, <c>AUTH-011</c>). Only affects which requests the browser attaches the cookie
+    /// to — irrelevant to script readability, since it's HttpOnly anyway.
     /// </summary>
     public const string CookiePath = "/api/v1/auth";
 
@@ -38,12 +39,13 @@ public sealed class AuthCookieManager
     /// Scope of the CSRF cookie: the whole origin, deliberately wider than <see cref="CookiePath"/>.
     /// </summary>
     /// <remarks>
-    /// The double-submit token is worth nothing unless script can read it, and a cookie scoped to
-    /// <c>/api/v1/auth</c> is invisible to <c>document.cookie</c> on every page the SPA actually
-    /// renders — <c>/login</c>, <c>/dashboard</c> and the rest. Sharing one path between the two
-    /// cookies left the client unable to build <c>X-CSRF-Token</c> at all, so the refresh answered
-    /// 403 CSRF_VALIDATION_FAILED and the session ended when the access token expired. Приложение D.1
-    /// specifies the two paths separately for this reason.
+    /// A cookie's <c>Path</c> scopes both when the browser sends it AND which documents may read it
+    /// via script, using the same prefix match. Scoping this cookie to <see cref="CookiePath"/> made
+    /// <c>readCsrfToken()</c> (<c>lib/cookies.ts</c>) return <c>null</c> on every real page the SPA
+    /// renders — <c>/login</c>, <c>/dashboard</c> and the rest — so <c>X-CSRF-Token</c> was never
+    /// attached and every <c>/auth/refresh</c> call failed <c>CSRF_VALIDATION_FAILED</c>, the root
+    /// cause of "refresh logs the user out". Приложение D.1 specifies the two paths separately for
+    /// this reason.
     ///
     /// Widening it costs nothing: the value is an opaque random token that only ever proves the
     /// caller could read a cookie from this origin.

@@ -283,6 +283,20 @@ public sealed class ReviewService(
                 ErrorCodes.ReviewAlreadyExists,
                 "Решение по этой версии уже вынесено.");
         }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException
+                                                  {
+                                                      SqlState: PostgresErrorCodes.CheckViolation,
+                                                      ConstraintName: "ck_assignments_due_order",
+                                                  })
+        {
+            // Found live (audit 2026-09-08): `NeedsReworkForm` only refuses a past date, never one
+            // earlier than the assignment's original deadline — a Lead legitimately picking a tighter
+            // rework deadline than the initial one previously crashed this call with an unhandled 500
+            // instead of a clean validation error.
+            throw new ValidationAppException(
+                "reworkDueAt",
+                "Новый дедлайн не может быть раньше первоначального дедлайна задания.");
+        }
     }
 
     private static ReviewDecision ParseDecision(string? value) =>

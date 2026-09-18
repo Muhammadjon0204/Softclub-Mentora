@@ -7,11 +7,17 @@ import {
   deactivateBranch as deactivateBranchApi,
   updateBranch as updateBranchApi,
 } from '../../api/admin/branches';
+import { changeUserRole as changeUserRoleApi, deactivateUser as deactivateUserApi } from '../../api/admin/users';
 import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useAuth } from '../../auth/useAuth';
+import { usersListQueryKey } from '../admin-users/useUsersQuery';
 import { useToast } from '../../shared/overlays';
-import type { PreviewBranchDetails } from './branchPresentation';
+import type { BranchAdminCandidateRef, ChangeBranchAdminInput, PreviewBranchDetails } from './branchPresentation';
 import { toBranchDetails } from './useBranchesQuery';
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : 'Неизвестная ошибка';
+}
 
 export interface CreateBranchInput {
   name: string;
@@ -32,10 +38,8 @@ export interface UseBranchActionsResult {
   updateBranch: (id: string, concurrencyToken: string, code: string, input: UpdateBranchInput) => Promise<PreviewBranchDetails>;
   activateBranch: (id: string, concurrencyToken: string) => Promise<PreviewBranchDetails>;
   deactivateBranch: (id: string, concurrencyToken: string) => Promise<PreviewBranchDetails>;
-  /** TODO(users-domain): требует `POST /users/{id}/change-role` — вне скоупа этой интеграции. */
-  assignAdmin: (branchId: string) => Promise<void>;
-  /** TODO(users-domain): требует `POST /users/{id}/change-role` — вне скоупа этой интеграции. */
-  changeAdmin: (branchId: string) => Promise<void>;
+  assignAdmin: (branch: PreviewBranchDetails, admin: BranchAdminCandidateRef) => Promise<void>;
+  changeAdmin: (branch: PreviewBranchDetails, input: ChangeBranchAdminInput) => Promise<void>;
 }
 
 /** Единая точка real-мутаций Branches — POST/PUT + toast, замена `useBranchPreviewActions`. */
@@ -49,6 +53,15 @@ export function useBranchActions(): UseBranchActionsResult {
   const invalidateList = useCallback((): void => {
     void queryClient.invalidateQueries({ queryKey: ['admin-branches', 'list', organizationId] });
   }, [queryClient, organizationId]);
+
+  const invalidateUsers = useCallback((): void => {
+    void queryClient.invalidateQueries({ queryKey: usersListQueryKey(organizationId) });
+  }, [queryClient, organizationId]);
+
+  const invalidateAll = useCallback((): void => {
+    invalidateList();
+    invalidateUsers();
+  }, [invalidateList, invalidateUsers]);
 
   const run = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
     setIsSubmitting(true);
@@ -138,15 +151,66 @@ export function useBranchActions(): UseBranchActionsResult {
     [run, invalidateList, toast],
   );
 
-  const assignAdmin = useCallback(async (): Promise<void> => {
-    // TODO(users-domain): POST /users/{id}/change-role — вне скоупа этой интеграции.
-    toast.info('Назначение администратора филиала пока недоступно — Users-домен ещё не подключён к реальному API');
-  }, [toast]);
+  const assignAdmin = useCallback(
+    async (branch: PreviewBranchDetails, admin: BranchAdminCandidateRef): Promise<void> => {
+      await run(() =>
+        changeUserRoleApi(admin.id, {
+          role: 'Admin',
+          adminScope: 'Branch',
+          branchId: branch.id,
+          categoryId: null,
+          reason: `Назначен администратором филиала «${branch.name}»`,
+          concurrencyToken: admin.concurrencyToken,
+        }),
+      );
+      invalidateAll();
+      toast.success(`${admin.fullName}: назначен администратором филиала`);
+    },
+    [run, invalidateAll, toast],
+  );
 
-  const changeAdmin = useCallback(async (): Promise<void> => {
-    // TODO(users-domain): POST /users/{id}/change-role — вне скоупа этой интеграции.
-    toast.info('Смена администратора филиала пока недоступна — Users-домен ещё не подключён к реальному API');
-  }, [toast]);
+  const changeAdmin = useCallback(
+    async (branch: PreviewBranchDetails, input: ChangeBranchAdminInput): Promise<void> => {
+      await run(async () => {
+        await changeUserRoleApi(input.newAdmin.id, {
+          role: 'Admin',
+          adminScope: 'Branch',
+          branchId: branch.id,
+          categoryId: null,
+          reason: `Назначен администратором филиала «${branch.name}»`,
+          concurrencyToken: input.newAdmin.concurrencyToken,
+        });
+        invalidateAll();
+        toast.success(`${input.newAdmin.fullName}: назначен администратором филиала`);
+
+        if (input.previousAdmin === null) return;
+
+        // Судьба предыдущего администратора — отдельная мутация: если новый уже назначен, а этот
+        // шаг упадёт, не притворяемся одним общим успехом (тот же приём, что useCategoryActions.changeLead).
+        try {
+          if (input.previousAdminRoleChoice === 'Deactivate') {
+            await deactivateUserApi(input.previousAdmin.id, { concurrencyToken: input.previousAdmin.concurrencyToken });
+            toast.success(`${input.previousAdmin.fullName}: доступ деактивирован`);
+          } else {
+            const role = input.previousAdminRoleChoice;
+            await changeUserRoleApi(input.previousAdmin.id, {
+              role,
+              adminScope: null,
+              branchId: branch.id,
+              categoryId: input.previousAdminCategoryId,
+              reason: `Освобождён от роли администратора филиала «${branch.name}»`,
+              concurrencyToken: input.previousAdmin.concurrencyToken,
+            });
+            toast.success(`${input.previousAdmin.fullName}: переведён в ${role === 'Lead' ? 'руководители направления' : 'менторы'}`);
+          }
+          invalidateAll();
+        } catch (error) {
+          toast.error(`Новый администратор назначен, но действие над предыдущим (${input.previousAdmin.fullName}) не выполнено: ${messageOf(error)}`);
+        }
+      });
+    },
+    [run, invalidateAll, toast],
+  );
 
   return { isSubmitting, createBranch, updateBranch, activateBranch, deactivateBranch, assignAdmin, changeAdmin };
 }

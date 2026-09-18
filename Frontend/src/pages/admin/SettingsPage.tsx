@@ -11,6 +11,7 @@ import { organizationQueryKey, useOrganizationQuery } from '../../features/admin
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewTabs } from '../../features/admin-preview/PreviewTabs';
 import { useAuth } from '../../auth/useAuth';
+import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { UnsavedChangesDialog, useToast } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
@@ -89,9 +90,14 @@ interface SettingsSnapshot {
  */
 export function SettingsPage(): JSX.Element {
   const { user: authUser } = useAuth();
-  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const branchContext = useBranchContext();
+  // Тот же единственный источник правды, что в UsersPage.tsx — `role === 'Admin' && adminScope
+  // === 'Organization'`, а не только `adminScope`, иначе при расхождении вкладка «Организация»
+  // могла бы отрисоваться для актора, для которого `BranchProvider` так и не запросил филиалы.
+  const isOrgAdmin = branchContext.canOverrideBranch;
   const TABS = isOrgAdmin ? ORG_ADMIN_TABS : BRANCH_ADMIN_TABS;
   const organizationId = authUser?.organization.id ?? 'anonymous';
+  const headOfficeName = branchContext.availableBranches.find((branch) => branch.isHeadOffice)?.name ?? null;
 
   const [tab, setTab] = useState(isOrgAdmin ? 'organization' : 'interface');
   const toast = useToast();
@@ -239,7 +245,7 @@ export function SettingsPage(): JSX.Element {
                 <FormInput id="settings-org-name" value={orgNameDraft} invalid={orgNameError !== null} onChange={(event) => { setOrgNameDraft(event.target.value); }} />
               </FormField>
               <ReadOnlyField label="Slug" value={orgQuery.data.slug} hint="Неизменяем после создания" />
-              <ReadOnlyField label="Главный офис" value="Душанбе" hint="Изменяется на странице «Филиалы»" />
+              <ReadOnlyField label="Главный офис" value={headOfficeName ?? '—'} hint="Изменяется на странице «Филиалы»" />
             </div>
           </SectionCard>
 
@@ -270,8 +276,8 @@ export function SettingsPage(): JSX.Element {
   } else if (tab === 'integrations') {
     content = (
       <SectionCard title="Интеграции" description="Текущие подключения">
-        <IntegrationRow name="Email provider" detail="SMTP · mail.softclub-academy.test" connected={emailConnected} onDisconnect={emailConnected ? () => { setDisconnectTarget('email'); } : undefined} />
-        <IntegrationRow name="Telegram bot" detail="@mentora_notify_bot" connected={telegramConnected} onDisconnect={telegramConnected ? () => { setDisconnectTarget('telegram'); } : undefined} />
+        <IntegrationRow name="Email provider" detail="SMTP · настраивается при развёртывании" connected={emailConnected} onDisconnect={emailConnected ? () => { setDisconnectTarget('email'); } : undefined} />
+        <IntegrationRow name="Telegram bot" detail="Настраивается при развёртывании" connected={telegramConnected} onDisconnect={telegramConnected ? () => { setDisconnectTarget('telegram'); } : undefined} />
         <IntegrationRow name="MinIO" detail="Хранилище файлов и вложений" connected />
         <IntegrationRow name="AI provider" detail="Для AI-резюме в разделе «Отчёты»" connected={false} />
       </SectionCard>

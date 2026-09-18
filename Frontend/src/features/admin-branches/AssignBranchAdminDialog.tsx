@@ -6,20 +6,20 @@ import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField } from '../../shared/ui/FormField';
 import { branchDisplayName } from '../admin-users/userPresentation';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
-import type { PreviewBranchDetails } from './branchPresentation';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
+import type { BranchAdminCandidateRef, PreviewBranchDetails } from './branchPresentation';
 
 export interface AssignBranchAdminDialogProps {
   branch: PreviewBranchDetails | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isSubmitting: boolean;
-  onConfirm: (adminUserId: string) => Promise<void>;
+  onConfirm: (admin: BranchAdminCandidateRef) => Promise<void>;
 }
 
 /** ConfirmDialog + select кандидата (раздел 32 промпта) — только Organization Admin. */
 export function AssignBranchAdminDialog({ branch, open, onOpenChange, isSubmitting, onConfirm }: AssignBranchAdminDialogProps): JSX.Element {
-  const users = useUsersPreview();
+  const { users } = useUsersQuery();
   const candidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin' && user.role !== 'BranchAdmin');
   const [selectedId, setSelectedId] = useState('');
 
@@ -38,10 +38,10 @@ export function AssignBranchAdminDialog({ branch, open, onOpenChange, isSubmitti
       description={<>Филиал: <span className="font-medium text-ink">{branch?.name}</span></>}
       confirmLabel="Назначить"
       loading={isSubmitting}
-      confirmDisabled={branch === null || selectedId.length === 0}
+      confirmDisabled={branch === null || selected === undefined}
       onConfirm={async () => {
-        if (branch === null || selectedId.length === 0) return;
-        await onConfirm(selectedId);
+        if (branch === null || selected === undefined) return;
+        await onConfirm({ id: selected.id, concurrencyToken: selected.concurrencyToken ?? '', fullName: selected.fullName });
         onOpenChange(false);
       }}
       details={

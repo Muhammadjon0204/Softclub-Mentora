@@ -10,6 +10,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace MentorTaskFlow.Infrastructure.Analytics;
@@ -28,8 +29,20 @@ public sealed class AdminDashboardService(
     IBranchContext branchContext,
     IAuditLogReader auditLogReader,
     HealthCheckService healthCheckService,
+    IMemoryCache cache,
     IClock clock) : IAdminDashboardService
 {
+    /// <summary>
+    /// The Postgres/MinIO checks behind <see cref="BuildSystemHealthAsync"/> are live network round
+    /// trips to infra shared by the whole deployment, not anything scoped to a request's org/branch/
+    /// period — re-pinging them on every dashboard load (e.g. a user flipping the period filter a few
+    /// times in a row) buys no fresher information than this TTL already gives, at the cost of two
+    /// blocking network calls per request (<c>TokenVersionValidator</c> establishes the same
+    /// short-TTL-<see cref="IMemoryCache"/> pattern elsewhere in this codebase for the same reason).
+    /// </summary>
+    private static readonly TimeSpan SystemHealthCacheDuration = TimeSpan.FromSeconds(20);
+    private const string SystemHealthCacheKey = "admin-dashboard:system-health-report";
+
     private static readonly IReadOnlySet<AssignmentStatus> ActiveStatuses = new HashSet<AssignmentStatus>
     {
         AssignmentStatus.Assigned,
@@ -125,12 +138,14 @@ public sealed class AdminDashboardService(
             .AsNoTracking()
             .Where(u => u.OrganizationId == organizationId)
             .Where(u => branchId == null || u.BranchId == branchId)
+            .Where(u => u.IsActive)
             .ToListAsync(cancellationToken);
 
         var branches = await dbContext.Branches
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(b => b.OrganizationId == organizationId)
+            .Where(b => b.IsActive)
             .ToListAsync(cancellationToken);
 
         var categories = await dbContext.Categories
@@ -138,6 +153,7 @@ public sealed class AdminDashboardService(
             .AsNoTracking()
             .Where(c => c.OrganizationId == organizationId)
             .Where(c => branchId == null || c.BranchId == branchId)
+            .Where(c => c.IsActive)
             .ToListAsync(cancellationToken);
 
         var submissions = await dbContext.Submissions
@@ -676,7 +692,7 @@ public sealed class AdminDashboardService(
     private async Task<SystemHealthDto> BuildSystemHealthAsync(
         IReadOnlyList<AuditLogEntryDto> systemEventEntries, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var report = await healthCheckService.CheckHealthAsync(check => check.Tags.Contains("ready"), cancellationToken);
+        var report = await GetCachedHealthReportAsync(cancellationToken);
 
         var services = report.Entries
             .Select(entry => new ServiceHealthDto(
@@ -694,6 +710,18 @@ public sealed class AdminDashboardService(
             .ToList();
 
         return new SystemHealthDto(services, recentEvents);
+    }
+
+    private async Task<HealthReport> GetCachedHealthReportAsync(CancellationToken cancellationToken)
+    {
+        if (cache.TryGetValue<HealthReport>(SystemHealthCacheKey, out var cached) && cached is not null)
+        {
+            return cached;
+        }
+
+        var report = await healthCheckService.CheckHealthAsync(check => check.Tags.Contains("ready"), cancellationToken);
+        cache.Set(SystemHealthCacheKey, report, SystemHealthCacheDuration);
+        return report;
     }
 
     private static string MapHealthStatus(HealthStatus status) => status switch

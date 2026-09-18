@@ -6,7 +6,7 @@ import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeade
 import { PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
 import { useLeadReports } from '../../features/lead-reports/useLeadReports';
 import type { ReportsFilters } from '../../features/lead-reports/useLeadReports';
-import { scopedActiveMentors } from '../../features/lead/scope/leadScopedData';
+import { useActiveLeadMentors } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { Modal } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
@@ -41,7 +41,7 @@ function initialsOf(fullName: string): string {
  */
 export function ReportsPage(): JSX.Element {
   const scope = useLeadScope();
-  const mentors = scopedActiveMentors(scope.categoryId);
+  const mentors = useActiveLeadMentors();
 
   const [periodDays, setPeriodDays] = useState('30');
   const [mentorId, setMentorId] = useState('all');

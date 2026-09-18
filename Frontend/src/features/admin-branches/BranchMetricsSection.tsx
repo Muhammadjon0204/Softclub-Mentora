@@ -1,5 +1,6 @@
-import { PREVIEW_CATEGORIES } from '../../mocks/ui-preview/categories.preview';
-import { useUsersPreview } from '../admin-users/userPreviewStore';
+import { useAuth } from '../../auth/useAuth';
+import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
+import { useUsersQuery } from '../admin-users/useUsersQuery';
 import type { PreviewBranchDetails } from './branchPresentation';
 
 function healthTone(value: number): string {
@@ -10,16 +11,18 @@ function healthTone(value: number): string {
 
 /** Компактная metric grid — не полноценный Dashboard внутри Drawer (раздел 26 промпта). */
 export function BranchMetricsSection({ branch }: { branch: PreviewBranchDetails }): JSX.Element {
-  const users = useUsersPreview();
-  const usersCount = users.filter((user) => user.branchName === branch.name && user.status !== 'Deactivated').length;
-  const pendingReview = PREVIEW_CATEGORIES.filter((category) => category.branchName === branch.name).reduce((sum, category) => sum + category.pendingReview, 0);
+  const { user: authUser } = useAuth();
+  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const { users } = useUsersQuery();
+  const { categories } = useCategoriesForBranch(branch.id, isOrgAdmin);
+  const usersCount = users.filter((user) => user.branchId === branch.id && user.status !== 'Deactivated').length;
+  const mentorsCount = users.filter((user) => user.branchId === branch.id && user.role === 'Mentor' && user.status !== 'Deactivated').length;
 
   const metrics = [
     { label: 'Пользователи', value: usersCount },
-    { label: 'Направления', value: branch.categoriesCount },
-    { label: 'Менторы', value: branch.mentorsCount },
+    { label: 'Направления', value: categories.length },
+    { label: 'Менторы', value: mentorsCount },
     { label: 'Активные задания', value: branch.activeAssignments },
-    { label: 'Ожидают проверки', value: pendingReview },
     { label: 'Индекс состояния', value: `${branch.healthPct}%`, tone: healthTone(branch.healthPct) },
   ];
 

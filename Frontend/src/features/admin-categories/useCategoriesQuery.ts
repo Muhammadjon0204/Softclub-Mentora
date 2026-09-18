@@ -102,7 +102,7 @@ export function useCategoriesQuery(): UseCategoriesQueryResult {
 
   const categoriesQuery = useQuery({
     queryKey: categoriesListQueryKey(organizationId, branchContext.selectedBranchId),
-    queryFn: () => listCategories({ page: 1, pageSize: MAX_PAGE_SIZE }),
+    queryFn: () => listCategories({ page: 1, pageSize: MAX_PAGE_SIZE, isActive: true }),
     enabled: user !== null,
   });
 
@@ -143,8 +143,10 @@ export function useCategoriesQuery(): UseCategoriesQueryResult {
 
 export interface UseCategoriesForBranchResult {
   categories: CategoryDto[];
+  /** `true` only while a request for the currently selected branch is actually in flight — stays `false` (not stuck `true`) while the query is disabled, e.g. no branch chosen yet. */
   isPending: boolean;
   error: unknown;
+  refetch: () => void;
 }
 
 /**
@@ -160,13 +162,24 @@ export interface UseCategoriesForBranchResult {
  */
 export function useCategoriesForBranch(branchId: string | null, sendBranchOverride: boolean): UseCategoriesForBranchResult {
   const overrideId = sendBranchOverride ? branchId : null;
+  const enabled = !sendBranchOverride || (branchId !== null && branchId.length > 0);
   const query = useQuery({
     queryKey: ['admin-categories', 'for-branch', sendBranchOverride ? (branchId ?? 'none') : 'own'],
     queryFn: () => listCategories({ page: 1, pageSize: MAX_PAGE_SIZE, isActive: true }, overrideId ?? undefined),
-    enabled: !sendBranchOverride || (branchId !== null && branchId.length > 0),
+    enabled,
   });
 
-  return { categories: query.data?.items ?? [], isPending: query.isPending, error: query.error };
+  // A disabled TanStack Query never leaves its initial 'pending' status, so `query.isPending` alone
+  // would report "loading" forever whenever no branch is selected yet — gate it on `enabled` so callers
+  // can tell "actually fetching" apart from "nothing to fetch".
+  return {
+    categories: query.data?.items ?? [],
+    isPending: enabled && query.isPending,
+    error: query.error,
+    refetch: () => {
+      void query.refetch();
+    },
+  };
 }
 
 export interface UseCategorySettingsQueryResult {

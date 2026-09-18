@@ -22,11 +22,13 @@ import { useUserActions } from '../../features/admin-users/useUserActions';
 import { useUsersQuery } from '../../features/admin-users/useUsersQuery';
 import { branchDisplayName, ROLE_ICON, ROLE_TONE, STATUS_META } from '../../features/admin-users/userPresentation';
 import type { PreviewUserDetails } from '../../features/admin-users/userPresentation';
-import { ROLE_LABEL, STATUS_LABEL, PREVIEW_NEW_USERS_SERIES } from '../../mocks/ui-preview/users.preview';
+import { ROLE_LABEL, STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
 import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Button } from '../../shared/ui/Button';
+import { getGenericErrorMessage } from '../../api/problemDetails';
+import { useToast } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 
@@ -60,6 +62,21 @@ function formatLastLogin(label: string): { primary: string; secondary?: string }
 
 function initialsOf(fullName: string): string {
   return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
+}
+
+function buildNewUsersSeries(users: readonly PreviewUserDetails[]): { label: string; value: number }[] {
+  const now = new Date();
+  return Array.from({ length: 5 }, (_, index) => {
+    const end = new Date(now);
+    end.setDate(now.getDate() - (4 - index) * 7);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    const value = users.filter((user) => {
+      const created = new Date(user.createdLabel.split('.').reverse().join('-'));
+      return created >= start && created <= end;
+    }).length;
+    return { label: `${String(start.getDate()).padStart(2, '0')}.${String(start.getMonth() + 1).padStart(2, '0')}`, value };
+  });
 }
 
 function getAccessScope(user: PreviewUserDetails): { primary: string; secondary?: string } {
@@ -140,8 +157,15 @@ type ActionDialogState =
  */
 export function UsersPage(): JSX.Element {
   const { user: authUser } = useAuth();
-  const isOrgAdmin = authUser?.adminScope === 'Organization';
+  const currentUserId = authUser?.id ?? null;
   const branchContext = useBranchContext();
+  // Единственный источник правды для «это Organization Admin?» — `BranchContext.tsx` уже вычисляет
+  // это с полной проверкой (`role === 'Admin' && adminScope === 'Organization'`), которая же решает,
+  // запускать ли `GET /branches` вообще (`enabled: isOrgAdmin` там же). Использовать здесь локально
+  // упрощённую проверку (`adminScope === 'Organization'` без `role`) означало бы, что при расхождении
+  // форма показала бы редактируемый выбор филиала, для которого сам провайдер списка так и не сделал
+  // запрос — пустой dropdown без объяснения причины.
+  const isOrgAdmin = branchContext.canOverrideBranch;
 
   const usersQuery = useUsersQuery();
   const allUsers = usersQuery.users;
@@ -158,7 +182,7 @@ export function UsersPage(): JSX.Element {
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [role, setRole] = useState('all');
   const [branch, setBranch] = useState('all');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState('Active');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(14);
   const [formDrawer, setFormDrawer] = useState<UserFormDrawerState | null>(null);
@@ -203,7 +227,8 @@ export function UsersPage(): JSX.Element {
   const currentPage = Math.min(page, totalPages);
   const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const filtersActive = search.trim().length > 0 || role !== 'all' || branch !== 'all' || status !== 'all';
-  const newThisWeek = PREVIEW_NEW_USERS_SERIES[PREVIEW_NEW_USERS_SERIES.length - 1]?.value ?? 0;
+  const newUsersSeries = useMemo(() => buildNewUsersSeries(allUsers), [allUsers]);
+  const newThisWeek = newUsersSeries[newUsersSeries.length - 1]?.value ?? 0;
 
   const summary = useMemo(
     () => ({
@@ -216,6 +241,15 @@ export function UsersPage(): JSX.Element {
   );
 
   const actions = useUserActions();
+  const toast = useToast();
+
+  async function handleActivate(target: PreviewUserDetails): Promise<void> {
+    try {
+      await actions.activateUser(target.id, target.concurrencyToken ?? '');
+    } catch (error) {
+      toast.error(getGenericErrorMessage(error));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -251,7 +285,7 @@ export function UsersPage(): JSX.Element {
         </div>
         <div className="px-2 pb-3 pt-2 sm:px-3" style={{ height: 116 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={PREVIEW_NEW_USERS_SERIES} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
+            <AreaChart data={newUsersSeries} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
               <CartesianGrid vertical={false} stroke="var(--divider)" />
               <XAxis dataKey="label" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
               <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 12 }} />
@@ -270,7 +304,7 @@ export function UsersPage(): JSX.Element {
           <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
           <PreviewResetButton
             disabled={!filtersActive}
-            onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('all'); }}
+            onClick={() => { setSearch(''); setRole('all'); setBranch('all'); setStatus('Active'); }}
           />
         </PreviewToolbar>
 
@@ -330,8 +364,10 @@ export function UsersPage(): JSX.Element {
                     user={rowUser}
                     context="row"
                     isOrgAdmin={isOrgAdmin}
+                    isSelf={rowUser.id === currentUserId}
                     onOpenProfile={() => { openUserDetails(rowUser.id); }}
                     onEdit={() => { setFormDrawer({ mode: 'edit', userId: rowUser.id }); }}
+                    onActivate={() => { void handleActivate(rowUser); }}
                     onChangeRole={() => { setActionDialog({ type: 'changeRole', user: rowUser }); }}
                     onTransfer={() => { setActionDialog({ type: 'transfer', user: rowUser }); }}
                     onResendInvitation={() => { setActionDialog({ type: 'resendInvitation', user: rowUser }); }}
@@ -355,7 +391,9 @@ export function UsersPage(): JSX.Element {
         users={allUsers}
         onClose={closeUserDetails}
         isOrgAdmin={isOrgAdmin}
+        currentUserId={currentUserId}
         onEdit={(target) => { setFormDrawer({ mode: 'edit', userId: target.id }); }}
+        onActivate={(target) => { void handleActivate(target); }}
         onChangeRole={(target) => { setActionDialog({ type: 'changeRole', user: target }); }}
         onTransfer={(target) => { setActionDialog({ type: 'transfer', user: target }); }}
         onResendInvitation={(target) => { setActionDialog({ type: 'resendInvitation', user: target }); }}

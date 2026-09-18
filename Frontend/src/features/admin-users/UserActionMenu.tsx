@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Pencil,
   ShieldOff,
+  UserCheck,
   UserCog,
   UserX,
 } from 'lucide-react';
@@ -21,8 +22,11 @@ export interface UserActionMenuProps {
   /** В Details Drawer нет смысла показывать «Открыть профиль» — вы уже там. */
   context: 'row' | 'drawer';
   isOrgAdmin: boolean;
+  /** `true`, если `user` — это сам вошедший администратор (сравнение по id, см. `UsersPage.tsx`). */
+  isSelf: boolean;
   onOpenProfile?: () => void;
   onEdit: () => void;
+  onActivate: () => void;
   onChangeRole: () => void;
   onTransfer: () => void;
   onResendInvitation: () => void;
@@ -42,8 +46,10 @@ export function UserActionMenu({
   user,
   context,
   isOrgAdmin,
+  isSelf,
   onOpenProfile,
   onEdit,
+  onActivate,
   onChangeRole,
   onTransfer,
   onResendInvitation,
@@ -64,71 +70,87 @@ export function UserActionMenu({
   if (canManageThisUser) {
     items.push({ id: 'edit', label: 'Редактировать', icon: <Pencil className="h-full w-full" aria-hidden="true" />, onSelect: onEdit });
 
-    if (!isDeactivated) {
-      items.push({
-        id: 'change-role',
-        label: 'Изменить роль',
-        icon: <UserCog className="h-full w-full" aria-hidden="true" />,
-        onSelect: onChangeRole,
-      });
-
-      if (isOrgAdmin && user.role !== 'OrgAdmin') {
+    // Действия ниже либо необратимо режут доступ (блокировка/деактивация — своя сессия завершится
+    // немедленно), либо меняют собственные роль/филиал — на своей же строке это либо бессмысленно,
+    // либо реальный риск закрыть себе вход. Редактирование профиля и просмотр выше остаются
+    // доступны и для себя.
+    if (!isSelf) {
+      if (isDeactivated) {
         items.push({
-          id: 'transfer',
-          label: 'Перевести в другой филиал',
-          icon: <ArrowLeftRight className="h-full w-full" aria-hidden="true" />,
-          onSelect: onTransfer,
+          id: 'activate',
+          label: 'Активировать',
+          icon: <UserCheck className="h-full w-full" aria-hidden="true" />,
+          separatorBefore: true,
+          onSelect: onActivate,
         });
       }
-    }
 
-    const securityItems: ActionMenuItem[] = [];
-    if (!user.passwordSet && user.status === 'Invited') {
-      securityItems.push({
-        id: 'resend-invitation',
-        label: 'Повторно отправить приглашение',
-        icon: <Mail className="h-full w-full" aria-hidden="true" />,
-        onSelect: onResendInvitation,
-      });
-    }
-    if (user.passwordSet && !isDeactivated) {
-      securityItems.push({
-        id: 'password-reset',
-        label: 'Отправить ссылку сброса пароля',
-        icon: <KeyRound className="h-full w-full" aria-hidden="true" />,
-        onSelect: onRequestPasswordReset,
-      });
-    }
-    if (user.status === 'Active') {
-      securityItems.push({
-        id: 'block',
-        label: 'Заблокировать',
-        icon: <Lock className="h-full w-full" aria-hidden="true" />,
-        onSelect: onBlock,
-      });
-    }
-    if (user.status === 'Locked') {
-      securityItems.push({
-        id: 'unblock',
-        label: 'Разблокировать',
-        icon: <ShieldOff className="h-full w-full" aria-hidden="true" />,
-        onSelect: onUnblock,
-      });
-    }
-    if (securityItems.length > 0) {
-      securityItems[0] = { ...securityItems[0], separatorBefore: true };
-      items.push(...securityItems);
-    }
+      if (!isDeactivated) {
+        items.push({
+          id: 'change-role',
+          label: 'Изменить роль',
+          icon: <UserCog className="h-full w-full" aria-hidden="true" />,
+          onSelect: onChangeRole,
+        });
 
-    if (!isDeactivated) {
-      items.push({
-        id: 'deactivate',
-        label: 'Деактивировать',
-        icon: <UserX className="h-full w-full" aria-hidden="true" />,
-        destructive: true,
-        separatorBefore: true,
-        onSelect: onDeactivate,
-      });
+        if (isOrgAdmin && user.role !== 'OrgAdmin') {
+          items.push({
+            id: 'transfer',
+            label: 'Перевести в другой филиал',
+            icon: <ArrowLeftRight className="h-full w-full" aria-hidden="true" />,
+            onSelect: onTransfer,
+          });
+        }
+      }
+
+      const securityItems: ActionMenuItem[] = [];
+      if (!user.passwordSet && user.status === 'Invited') {
+        securityItems.push({
+          id: 'resend-invitation',
+          label: 'Повторно отправить приглашение',
+          icon: <Mail className="h-full w-full" aria-hidden="true" />,
+          onSelect: onResendInvitation,
+        });
+      }
+      if (user.passwordSet && !isDeactivated) {
+        securityItems.push({
+          id: 'password-reset',
+          label: 'Отправить ссылку сброса пароля',
+          icon: <KeyRound className="h-full w-full" aria-hidden="true" />,
+          onSelect: onRequestPasswordReset,
+        });
+      }
+      if (user.status === 'Active') {
+        securityItems.push({
+          id: 'block',
+          label: 'Заблокировать',
+          icon: <Lock className="h-full w-full" aria-hidden="true" />,
+          onSelect: onBlock,
+        });
+      }
+      if (user.status === 'Locked') {
+        securityItems.push({
+          id: 'unblock',
+          label: 'Разблокировать',
+          icon: <ShieldOff className="h-full w-full" aria-hidden="true" />,
+          onSelect: onUnblock,
+        });
+      }
+      if (securityItems.length > 0) {
+        securityItems[0] = { ...securityItems[0], separatorBefore: true };
+        items.push(...securityItems);
+      }
+
+      if (!isDeactivated) {
+        items.push({
+          id: 'deactivate',
+          label: 'Деактивировать',
+          icon: <UserX className="h-full w-full" aria-hidden="true" />,
+          destructive: true,
+          separatorBefore: true,
+          onSelect: onDeactivate,
+        });
+      }
     }
   }
 
