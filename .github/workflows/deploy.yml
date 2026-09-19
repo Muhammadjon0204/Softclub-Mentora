@@ -92,6 +92,14 @@ jobs:
             set -e
             cd ${{ secrets.SERVER_PROJECT_FOLDER }}
             git pull --ff-only
+
+            # Анонимный docker pull упирается в rate-limit Docker Hub на подсетях
+            # хостингов вроде Hetzner даже для чисто публичных образов (minio/minio,
+            # postgres) — ошибка при этом звучит как «repository does not exist».
+            # Логинимся тем же аккаунтом, которым job build выше пушит образы, это
+            # снимает лимит для всех pull ниже, включая публичные.
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+
             docker compose --env-file .env.api -f docker-compose.api.yml pull
             docker compose --env-file .env.api -f docker-compose.api.yml up -d --no-build
 
