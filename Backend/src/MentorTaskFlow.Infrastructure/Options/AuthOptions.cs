@@ -78,6 +78,25 @@ public sealed class AuthOptions
     /// </remarks>
     public bool RequireSecureCookies { get; init; } = true;
 
+    /// <summary>
+    /// <c>Domain</c> attribute for <c>mtf_csrf</c> only. Null (default) leaves it host-only.
+    /// </summary>
+    /// <remarks>
+    /// Needed whenever the SPA and the API are on different subdomains (<c>app.&lt;domain&gt;</c> /
+    /// <c>api.&lt;domain&gt;</c>): a cookie without <c>Domain</c> is host-only, so it is sent back to
+    /// the API that set it, but <c>document.cookie</c> on the SPA's own origin — a different host —
+    /// cannot see it at all. <c>readCsrfToken()</c> (<c>lib/cookies.ts</c>) then always returns
+    /// <c>null</c>, no <c>X-CSRF-Token</c> is ever attached, and every refresh fails
+    /// <c>CSRF_VALIDATION_FAILED</c> — indistinguishable, from the browser, from the cookie not
+    /// existing at all. Set it to the shared registrable domain (<c>example.com</c>, no leading dot)
+    /// so both hosts can read it.
+    ///
+    /// <c>mtf_rt</c> is deliberately excluded: it is HttpOnly, never read by script, and only ever
+    /// needs to reach the one host that issued it, so widening it would only enlarge its exposure for
+    /// no benefit.
+    /// </remarks>
+    public string? CsrfCookieDomain { get; init; }
+
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenMinutes);
 
     public TimeSpan RefreshTokenLifetime => TimeSpan.FromDays(RefreshTokenDays);

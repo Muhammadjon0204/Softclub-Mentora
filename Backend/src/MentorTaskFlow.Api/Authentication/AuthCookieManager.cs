@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using MentorTaskFlow.Infrastructure.Options;
+using Microsoft.Extensions.Options;
 
 namespace MentorTaskFlow.Api.Authentication;
 
@@ -14,11 +16,15 @@ namespace MentorTaskFlow.Api.Authentication;
 /// (<c>DEPLOY-010</c>, <c>AUTH-010</c>).
 /// </para>
 /// <para>
-/// No <c>Domain</c> attribute is set, making both cookies host-only: a sibling subdomain cannot
-/// receive them.
+/// Neither cookie carries a <c>Domain</c> attribute by default, making both host-only: a sibling
+/// subdomain cannot receive them. That is fine for <c>mtf_rt</c> — only the API ever needs it — but
+/// it silently breaks the CSRF double-submit on a split <c>app.</c>/<c>api.</c> topology, since
+/// script on <c>app.&lt;domain&gt;</c> then can't read a cookie that belongs to
+/// <c>api.&lt;domain&gt;</c>. <see cref="AuthOptions.CsrfCookieDomain"/> widens <c>mtf_csrf</c> alone
+/// for exactly that case.
 /// </para>
 /// </remarks>
-public sealed class AuthCookieManager
+public sealed class AuthCookieManager(IOptions<AuthOptions> authOptions)
 {
     /// <summary>Refresh token. HttpOnly, so page script cannot read it.</summary>
     public const string RefreshTokenCookieName = "mtf_rt";
@@ -81,6 +87,7 @@ public sealed class AuthCookieManager
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
             Path = CsrfCookiePath,
+            Domain = authOptions.Value.CsrfCookieDomain,
             Expires = expiresAt,
             IsEssential = true,
         });
@@ -105,6 +112,7 @@ public sealed class AuthCookieManager
             Secure = requireSecure,
             SameSite = SameSiteMode.Strict,
             Path = CsrfCookiePath,
+            Domain = authOptions.Value.CsrfCookieDomain,
         });
     }
 

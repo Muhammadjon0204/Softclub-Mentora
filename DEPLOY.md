@@ -129,10 +129,11 @@ git update-index --skip-worktree .env.api .env.web
 Npgsql, второй начинает комментарий в `.env`. Сгенерированные значения в hex таких
 символов не содержат.
 
-Домены уже проставлены, менять не нужно — четыре строки для справки:
+Домены уже проставлены, менять не нужно — пять строк для справки:
 
 ```
 Auth__AppBaseUrl=https://tms.softclub.tj
+Auth__CsrfCookieDomain=softclub.tj
 Notifications__AppBaseUrl=https://tms.softclub.tj
 Cors__AllowedOrigins__0=https://tms.softclub.tj
 Storage__PublicEndpoint=https://tmsstorage.softclub.tj
@@ -141,6 +142,13 @@ Storage__PublicEndpoint=https://tmsstorage.softclub.tj
 `Cors__AllowedOrigins__0` должен совпадать с адресом фронта **точно** — схема, хост, без
 слеша на конце. Этот же список проверяет заголовок `Origin` у `/auth/refresh`, поэтому
 опечатка ломает и вход, и продление сессии.
+
+`Auth__CsrfCookieDomain` — общий регистрируемый домен (`softclub.tj`, без поддомена и без
+точки впереди), **не** адрес API. Фронт и API живут на разных поддоменах
+(`tms.` / `tmsapi.`), а кука `mtf_csrf` без `Domain` — host-only: API её видит, а
+`document.cookie` на странице SPA — нет, `X-CSRF-Token` не уходит, и каждый `/auth/refresh`
+(то есть каждое обновление страницы) отвечает `CSRF_VALIDATION_FAILED`. Пустое значение
+годится только если фронт и API когда-нибудь окажутся на одном хосте.
 
 ### `.env.web`
 
@@ -345,6 +353,11 @@ docker compose --env-file .env.api -f docker-compose.api.yml logs mentora-worker
 **Вход проходит, но через 15 минут выкидывает** — не сохранилась кука. Проверьте, что
 сайт открыт по `https` и `Auth__RequireSecureCookies=true`; по `http` эта комбинация не
 работает.
+
+**Вход проходит, но выкидывает на логин при КАЖДОМ обновлении страницы** — `refresh`
+отвечает `403 CSRF_VALIDATION_FAILED` (видно в Network → `refresh` → Response). Если фронт
+и API на разных поддоменах, проверьте `Auth__CsrfCookieDomain` — без него `mtf_csrf`
+host-only, и SPA не может её прочитать, чтобы отправить `X-CSRF-Token`.
 
 **Файл не загружается, обрывается на большом размере** — `client_max_body_size` у
 хостового nginx. Приложение разрешает 50 MB, дефолт nginx — 1 MB.
