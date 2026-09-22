@@ -199,9 +199,10 @@ export function useUserActions(): UseUserActionsResult {
   const resendInvitation = useCallback(
     async (id: string): Promise<void> => {
       await run(() => resendInvitationApi(id));
+      void queryClient.invalidateQueries({ queryKey: ['user-invitation-notification', id] });
       toast.success('Новое приглашение отправлено');
     },
-    [run, toast],
+    [run, toast, queryClient],
   );
 
   const requestPasswordReset = useCallback(async (): Promise<void> => {

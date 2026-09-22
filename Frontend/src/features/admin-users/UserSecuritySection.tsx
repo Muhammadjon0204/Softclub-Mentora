@@ -1,7 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import { KeyRound, Lock, Mail, ShieldOff, UserCheck, UserX } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { listNotifications } from '../../api/admin/notifications';
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
+import { Badge } from '../../shared/ui/Badge';
+import type { BadgeTone } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { emptyOrValue } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
@@ -12,6 +16,54 @@ function SecurityRow({ label, value }: { label: string; value: ReactNode }): JSX
       <span className="shrink-0 text-ink-muted">{label}</span>
       <span className="min-w-0 truncate text-right font-medium text-ink">{value}</span>
     </div>
+  );
+}
+
+const INVITATION_STATUS_LABEL: Record<string, string> = {
+  Pending: 'В очереди на отправку',
+  Processing: 'Отправляется',
+  Sent: 'Письмо отправлено',
+  DeadLetter: 'Не удалось отправить',
+};
+
+const INVITATION_STATUS_TONE: Record<string, BadgeTone> = {
+  Pending: 'neutral',
+  Processing: 'info',
+  Sent: 'success',
+  DeadLetter: 'danger',
+};
+
+/**
+ * Показывает реальный статус доставки последнего письма-приглашения (очередь
+ * `notification_outbox`, `GET /admin/notifications?userId=…&eventType=UserInvitation`),
+ * а не факт создания аккаунта — раньше карточка пользователя вообще не отличала
+ * «письмо ушло» от «письмо всё ещё в очереди» или «доставка провалилась».
+ */
+function InvitationDeliveryRow({ userId }: { userId: string }): JSX.Element {
+  const query = useQuery({
+    queryKey: ['user-invitation-notification', userId],
+    queryFn: async () => listNotifications({ userId, eventType: 'UserInvitation', page: 1, pageSize: 1 }),
+  });
+
+  const latest = query.data?.items[0];
+
+  return (
+    <SecurityRow
+      label="Доставка письма"
+      value={
+        query.isPending ? (
+          <span className="text-ink-muted">Проверка…</span>
+        ) : query.error !== null ? (
+          <span className="text-danger">Не удалось проверить</span>
+        ) : latest === undefined ? (
+          <span className="text-ink-muted">Нет данных</span>
+        ) : (
+          <Badge tone={INVITATION_STATUS_TONE[latest.status] ?? 'neutral'}>
+            {INVITATION_STATUS_LABEL[latest.status] ?? latest.status}
+          </Badge>
+        )
+      }
+    />
   );
 }
 
@@ -48,6 +100,7 @@ export function UserSecuritySection({
     <div className="space-y-5">
       <dl className="divide-y divide-divider">
         <SecurityRow label="Статус приглашения" value={user.passwordSet ? 'Принято' : 'Ожидает установки пароля'} />
+        {!user.passwordSet && user.status === 'Invited' ? <InvitationDeliveryRow userId={user.id} /> : null}
         <SecurityRow label="Пароль установлен" value={user.passwordSet ? 'Да' : 'Нет'} />
         <SecurityRow label="Последняя смена пароля" value={emptyOrValue(user.lastPasswordChangeLabel)} />
         <SecurityRow label="Активные сессии" value={String(user.activeSessions)} />
