@@ -36,4 +36,7 @@ public sealed record NotificationListQuery
     public string? Channel { get; init; }
 
     public string? EventType { get; init; }
+
+    /// <summary>Narrows to one recipient — used to show a user's own invitation delivery status.</summary>
+    public Guid? UserId { get; init; }
 }

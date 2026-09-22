@@ -47,6 +47,11 @@ public sealed class NotificationAdminService(
             source = source.Where(n => n.EventType == query.EventType);
         }
 
+        if (query.UserId is not null)
+        {
+            source = source.Where(n => n.UserId == query.UserId);
+        }
+
         // Computed under the same predicate as the rows: a counter that saw more than the list would
         // disclose the volume of another branch's traffic (TEN-046).
         var totalCount = await source.CountAsync(cancellationToken);

@@ -74,3 +74,23 @@
       sans-serif;
   }
 }
+
+/**
+ * Recharts рендерит `.recharts-wrapper` с tabIndex={0} для доступности —
+ * клик по графику фокусирует этот div, и браузер рисует свой дефолтный
+ * (чёрный/синий) focus outline поверх всего чарта. Убираем его при обычном
+ * клике мышью, но сохраняем видимый outline при навигации с клавиатуры.
+ */
+.recharts-wrapper:focus {
+  outline: none;
+}
+
+.recharts-wrapper:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.recharts-surface:focus,
+.recharts-surface:focus-visible {
+  outline: none;
+}

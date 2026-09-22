@@ -7,7 +7,7 @@ import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { SearchSelect } from '../../shared/select';
 import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormSelect, FormTextarea, ReadOnlyField, fieldA11yProps } from '../../shared/ui/FormField';
 import { useBranchContext } from '../branch-context/useBranchContext';
-import { CATEGORY_CREATE_DEFAULTS, categoryCreateSchema, categoryEditSchema } from './categoryForm.schema';
+import { categoryCreateSchema, categoryEditSchema } from './categoryForm.schema';
 import type { CategoryCreateFormValues, CategoryEditFormValues } from './categoryForm.schema';
 import { TIMEZONE_OPTIONS } from './categoryPresentation';
 import type { PreviewCategoryDetails } from './categoryPresentation';
@@ -46,7 +46,6 @@ export function CategoryCreateForm({ formId, isOrgAdmin, bannerError, onDirtyCha
       description: '',
       branchId: isOrgAdmin ? '' : ownBranchId,
       leadUserId: '',
-      ...CATEGORY_CREATE_DEFAULTS,
     },
   });
 
@@ -125,38 +124,10 @@ export function CategoryCreateForm({ formId, isOrgAdmin, bannerError, onDirtyCha
         </FormField>
       </FormSection>
 
-      <FormSection title="Настройки задания">
-        <div className="space-y-4">
-          <FormField label="Часовой пояс" htmlFor="category-create-timezone" required>
-            <Controller
-              control={control}
-              name="timezone"
-              render={({ field }) => (
-                <FormSelect
-                  id="category-create-timezone"
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  onBlur={field.onBlur}
-                  ref={field.ref}
-                  options={TIMEZONE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-                />
-              )}
-            />
-          </FormField>
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Дедлайн (время)" htmlFor="category-create-due-time" required error={errors.defaultDueTimeLocal?.message} hint="Формат ЧЧ:ММ">
-              <FormInput id="category-create-due-time" placeholder="23:59" invalid={errors.defaultDueTimeLocal !== undefined} {...register('defaultDueTimeLocal')} />
-            </FormField>
-            <FormField label="Срок, дней" htmlFor="category-create-due-days" required error={errors.defaultDueDays?.message}>
-              <FormInput id="category-create-due-days" type="number" min={1} max={60} invalid={errors.defaultDueDays !== undefined} {...register('defaultDueDays')} />
-            </FormField>
-          </div>
-          <FormCheckbox
-            label="Разрешить приём после дедлайна"
-            description="Ментор сможет отправить решение после дедлайна — задание перейдёт в статус «Просрочено»"
-            {...register('allowLateSubmission')}
-          />
-        </div>
+      <FormSection title="Настройки задания" description="Дедлайн, часовой пояс и приём после срока настраиваются значениями по умолчанию (часовой пояс филиала, 23:59, 3 дня) и доступны для изменения сразу после создания направления — кнопка «Редактировать» в карточке.">
+        <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[13px] text-ink-muted">
+          Направление будет создано со стандартными настройками задания. Изменить их можно в любой момент после создания.
+        </p>
       </FormSection>
     </form>
   );
