@@ -46,6 +46,10 @@ beforeEach(() => {
   resetRefreshCoordinator();
   // Снапшот mock-сервера пишет только тест на reload — между кейсами убираем.
   clearMockServerState();
+  // jsdom держит один `window` на весь файл — без очистки выбор филиала
+  // (`BranchContext`, персистится в localStorage per-user) утёк бы из одного
+  // теста в другой, если оба используют одного mock-пользователя.
+  window.localStorage.clear();
 });
 
 afterEach(() => {
