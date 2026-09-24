@@ -30,6 +30,7 @@ import { AssignmentsPage as LeadAssignmentsPage } from '../pages/lead/Assignment
 import { ReviewQueuePage as LeadReviewQueuePage } from '../pages/lead/ReviewQueuePage';
 import { TeamPage as LeadTeamPage } from '../pages/lead/TeamPage';
 import { ReportsPage as LeadReportsPage } from '../pages/lead/ReportsPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { DashboardPage as MentorDashboardPage } from '../pages/mentor/DashboardPage';
 import { SchedulePage as MentorSchedulePage } from '../pages/mentor/SchedulePage';
 import { AssignmentsPage as MentorAssignmentsPage } from '../pages/mentor/AssignmentsPage';
@@ -102,6 +103,7 @@ export function AppRouter(): JSX.Element {
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="health" element={<HealthPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       {/* Lead-панель (Phase 3, ТЗ 2.2 раздел 24.4): единый `/lead/*`, ровно маршруты
@@ -126,6 +128,7 @@ export function AppRouter(): JSX.Element {
         <Route path="review-queue" element={<LeadReviewQueuePage />} />
         <Route path="team" element={<LeadTeamPage />} />
         <Route path="reports" element={<LeadReportsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       {/* Mentor-панель: тот же приём, что `/lead/*` — единый `/mentor/*`, ровно
@@ -148,6 +151,7 @@ export function AppRouter(): JSX.Element {
         <Route path="history" element={<MentorHistoryPage />} />
         <Route path="reports" element={<MentorReportsPage />} />
         <Route path="notifications" element={<MentorNotificationsPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

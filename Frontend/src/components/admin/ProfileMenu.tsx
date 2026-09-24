@@ -2,6 +2,7 @@ import { Building2, ChevronDown, LogOut, Settings, User } from 'lucide-react';
 
 import type { AuthUser } from '../../api/auth';
 import { useAuth } from '../../auth/useAuth';
+import { profilePathForRole } from '../../auth/roleRedirect';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Popover } from '../../shared/ui/Popover';
 import { ProfileMenuItem } from './ProfileMenuItem';
@@ -111,7 +112,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
 
           {/* 5.3 — действия. */}
           <div role="menu" aria-label="Действия профиля" className="flex flex-col gap-0.5">
-            <ProfileMenuItem icon={<User className="h-full w-full" aria-hidden="true" />} to="/profile" onClick={close}>
+            <ProfileMenuItem icon={<User className="h-full w-full" aria-hidden="true" />} to={profilePathForRole(user.role)} onClick={close}>
               Профиль
             </ProfileMenuItem>
             {user.role === 'Admin' ? (
