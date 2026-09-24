@@ -3,6 +3,7 @@ import { ScrollText, ShieldCheck, ShieldX } from 'lucide-react';
 import { useState } from 'react';
 
 import { apiClient } from '../../api/client';
+import { auditActionLabel, auditActionTone, auditActorLabel, auditEntityLabel } from '../../features/admin-preview/auditPresentation';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh } from '../../features/admin-preview/PreviewTable';
@@ -70,11 +71,11 @@ export function AuditPage(): JSX.Element {
       <Card padded={false} className="min-w-0">
         <PreviewTable>
           <PreviewTableHead>
-            <PreviewTh className="w-[18%]">Время</PreviewTh>
-            <PreviewTh className="w-[16%]">Актор</PreviewTh>
-            <PreviewTh className="w-[24%]">Действие</PreviewTh>
-            <PreviewTh className="w-[24%]">Объект</PreviewTh>
-            <PreviewTh className="w-[18%]">Результат</PreviewTh>
+            <PreviewTh className="w-[15%]">Время</PreviewTh>
+            <PreviewTh className="w-[12%]">Актор</PreviewTh>
+            <PreviewTh className="w-[33%]">Действие</PreviewTh>
+            <PreviewTh className="w-[20%]">Объект</PreviewTh>
+            <PreviewTh className="w-[20%]">Результат</PreviewTh>
           </PreviewTableHead>
           <tbody>
             {query.isPending ? (
@@ -103,9 +104,11 @@ export function AuditPage(): JSX.Element {
               pageItems.map((item) => (
                 <tr key={item.id} className="h-14 border-b border-divider text-sm transition-colors duration-150 last:border-0 hover:bg-surface-hover">
                   <PreviewTd className="whitespace-nowrap tabular-nums">{new Date(item.occurredAt).toLocaleString('ru-RU')}</PreviewTd>
-                  <PreviewTd>{item.actorType}</PreviewTd>
-                  <PreviewTd className="font-medium text-ink">{item.action}</PreviewTd>
-                  <PreviewTd>{item.entityType}</PreviewTd>
+                  <PreviewTd>{auditActorLabel(item.actorType)}</PreviewTd>
+                  <PreviewTd>
+                    <Badge tone={auditActionTone(item.action)}>{auditActionLabel(item.action)}</Badge>
+                  </PreviewTd>
+                  <PreviewTd>{auditEntityLabel(item.entityType)}</PreviewTd>
                   <PreviewTd>
                     <AuditResultBadge result={item.result} />
                   </PreviewTd>

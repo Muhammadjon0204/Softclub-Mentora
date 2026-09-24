@@ -48,4 +48,13 @@ public sealed record AuditLogQuery
     public DateTimeOffset? From { get; init; }
 
     public DateTimeOffset? To { get; init; }
+
+    /// <summary>
+    /// Hides <see cref="MentorTaskFlow.Domain.Auditing.AuditActions.PageNoiseActions"/> — background
+    /// jobs and the read-of-the-log-itself, which otherwise dominate the human-facing browse view.
+    /// Ignored when <see cref="Action"/> already narrows to one specific code. Set by
+    /// <c>AdminAuditLogController</c> for the real endpoint; <c>AdminDashboardService</c>'s own reuse
+    /// of the reader leaves this false, since its System Health widget needs exactly those rows.
+    /// </summary>
+    public bool ExcludeSystemNoise { get; init; }
 }

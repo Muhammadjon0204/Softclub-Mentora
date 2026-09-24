@@ -21,6 +21,33 @@ const STATUS_LABEL: Record<string, string> = {
   DeadLetter: 'Ошибка доставки',
 };
 
+/** `Backend/src/MentorTaskFlow.Domain/Notifications/NotificationEventTypes.cs` — все 19 типов события. */
+const EVENT_TYPE_LABEL: Record<string, string> = {
+  AssignmentAssigned: 'Задание назначено',
+  AssignmentSuggested: 'Предложено задание',
+  AssignmentReassigned: 'Задание переназначено',
+  SubmissionUploaded: 'Загружено решение',
+  LateSubmissionUploaded: 'Загружено решение с опозданием',
+  ReviewApproved: 'Решение одобрено',
+  ReviewNeedsRework: 'Решение отправлено на доработку',
+  DeadlineReminder: 'Напоминание о дедлайне',
+  AssignmentOverdue: 'Задание просрочено',
+  AssignmentCancelled: 'Задание отменено',
+  SchedulerNoActiveMentor: 'Нет активного ментора',
+  CategoryWithoutLead: 'Направление без руководителя',
+  BranchDeactivated: 'Филиал деактивирован',
+  BranchActivated: 'Филиал активирован',
+  UserBranchChanged: 'Пользователь переведён в филиал',
+  BranchWithoutAdmin: 'Филиал без администратора',
+  OrganizationSystemAlert: 'Системное оповещение',
+  NotificationDeadLetter: 'Сбой доставки уведомлений',
+  UserInvitation: 'Приглашение пользователя',
+};
+
+function eventTypeLabel(eventType: string): string {
+  return EVENT_TYPE_LABEL[eventType] ?? eventType;
+}
+
 const STATUS_TONE: Record<string, BadgeTone> = {
   Pending: 'neutral',
   Processing: 'info',
@@ -74,11 +101,11 @@ export function NotificationsPage(): JSX.Element {
       <Card padded={false} className="min-w-0">
         <PreviewTable>
           <PreviewTableHead>
-            <PreviewTh className="w-[28%]">Событие</PreviewTh>
-            <PreviewTh className="w-[14%]">Канал</PreviewTh>
+            <PreviewTh className="w-[32%]">Событие</PreviewTh>
+            <PreviewTh className="w-[12%]">Канал</PreviewTh>
             <PreviewTh className="w-[18%]">Статус</PreviewTh>
-            <PreviewTh className="w-[12%]">Попытки</PreviewTh>
-            <PreviewTh className="w-[22%]">Создано</PreviewTh>
+            <PreviewTh className="w-[10%]">Попытки</PreviewTh>
+            <PreviewTh className="w-[28%]">Создано</PreviewTh>
           </PreviewTableHead>
           <tbody>
             {query.isPending ? (
@@ -106,7 +133,7 @@ export function NotificationsPage(): JSX.Element {
             ) : (
               pageItems.map((item) => (
                 <tr key={item.id} className="h-14 border-b border-divider text-sm transition-colors duration-150 last:border-0 hover:bg-surface-hover">
-                  <PreviewTd className="font-medium text-ink">{item.eventType}</PreviewTd>
+                  <PreviewTd className="font-medium text-ink">{eventTypeLabel(item.eventType)}</PreviewTd>
                   <PreviewTd>{item.channel}</PreviewTd>
                   <PreviewTd>
                     <NotificationStatusBadge status={item.status} />

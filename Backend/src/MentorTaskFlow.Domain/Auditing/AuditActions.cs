@@ -144,4 +144,22 @@ public static class AuditActions
             AuditRead,
             AiSummaryGenerate,
         };
+
+    /// <summary>
+    /// Background/diagnostic actions and the read-of-the-log-itself — noise on the human-facing Audit
+    /// Log browse view (bug report 2026-09-24). Each stays fully recorded (<c>AUD-022</c>,
+    /// <c>AUD-023</c>) and reachable by asking for it explicitly via <c>AuditLogQuery.Action</c>; only
+    /// the default browse listing hides them. Not a general-purpose "unimportant actions" list — in
+    /// particular, <c>AdminDashboardService.SystemEventActions</c> deliberately surfaces most of the
+    /// same codes on the System Health widget, so this set must stay opt-in
+    /// (<c>AuditLogQuery.ExcludeSystemNoise</c>), never applied inside the shared reader itself.
+    /// </summary>
+    public static readonly IReadOnlySet<string> PageNoiseActions = new HashSet<string>(StringComparer.Ordinal)
+    {
+        AuditRead,
+        SchedulerNoActiveMentor,
+        RetentionCleanup,
+        StorageOrphanCleanup,
+        StorageCrossScopeInconsistency,
+    };
 }

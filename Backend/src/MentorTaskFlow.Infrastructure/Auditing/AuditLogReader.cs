@@ -85,6 +85,10 @@ public sealed class AuditLogReader(
         {
             source = source.Where(log => log.Action == query.Action);
         }
+        else if (query.ExcludeSystemNoise)
+        {
+            source = source.Where(log => !AuditActions.PageNoiseActions.Contains(log.Action));
+        }
 
         if (query.ActorId is { } actorId)
         {
