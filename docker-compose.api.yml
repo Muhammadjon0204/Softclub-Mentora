@@ -121,6 +121,8 @@ services:
       Notifications__EnableWorker: "false"
     ports:
       - "${API_EXTERNAL_PORT}:8080"
+    volumes:
+      - mentora_dataprotection_keys:/home/mentortaskflow/.aspnet/DataProtection-Keys
     depends_on:
       mentora-db:
         condition: service_healthy
@@ -152,6 +154,8 @@ services:
       Notifications__EnableWorker: "true"
       # Процесс не обслуживает HTTP, собирать с него /metrics нечего.
       Metrics__Enabled: "false"
+    volumes:
+      - mentora_dataprotection_keys:/home/mentortaskflow/.aspnet/DataProtection-Keys
     depends_on:
       mentora-db:
         condition: service_healthy
@@ -168,3 +172,9 @@ networks:
 volumes:
   mentora_db_data:
   mentora_minio_data:
+  # Общий для mentora-api и mentora-worker (одно и то же приложение, два процесса) —
+  # без него ключи DataProtection живут только в памяти контейнера (DEPLOY.md уже
+  # предупреждал об этом в логе: "may not be persisted"), и каждый `up -d`/деплой
+  # тихо разлогинивает всех и рвёт CSRF у уже открытых вкладок, потому что старые
+  # cookie больше нечем расшифровать.
+  mentora_dataprotection_keys:
