@@ -35,6 +35,16 @@ WORKDIR /app
 RUN test -f /usr/share/zoneinfo/Asia/Dushanbe \
  || (echo "IANA tzdata is missing from the base image (DEPLOY-011)." && exit 1)
 
+# docker-compose.api.yml's healthcheck probes /health/live with wget, but the aspnet base image
+# ships neither wget nor curl — every mentora-api container has been reporting (unhealthy) in
+# `docker ps` since day one regardless of the app's actual state, because the healthcheck command
+# itself is "command not found", not because anything is wrong. Installing wget is the standard
+# fix; unlike the tzdata check above this genuinely isn't present in the base image, so there's no
+# equivalent "verify instead of install" option here.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends wget \
+ && rm -rf /var/lib/apt/lists/*
+
 # Never run as root.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin mentortaskflow
 USER 10001
