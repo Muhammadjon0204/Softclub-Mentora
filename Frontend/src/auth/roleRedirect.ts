@@ -14,6 +14,17 @@ export function dashboardPathForRole(role: UserRole): string {
   return ROLE_DASHBOARD_PATH[role];
 }
 
+/** `/profile` живёт внутри каждого ролевого layout'а (`FE-014`) — общая страница, свой путь на роль. */
+export const ROLE_PROFILE_PATH: Record<UserRole, string> = {
+  Admin: '/admin/profile',
+  Lead: '/lead/profile',
+  Mentor: '/mentor/profile',
+};
+
+export function profilePathForRole(role: UserRole): string {
+  return ROLE_PROFILE_PATH[role];
+}
+
 /** Публичные auth-страницы: RequireAuth к ним не применяется. */
 export const PUBLIC_AUTH_PATHS = [
   '/login',
