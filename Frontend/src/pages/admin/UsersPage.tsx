@@ -230,15 +230,18 @@ export function UsersPage(): JSX.Element {
   const newUsersSeries = useMemo(() => buildNewUsersSeries(allUsers), [allUsers]);
   const newThisWeek = newUsersSeries[newUsersSeries.length - 1]?.value ?? 0;
 
-  const summary = useMemo(
-    () => ({
-      total: allUsers.length,
-      admins: allUsers.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
-      leads: allUsers.filter((candidate) => candidate.role === 'Lead').length,
-      mentors: allUsers.filter((candidate) => candidate.role === 'Mentor').length,
-    }),
-    [allUsers],
-  );
+  const summary = useMemo(() => {
+    // Деактивированные — это выбывшие/тестовые аккаунты, не текущий состав; "Всего" и разбивка
+    // по ролям должны отражать актуальную организацию, а не полную историю строк в базе
+    // (история и так доступна отдельно, через фильтр статуса и Журнал аудита).
+    const current = allUsers.filter((candidate) => candidate.status !== 'Deactivated');
+    return {
+      total: current.length,
+      admins: current.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
+      leads: current.filter((candidate) => candidate.role === 'Lead').length,
+      mentors: current.filter((candidate) => candidate.role === 'Mentor').length,
+    };
+  }, [allUsers]);
 
   const actions = useUserActions();
   const toast = useToast();
