@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField } from '../../shared/ui/FormField';
 import { branchDisplayName } from '../admin-users/userPresentation';
+import { isInvitationUndelivered, useInvitationDeliveryMap } from '../admin-users/useInvitationDeliveryStatus';
 import { useUsersQuery } from '../admin-users/useUsersQuery';
 import type { BranchAdminCandidateRef, PreviewBranchDetails } from './branchPresentation';
 
@@ -20,7 +21,14 @@ export interface AssignBranchAdminDialogProps {
 /** ConfirmDialog + select кандидата (раздел 32 промпта) — только Organization Admin. */
 export function AssignBranchAdminDialog({ branch, open, onOpenChange, isSubmitting, onConfirm }: AssignBranchAdminDialogProps): JSX.Element {
   const { users } = useUsersQuery();
-  const candidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin' && user.role !== 'BranchAdmin');
+  const { map: deliveryMap } = useInvitationDeliveryMap();
+  const candidates = users.filter(
+    (user) =>
+      user.status !== 'Deactivated' &&
+      user.role !== 'OrgAdmin' &&
+      user.role !== 'BranchAdmin' &&
+      !isInvitationUndelivered(user, deliveryMap),
+  );
   const [selectedId, setSelectedId] = useState('');
 
   useEffect(() => {

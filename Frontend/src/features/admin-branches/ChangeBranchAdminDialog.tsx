@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField, FormSelect } from '../../shared/ui/FormField';
 import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
+import { isInvitationUndelivered, useInvitationDeliveryMap } from '../admin-users/useInvitationDeliveryStatus';
 import { useUsersQuery } from '../admin-users/useUsersQuery';
 import type { ChangeBranchAdminInput, PreviousAdminRoleChoice, PreviewBranchDetails } from './branchPresentation';
 
@@ -28,9 +29,16 @@ export function ChangeBranchAdminDialog({ branch, open, onOpenChange, isSubmitti
   const { user: authUser } = useAuth();
   const isOrgAdmin = authUser?.adminScope === 'Organization';
   const { users } = useUsersQuery();
+  const { map: deliveryMap } = useInvitationDeliveryMap();
   const { categories: categoryOptions } = useCategoriesForBranch(branch?.id ?? null, isOrgAdmin);
   const currentAdmin = branch?.adminUserId !== null && branch?.adminUserId !== undefined ? users.find((user) => user.id === branch.adminUserId) : undefined;
-  const candidates = users.filter((user) => user.status !== 'Deactivated' && user.role !== 'OrgAdmin' && user.role !== 'BranchAdmin');
+  const candidates = users.filter(
+    (user) =>
+      user.status !== 'Deactivated' &&
+      user.role !== 'OrgAdmin' &&
+      user.role !== 'BranchAdmin' &&
+      !isInvitationUndelivered(user, deliveryMap),
+  );
 
   const [newAdminId, setNewAdminId] = useState('');
   const [previousRole, setPreviousRole] = useState<PreviousAdminRoleChoice>('Lead');
