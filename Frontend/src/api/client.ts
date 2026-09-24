@@ -59,11 +59,31 @@ apiClient.interceptors.response.use(
     if (!axios.isAxiosError(error) || error.config === undefined) throw error;
 
     const config = error.config;
-    if (error.response?.status !== 401) throw error;
+    const status = error.response?.status;
+    const code = getProblemCode(error);
+
+    // CSRF-провал на любом защищённом запросе (не только /auth/refresh) — например,
+    // ключи DataProtection перегенерировались при перезапуске API, и старая cookie
+    // `mtf_csrf` больше не валидна. Повторами это не чинится, нужен свежий логин —
+    // раньше такой ответ просто прокидывался наверх как обычная ошибка, и страница
+    // показывала общее «не удалось загрузить данные» вместо редиректа на /login.
+    if (status === 403 && code === AUTH_ERROR_CODE.CSRF_VALIDATION_FAILED) {
+      clearAccessToken();
+      notifySessionEnded(error);
+      throw error;
+    }
+
+    if (status !== 401) throw error;
     if (config._skipAuthRefresh === true) throw error;
 
-    const code = getProblemCode(error);
-    if (code === null || !REFRESHABLE_CODES.has(code)) throw error;
+    if (code === null || !REFRESHABLE_CODES.has(code)) {
+      // «Финальные» 401 (UNAUTHORIZED, SECURITY_TOKEN_INVALID, USER_DEACTIVATED, код
+      // отсутствует...) — retry их не чинит, нужен новый вход. Раньше это тоже просто
+      // прокидывалось наверх без очистки сессии и редиректа (тот же симптом, что выше).
+      clearAccessToken();
+      authEvents.emit('sessionExpired', { reason: 'session-expired' });
+      throw error;
+    }
 
     // Повторный 401 уже после успешного refresh — дальше крутиться бессмысленно.
     if (config._retried === true) {
