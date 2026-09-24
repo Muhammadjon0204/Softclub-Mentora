@@ -667,7 +667,12 @@ public sealed class AdminDashboardService(
                     ? name
                     : entry.ActorRole ?? "Пользователь";
 
+        // `audit.read` (an admin opening the Audit Log page) is itself an audited action, so it keeps
+        // appearing in its own feed — left in for the compliance-facing /admin/audit-log page, but
+        // excluded here: the dashboard widget is meant to surface what changed, and a few page-views
+        // in a row would otherwise crowd out every real event (bug report 2026-09-24).
         var recentAudit = page.Items
+            .Where(e => e.Action != AuditActions.AuditRead)
             .Take(6)
             .Select(e => new DashboardAuditLogEntryDto(
                 e.Id, e.OccurredAt, e.BranchId, ActorLabel(e), e.Action, e.EntityType, e.Result))
