@@ -13,7 +13,7 @@ import type { LeadAssignmentRecord, LeadAssignmentStatus } from '../../../mocks/
  * `MarkOverdue()`, раздел 13.3 №6/14), а не derived-индикатор по дедлайну,
  * поэтому у него своя lane, а не просто цветной маркер внутри «Назначено».
  */
-export type KanbanLaneId = 'preparation' | 'assigned' | 'review' | 'rework' | 'overdue' | 'done';
+export type KanbanLaneId = 'preparation' | 'assigned' | 'review' | 'rework' | 'overdue' | 'done' | 'cancelled';
 
 export interface KanbanLaneDef {
   id: KanbanLaneId;
@@ -28,7 +28,8 @@ export const KANBAN_LANES: KanbanLaneDef[] = [
   { id: 'review', title: 'На проверке', statuses: ['Submitted', 'InReview'], dot: 'bg-brand' },
   { id: 'rework', title: 'Доработка', statuses: ['NeedsRework'], dot: 'bg-warning' },
   { id: 'overdue', title: 'Просрочено', statuses: ['Overdue'], dot: 'bg-danger' },
-  { id: 'done', title: 'Завершено', statuses: ['Approved', 'Cancelled'], dot: 'bg-success' },
+  { id: 'done', title: 'Завершено', statuses: ['Approved'], dot: 'bg-success' },
+  { id: 'cancelled', title: 'Отменено', statuses: ['Cancelled'], dot: 'bg-ink-disabled' },
 ];
 
 const STATUS_TO_LANE = KANBAN_LANES.reduce<Record<LeadAssignmentStatus, KanbanLaneId>>((acc, lane) => {
