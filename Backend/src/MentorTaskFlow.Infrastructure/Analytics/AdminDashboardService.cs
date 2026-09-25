@@ -337,10 +337,24 @@ public sealed class AdminDashboardService(
     // Role distribution
     // -----------------------------------------------------------------
 
-    private static RoleDistributionDto ComputeRoleDistribution(IReadOnlyList<User> users) => new(
-        users.Count(u => u.Role == UserRole.Admin),
-        users.Count(u => u.Role == UserRole.Lead),
-        users.Count(u => u.Role == UserRole.Mentor));
+    /// <summary>
+    /// Only accounts that have actually accepted their invitation (password set) and are not the
+    /// organization's own owner account — an Organization Admin is not a team member being managed,
+    /// and an Invited-but-not-yet-accepted row is not a completed headcount yet (bug report 2026-09-25:
+    /// the widget must read as "the team", not "every row in the users table").
+    /// </summary>
+    private static RoleDistributionDto ComputeRoleDistribution(IReadOnlyList<User> users)
+    {
+        var team = users
+            .Where(u => u.PasswordHash is not null)
+            .Where(u => !(u.Role == UserRole.Admin && u.AdminScope == AdminScope.Organization))
+            .ToList();
+
+        return new RoleDistributionDto(
+            team.Count(u => u.Role == UserRole.Admin),
+            team.Count(u => u.Role == UserRole.Lead),
+            team.Count(u => u.Role == UserRole.Mentor));
+    }
 
     // -----------------------------------------------------------------
     // Branch health (all-time — never period-scoped, matching the mock)
