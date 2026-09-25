@@ -29,7 +29,9 @@ public sealed class AdminAuditLogController(
         [FromQuery] AuditLogQuery query,
         CancellationToken cancellationToken)
     {
-        var result = await auditLogReader.QueryAsync(query, cancellationToken);
+        // The real browse endpoint always hides background/diagnostic noise (AuditActions.PageNoiseActions);
+        // AdminDashboardService's own reuse of the reader leaves this false, see AuditLogQuery.ExcludeSystemNoise.
+        var result = await auditLogReader.QueryAsync(query with { ExcludeSystemNoise = true }, cancellationToken);
 
         // The reader appends the audit.read row to the change tracker; committing it here keeps the
         // record of the read in the same unit of work as the read itself (AUD-023).
