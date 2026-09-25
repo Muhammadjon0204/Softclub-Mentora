@@ -406,6 +406,16 @@ public sealed class AdminDashboardService(
     /// remaining weights renormalise) while no assignment has been approved yet.</summary>
     private static int WeightedPerformanceScore(PerformanceMetrics metrics)
     {
+        // No assignments at all: OnTimeRatePct defaults to 100 (vacuously — nothing to be late on),
+        // which is the right value for that field on its own (e.g. a branch health row), but blending
+        // it into a ranking score fabricates a non-zero "performance" out of zero real activity — a
+        // branch that has done nothing yet placed 47/100 and could even win "best branch" outright
+        // (bug report 2026-09-25). A branch/category with no work this period has no score to report.
+        if (metrics.WorkingTotal == 0)
+        {
+            return 0;
+        }
+
         var parts = new List<(double Value, double Weight)>
         {
             (metrics.CompletionRatePct, 0.40),
