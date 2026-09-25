@@ -24,8 +24,6 @@ import { ReportsPage } from '../pages/admin/ReportsPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 import { UsersPage } from '../pages/admin/UsersPage';
 import { DashboardPage as LeadDashboardPage } from '../pages/lead/DashboardPage';
-import { SchedulePage as LeadSchedulePage } from '../pages/lead/SchedulePage';
-import { SuggestionsPage as LeadSuggestionsPage } from '../pages/lead/SuggestionsPage';
 import { AssignmentsPage as LeadAssignmentsPage } from '../pages/lead/AssignmentsPage';
 import { ReviewQueuePage as LeadReviewQueuePage } from '../pages/lead/ReviewQueuePage';
 import { TeamPage as LeadTeamPage } from '../pages/lead/TeamPage';
@@ -122,8 +120,6 @@ export function AppRouter(): JSX.Element {
         }
       >
         <Route path="dashboard" element={<LeadDashboardPage />} />
-        <Route path="schedule" element={<LeadSchedulePage />} />
-        <Route path="suggestions" element={<LeadSuggestionsPage />} />
         <Route path="assignments" element={<LeadAssignmentsPage />} />
         <Route path="review-queue" element={<LeadReviewQueuePage />} />
         <Route path="team" element={<LeadTeamPage />} />
