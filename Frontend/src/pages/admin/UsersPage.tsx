@@ -231,15 +231,17 @@ export function UsersPage(): JSX.Element {
   const newThisWeek = newUsersSeries[newUsersSeries.length - 1]?.value ?? 0;
 
   const summary = useMemo(() => {
-    // Деактивированные — это выбывшие/тестовые аккаунты, не текущий состав; "Всего" и разбивка
-    // по ролям должны отражать актуальную организацию, а не полную историю строк в базе
-    // (история и так доступна отдельно, через фильтр статуса и Журнал аудита).
-    const current = allUsers.filter((candidate) => candidate.status !== 'Deactivated');
+    // "Всего"/разбивка по ролям — это состав команды, а не полная история строк в базе (та
+    // остаётся доступна через фильтр статуса и Журнал аудита): только те, кто реально принял
+    // приглашение (status === 'Active', не 'Invited'/'Locked'/'Deactivated'), и без владельца
+    // организации (OrgAdmin) — это учётная запись владельца, не управляемый член команды
+    // (запрос 2026-09-25).
+    const team = allUsers.filter((candidate) => candidate.status === 'Active' && candidate.role !== 'OrgAdmin');
     return {
-      total: current.length,
-      admins: current.filter((candidate) => candidate.role === 'OrgAdmin' || candidate.role === 'BranchAdmin').length,
-      leads: current.filter((candidate) => candidate.role === 'Lead').length,
-      mentors: current.filter((candidate) => candidate.role === 'Mentor').length,
+      total: team.length,
+      admins: team.filter((candidate) => candidate.role === 'BranchAdmin').length,
+      leads: team.filter((candidate) => candidate.role === 'Lead').length,
+      mentors: team.filter((candidate) => candidate.role === 'Mentor').length,
     };
   }, [allUsers]);
 
