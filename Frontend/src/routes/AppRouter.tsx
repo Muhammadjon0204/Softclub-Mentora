@@ -104,11 +104,15 @@ export function AppRouter(): JSX.Element {
         <Route path="profile" element={<ProfilePage />} />
       </Route>
 
-      {/* Lead-панель (Phase 3, ТЗ 2.2 раздел 24.4): единый `/lead/*`, ровно маршруты
-          из таблицы «Страницы Lead» — никаких `/lead-panel/*` или иных вариантов
-          (тот же принцип, что `FE-030` закрепляет для `/admin/*`). Detail-роуты
-          не заводятся — `?assignmentId=`/`?mentorId=`/`?topicId=` + drawer, тот же
-          приём, что уже применён в разделе `/admin/*`. */}
+      {/* Lead-панель (Phase 3, ТЗ 2.2 раздел 24.4): единый `/lead/*` — никаких
+          `/lead-panel/*` или иных вариантов (тот же принцип, что `FE-030`
+          закрепляет для `/admin/*`). Detail-роуты не заводятся —
+          `?assignmentId=`/`?mentorId=`/`?topicId=` + drawer, тот же приём, что
+          уже применён в разделе `/admin/*`.
+          `schedule`/`suggestions` из таблицы ТЗ сюда намеренно не входят —
+          убраны из фронтенда (запрос 2026-09-28), backend не тронут; страницы
+          `pages/lead/SchedulePage.tsx`/`SuggestionsPage.tsx` остаются в
+          репозитории неподключёнными на случай, если понадобятся позже. */}
       <Route
         path="/lead"
         element={
