@@ -10,6 +10,7 @@ import { AssignmentsKanbanBoard } from '../../features/lead-assignments/Assignme
 import { LeadAssignmentDetailsDrawer } from '../../features/lead-assignments/LeadAssignmentDetailsDrawer';
 import { ReassignAssignmentDialog } from '../../features/lead-assignments/ReassignAssignmentDialog';
 import { assignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
+import type { KanbanDragAction } from '../../features/lead/assignments/leadAssignmentKanban';
 import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
 import { useActiveLeadMentors, useLeadMentorNameResolver } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
@@ -154,6 +155,21 @@ export function AssignmentsPage(): JSX.Element {
     ];
   }
 
+  /** Карточку перетащили — тот же самый обработчик, что и у соответствующего пункта меню выше. */
+  function handleDropAction(a: LeadAssignmentRecord, action: KanbanDragAction): void {
+    if (action === 'publish') {
+      void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано');
+      return;
+    }
+    if (action === 'acceptSuggestion') {
+      void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято');
+      return;
+    }
+    // cancel/reject требуют причину — как и при клике на "Отменить"/"Отклонить", тут только
+    // открываем тот же диалог, а не отменяем задание вслепую одним перетаскиванием.
+    setCancelDialog({ assignment: a, kind: action === 'reject' ? 'reject' : 'cancel' });
+  }
+
   return (
     <div className="space-y-5">
       <PreviewPageHeader
@@ -198,6 +214,7 @@ export function AssignmentsPage(): JSX.Element {
         onOpen={openRow}
         getActionItems={buildActionItems}
         mentorNameOf={mentorNameOf}
+        onDropAction={handleDropAction}
       />
 
       <LeadAssignmentDetailsDrawer
