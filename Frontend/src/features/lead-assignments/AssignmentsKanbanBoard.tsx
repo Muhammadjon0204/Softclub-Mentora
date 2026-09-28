@@ -1,17 +1,18 @@
 import {
   DndContext,
-  KeyboardSensor,
+  DragOverlay,
   PointerSensor,
-  closestCenter,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
-import { Calendar, Clock3, Move, UserRound } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Calendar, Clock3, UserRound } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { KanbanDragAction, KanbanLaneId } from '../lead/assignments/leadAssignmentKanban';
 import { KANBAN_LANES, getAssignmentKanbanLane, resolveKanbanDragAction } from '../lead/assignments/leadAssignmentKanban';
@@ -25,6 +26,11 @@ import type { PreviewActionMenuItem } from '../admin-preview/PreviewActionMenu';
 
 const THIN_SCROLLBAR_X = '[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line-strong';
 const THIN_SCROLLBAR_Y = '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line-strong';
+const CARD_BASE = 'flex flex-col gap-2.5 rounded-control border bg-surface p-3.5';
+
+// A click that lands right after a drop (pointer released over the card it started on) is the tail of
+// the drag gesture, not a request to open the drawer.
+const CLICK_AFTER_DRAG_GRACE_MS = 250;
 
 function initialsOf(fullName: string): string {
   return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
@@ -54,65 +60,27 @@ interface AssignmentsKanbanBoardProps {
   onDropAction: (assignment: LeadAssignmentRecord, action: KanbanDragAction) => void;
 }
 
-interface KanbanCardProps {
+interface KanbanCardBodyProps {
   assignment: LeadAssignmentRecord;
   timeZoneId: string;
-  selected: boolean;
-  onOpen: (id: string) => void;
-  actionItems: PreviewActionMenuItem[];
   mentorNameOf: (mentorId: string) => string;
-  /** Есть ли хоть одна lane, куда эту карточку можно перетащить — иначе ручка перетаскивания не нужна. */
-  draggable: boolean;
+  actionSlot: ReactNode;
 }
 
-function KanbanCard({ assignment: a, timeZoneId, selected, onOpen, actionItems, mentorNameOf, draggable }: KanbanCardProps): JSX.Element {
+/** Содержимое карточки без поведения — общее для карточки в колонке и её копии, летящей за курсором. */
+function KanbanCardBody({ assignment: a, timeZoneId, mentorNameOf, actionSlot }: KanbanCardBodyProps): JSX.Element {
   const latest = a.submissions[a.submissions.length - 1];
   const isOverdue = a.status === 'Overdue';
   const statusMeta = LEAD_STATUS_META[a.status];
 
-  // Отдельная ручка, а не вся карточка целиком — карточка уже кликабельна целиком (открывает drawer),
-  // и одному и тому же элементу нельзя одновременно быть "click to open" и "press to drag" без конфликта.
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: a.id,
-    disabled: !draggable,
-  });
-  const style = transform !== null ? { transform: CSS.Translate.toString(transform), zIndex: 30 } : undefined;
-
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      role="button"
-      tabIndex={0}
-      onClick={() => { onOpen(a.id); }}
-      onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(a.id); } }}
-      className={`group flex cursor-pointer flex-col gap-2.5 rounded-control border bg-surface p-3.5 shadow-surface outline-none transition-all duration-150 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-        selected ? 'border-brand bg-brand-soft' : 'border-line'
-      } ${isDragging ? 'opacity-40 shadow-none' : ''}`}
-    >
+    <>
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex min-w-0 items-center gap-1 text-[11px] font-medium text-ink-muted">
           {a.source === 'Auto' ? <Calendar className="h-3 w-3 shrink-0" aria-hidden="true" /> : <UserRound className="h-3 w-3 shrink-0" aria-hidden="true" />}
           <span className="truncate">{sourceLabel(a.source)}</span>
         </span>
-        <div className="-mr-1 -mt-1 flex shrink-0 items-center gap-0.5">
-          {draggable ? (
-            <button
-              type="button"
-              {...attributes}
-              {...listeners}
-              onClick={(event) => { event.stopPropagation(); }}
-              aria-label={`Перетащить «${a.title}» в другую колонку`}
-              title="Перетащите карточку, чтобы изменить статус"
-              className="flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded-control-sm text-ink-disabled opacity-0 transition-opacity duration-150 hover:bg-surface-hover hover:text-ink-secondary focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand group-hover:opacity-100 active:cursor-grabbing"
-            >
-              <Move className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          ) : null}
-          <div className="p-1" onClick={(event) => { event.stopPropagation(); }}>
-            <PreviewActionMenu items={actionItems} />
-          </div>
-        </div>
+        {actionSlot}
       </div>
 
       <p className="line-clamp-2 text-[13px] font-semibold leading-[18px] text-ink" title={a.title}>
@@ -152,6 +120,60 @@ function KanbanCard({ assignment: a, timeZoneId, selected, onOpen, actionItems, 
           <span className={`truncate text-[11.5px] font-medium ${statusMeta.text}`}>{LEAD_ASSIGNMENT_STATUS_LABEL[a.status]}</span>
         </div>
       </div>
+    </>
+  );
+}
+
+interface KanbanCardProps {
+  assignment: LeadAssignmentRecord;
+  timeZoneId: string;
+  selected: boolean;
+  onOpen: (id: string) => void;
+  actionItems: PreviewActionMenuItem[];
+  mentorNameOf: (mentorId: string) => string;
+  /** Есть ли хоть одна lane, куда эту карточку можно перетащить. */
+  draggable: boolean;
+}
+
+/**
+ * Вся карточка — и кнопка открытия drawer'а (клик), и то, что тащат (нажать и повести). Их различает
+ * порог PointerSensor в 6px: клик без движения открывает drawer, движение начинает перетаскивание.
+ * Сама карточка при этом остаётся на месте полупрозрачной — за курсором летит её копия из `DragOverlay`,
+ * иначе она обрезалась бы скроллом своей колонки, как только выходит за её край.
+ */
+function KanbanCard({ assignment: a, timeZoneId, selected, onOpen, actionItems, mentorNameOf, draggable }: KanbanCardProps): JSX.Element {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: a.id, disabled: !draggable });
+
+  return (
+    <div
+      ref={setNodeRef}
+      // Only when draggable: dnd-kit's attributes carry `aria-disabled` for a disabled draggable, which
+      // would announce a perfectly clickable card as a disabled button.
+      {...(draggable ? attributes : {})}
+      {...listeners}
+      role="button"
+      tabIndex={0}
+      aria-roledescription={draggable ? 'перетаскиваемая карточка' : undefined}
+      title={draggable ? 'Нажмите, чтобы открыть, или перетащите в другую колонку' : undefined}
+      onClick={() => { onOpen(a.id); }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(a.id); }
+      }}
+      className={`group ${CARD_BASE} cursor-pointer select-none shadow-surface outline-none transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+        selected ? 'border-brand bg-brand-soft' : 'border-line'
+      } ${isDragging ? 'border-dashed opacity-40 shadow-none' : 'hover:-translate-y-0.5 hover:border-line-strong hover:shadow-surface-hover'}`}
+    >
+      <KanbanCardBody
+        assignment={a}
+        timeZoneId={timeZoneId}
+        mentorNameOf={mentorNameOf}
+        actionSlot={
+          <div className="-mr-1 -mt-1 shrink-0 p-1" onClick={(event) => { event.stopPropagation(); }}>
+            <PreviewActionMenu items={actionItems} />
+          </div>
+        }
+      />
     </div>
   );
 }
@@ -161,7 +183,7 @@ interface KanbanLaneProps {
   title: string;
   dot: string;
   items: LeadAssignmentRecord[];
-  /** `null`, пока ничего не перетаскивается. */
+  /** `'none'`, пока ничего не перетаскивается. */
   dropState: 'none' | 'valid' | 'invalid';
   timeZoneId: string;
   selectedId: string | null;
@@ -185,7 +207,7 @@ function KanbanLane({
   mentorNameOf,
   isCardDraggable,
 }: KanbanLaneProps): JSX.Element {
-  const { setNodeRef, isOver } = useDroppable({ id: laneId, disabled: dropState === 'none' });
+  const { setNodeRef, isOver } = useDroppable({ id: laneId });
 
   return (
     <div
@@ -194,7 +216,7 @@ function KanbanLane({
         dropState === 'valid'
           ? isOver
             ? 'border-brand bg-brand-soft/40'
-            : 'border-brand/40 border-dashed'
+            : 'border-dashed border-brand/40'
           : dropState === 'invalid' && isOver
             ? 'border-danger/50'
             : 'border-line'
@@ -210,7 +232,7 @@ function KanbanLane({
         </span>
       </div>
 
-      <div className={`flex-1 space-y-2 overflow-y-auto p-2.5 max-h-[70vh] ${THIN_SCROLLBAR_Y}`}>
+      <div className={`max-h-[70vh] flex-1 space-y-2 overflow-y-auto p-2.5 ${THIN_SCROLLBAR_Y}`}>
         {items.length === 0 ? (
           <p className="px-1.5 py-4 text-center text-[11.5px] text-ink-disabled">
             {dropState === 'valid' ? 'Отпустите здесь' : 'Нет заданий'}
@@ -247,6 +269,7 @@ function KanbanLane({
  * действия (например перетащить сразу в "Одобрено"), просто не считается
  * валидным dropzone и не срабатывает — решения проверки по-прежнему только на
  * `/lead/review-queue`, где перед решением видно содержимое Submission.
+ * С клавиатуры те же переходы доступны через action-меню карточки.
  */
 export function AssignmentsKanbanBoard({
   assignments,
@@ -258,11 +281,9 @@ export function AssignmentsKanbanBoard({
   onDropAction,
 }: AssignmentsKanbanBoardProps): JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const suppressClickUntil = useRef(0);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const byId = useMemo(() => new Map(assignments.map((a) => [a.id, a])), [assignments]);
   const byLane = useMemo(() => {
@@ -287,12 +308,22 @@ export function AssignmentsKanbanBoard({
     return KANBAN_LANES.some((lane) => resolveKanbanDragAction(a, lane.id) !== null);
   }
 
+  function openCard(id: string): void {
+    if (Date.now() < suppressClickUntil.current) return;
+    onOpen(id);
+  }
+
+  function finishDrag(): void {
+    setActiveId(null);
+    suppressClickUntil.current = Date.now() + CLICK_AFTER_DRAG_GRACE_MS;
+  }
+
   function handleDragStart(event: DragStartEvent): void {
     setActiveId(String(event.active.id));
   }
 
   function handleDragEnd(event: DragEndEvent): void {
-    setActiveId(null);
+    finishDrag();
     const { active, over } = event;
     if (over === null) return;
 
@@ -308,10 +339,10 @@ export function AssignmentsKanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setActiveId(null); }}
+      onDragCancel={finishDrag}
     >
       <div className={`flex gap-4 overflow-x-auto pb-3 ${THIN_SCROLLBAR_X}`}>
         {KANBAN_LANES.map((lane) => (
@@ -324,13 +355,27 @@ export function AssignmentsKanbanBoard({
             dropState={activeId === null ? 'none' : validTargetLanes.has(lane.id) ? 'valid' : 'invalid'}
             timeZoneId={timeZoneId}
             selectedId={selectedId}
-            onOpen={onOpen}
+            onOpen={openCard}
             getActionItems={getActionItems}
             mentorNameOf={mentorNameOf}
             isCardDraggable={isCardDraggable}
           />
         ))}
       </div>
+
+      {/* Portaled to <body>: fixed positioning is still clipped by any transformed ancestor on the page.
+          No drop animation: dnd-kit's default slides the copy back to the card's ORIGINAL column, which
+          after a successful drop reads as "rejected" until the refetch moves the card. */}
+      {createPortal(
+        <DragOverlay dropAnimation={null}>
+          {activeAssignment !== null ? (
+            <div className={`${CARD_BASE} h-full w-full rotate-[1.5deg] cursor-grabbing border-brand shadow-surface-hover`}>
+              <KanbanCardBody assignment={activeAssignment} timeZoneId={timeZoneId} mentorNameOf={mentorNameOf} actionSlot={null} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }
