@@ -8,16 +8,21 @@ namespace MentorTaskFlow.Contracts.Submissions;
 /// reached through a presigned URL issued after the permission checks are repeated in full
 /// (<c>SUB-008</c>, <c>SEC-004</c>). <c>hasPreview</c> replaces exposing the preview key: the interface
 /// needs to know whether to offer a viewer, which is a boolean, not a location.
+///
+/// The five file fields are null together on a comment-only submission (2026-09-28) — not every task
+/// produces a file to attach. <c>Comment</c> is the only content in that case, and optional context
+/// alongside a file otherwise.
 /// </remarks>
 public sealed record SubmissionDto(
     Guid Id,
     Guid AssignmentId,
     int VersionNumber,
-    string OriginalFileName,
-    string ContentType,
-    string FileExtension,
-    long FileSizeBytes,
-    string Sha256Hash,
+    string? OriginalFileName,
+    string? ContentType,
+    string? FileExtension,
+    long? FileSizeBytes,
+    string? Sha256Hash,
+    string? Comment,
     bool IsLate,
     Guid SubmittedById,
     DateTimeOffset SubmittedAt,

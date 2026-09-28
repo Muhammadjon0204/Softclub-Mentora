@@ -86,6 +86,11 @@ function OverviewTab({ assignment }: { assignment: MentorAssignmentRecord }): JS
  * roll back or hide (Phase 1E contract map, Open Question #2 — resolved). `onSubmitted` invalidates the
  * real queries `useResolvedMentorAssignment` reads from, so the assignment's new status/version show up
  * from the actual API response, not an optimistic local patch.
+ *
+ * A file is optional (2026-09-28) — not every task produces one (e.g. "call the parents"), so
+ * `canConfirm` accepts a comment alone. When both a file and a comment are given, the comment rides
+ * along with the last file's `POST` (`useSubmitAssignment.ts`), matching "one comment describes the
+ * whole submission," not each version.
  */
 function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignmentRecord; onSubmitted: () => void }): JSX.Element {
   const toast = useToast();
@@ -95,7 +100,10 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
 
   const readyFiles = pending.filter((f) => f.status === 'ready');
   const hasBlockingFiles = pending.some((f) => f.status === 'uploading' || f.status === 'error');
-  const canConfirm = readyFiles.length > 0 && !hasBlockingFiles && !isSubmitting;
+  const hasComment = comment.trim().length > 0;
+  // A file or a comment, at least one (2026-09-28) — not every task produces a file to attach (e.g.
+  // "call the parents"), mirrors the backend's own `ck_submissions_file_or_comment` constraint.
+  const canConfirm = (readyFiles.length > 0 || hasComment) && !hasBlockingFiles && !isSubmitting;
   const isOverdueWarning = assignment.status === 'Overdue';
 
   function updatePendingFile(id: string, patch: Partial<Pick<PendingFile, 'status' | 'progress' | 'errorMessage'>>): void {
@@ -105,7 +113,7 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
   async function handleSubmit(): Promise<void> {
     if (!canConfirm) return;
     const attempted = readyFiles;
-    const results = await submitFiles(assignment.id, attempted, updatePendingFile);
+    const results = await submitFiles(assignment.id, attempted, hasComment ? comment : null, updatePendingFile);
     const succeeded = results.filter((r) => r.outcome === 'success');
     const failed = results.filter((r) => r.outcome === 'error');
 
@@ -143,7 +151,7 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
       <FileDropzone acceptExtensions={ACCEPT_EXTENSIONS} maxSizeBytes={MAX_FILE_SIZE_BYTES} files={pending} onFilesChange={setPending} disabled={isSubmitting} />
       <div>
         <label htmlFor="submission-comment" className="mb-1 block text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">
-          Комментарий к работе
+          Комментарий к работе{readyFiles.length > 0 ? ' (необязательно)' : ''}
         </label>
         <textarea
           id="submission-comment"
@@ -151,11 +159,10 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
           value={comment}
           onChange={(event) => { setComment(event.target.value); }}
           disabled={isSubmitting}
-          placeholder="Например: реализовал все требования задания, основные изменения находятся..."
+          placeholder="Например: позвонил родителям студентов и обсудил результаты, файл прикладывать не требуется"
           className="w-full resize-none rounded-control-sm border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition placeholder:text-ink-disabled focus:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand disabled:opacity-60"
         />
-        {/* Backend не хранит комментарий к Submission ни в каком поле — см. docs/INTEGRATION_UI_ISSUES.md, #9 */}
-        <p className="mt-1 text-[11.5px] text-ink-muted">Комментарий не сохраняется на сервере и виден только вам сейчас — у backend нет такого поля.</p>
+        <p className="mt-1 text-[11.5px] text-ink-muted">Если задание не предполагает файл — достаточно комментария. Иначе можно приложить и то, и другое.</p>
       </div>
       <div className="flex justify-end">
         <Button variant="primary" leadingIcon={<Send className="h-4 w-4" aria-hidden="true" />} disabled={!canConfirm} isLoading={isSubmitting} onClick={() => { void handleSubmit(); }}>

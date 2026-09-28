@@ -15,26 +15,43 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
 
             // SUB-010 and SUB-015 as one rule: an empty file and an oversized one are both refused
             // long before this, but the column is where the guarantee outlives the code that made it.
+            // NULL is the file-less case (2026-09-28) — a comment-only submission has no size to bound.
             table.HasCheckConstraint(
                 "ck_submissions_size_bounds",
-                "file_size_bytes > 0 AND file_size_bytes <= 52428800");
+                "file_size_bytes IS NULL OR (file_size_bytes > 0 AND file_size_bytes <= 52428800)");
 
-            table.HasCheckConstraint("ck_submissions_extension_allowed", "file_extension IN ('Pdf','Pptx')");
+            table.HasCheckConstraint("ck_submissions_extension_allowed", "file_extension IS NULL OR file_extension IN ('Pdf','Pptx')");
 
             // Lower-case hex, exactly 64 characters. Mixed case would make the duplicate check of
             // SUB-028 miss a byte-identical file (10.7).
-            table.HasCheckConstraint("ck_submissions_sha256_format", "sha256_hash ~ '^[0-9a-f]{64}$'");
+            table.HasCheckConstraint("ck_submissions_sha256_format", "sha256_hash IS NULL OR sha256_hash ~ '^[0-9a-f]{64}$'");
 
             // 17.5: in Release 1.0 a PDF previews as itself and a PPTX has no preview at all. Anything
             // else would mean a preview pointing at a different object than the one submitted.
             table.HasCheckConstraint(
                 "ck_submissions_preview_key",
                 "(file_extension = 'Pdf' AND preview_storage_key = storage_key) "
-                + "OR (file_extension = 'Pptx' AND preview_storage_key IS NULL)");
+                + "OR (file_extension = 'Pptx' AND preview_storage_key IS NULL) "
+                + "OR (file_extension IS NULL AND preview_storage_key IS NULL)");
 
             // Reserved for the asynchronous conversion of a later version; a value here now would be a
             // state nothing in Release 1.0 can produce or interpret.
             table.HasCheckConstraint("ck_submissions_conversion_status", "conversion_status IS NULL");
+
+            // The five file-derived columns are all-or-nothing: there is no such thing as a submission
+            // with a hash but no name (2026-09-28).
+            table.HasCheckConstraint(
+                "ck_submissions_file_fields_consistent",
+                "(file_extension IS NULL AND storage_key IS NULL AND original_file_name IS NULL "
+                + "AND content_type IS NULL AND sha256_hash IS NULL) "
+                + "OR (file_extension IS NOT NULL AND storage_key IS NOT NULL AND original_file_name IS NOT NULL "
+                + "AND content_type IS NOT NULL AND sha256_hash IS NOT NULL)");
+
+            // A mentor must hand in something — a file, a comment, or both (2026-09-28: not every task
+            // produces a file, e.g. "call the parents", but a submission cannot be entirely empty).
+            table.HasCheckConstraint(
+                "ck_submissions_file_or_comment",
+                "file_extension IS NOT NULL OR (comment IS NOT NULL AND length(trim(comment)) > 0)");
         });
 
         builder.HasKey(x => x.Id);
@@ -44,14 +61,16 @@ public sealed class SubmissionConfiguration : IEntityTypeConfiguration<Submissio
         builder.Property(x => x.BranchId).IsRequired();
         builder.Property(x => x.CategoryId).IsRequired();
         builder.Property(x => x.VersionNumber).IsRequired();
-        builder.Property(x => x.StorageKey).HasMaxLength(Submission.StorageKeyMaxLength).IsRequired();
-        builder.Property(x => x.OriginalFileName).HasMaxLength(Submission.OriginalFileNameMaxLength).IsRequired();
-        builder.Property(x => x.ContentType).HasMaxLength(128).IsRequired();
-        builder.Property(x => x.FileExtension).HasConversion<string>().HasMaxLength(8).IsRequired();
-        builder.Property(x => x.FileSizeBytes).IsRequired();
+        // Nullable (2026-09-28): a comment-only submission has no file, see ck_submissions_file_or_comment.
+        builder.Property(x => x.StorageKey).HasMaxLength(Submission.StorageKeyMaxLength);
+        builder.Property(x => x.OriginalFileName).HasMaxLength(Submission.OriginalFileNameMaxLength);
+        builder.Property(x => x.ContentType).HasMaxLength(128);
+        builder.Property(x => x.FileExtension).HasConversion<string>().HasMaxLength(8);
+        builder.Property(x => x.FileSizeBytes);
         // Named explicitly: the convention turns Sha256Hash into sha256hash, which would not match the
         // check constraint above — and a mismatch there fails the migration, not the request.
-        builder.Property(x => x.Sha256Hash).HasColumnName("sha256_hash").HasColumnType("char(64)").IsRequired();
+        builder.Property(x => x.Sha256Hash).HasColumnName("sha256_hash").HasColumnType("char(64)");
+        builder.Property(x => x.Comment).HasMaxLength(Submission.CommentMaxLength);
         builder.Property(x => x.IsLate).IsRequired();
         builder.Property(x => x.SubmittedById).IsRequired();
         builder.Property(x => x.SubmittedAt).IsRequired();
