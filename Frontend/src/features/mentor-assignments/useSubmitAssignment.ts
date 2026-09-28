@@ -44,9 +44,15 @@ export interface UseSubmitAssignmentResult {
    * Invalidates the assignment list/history/submissions caches once, after the whole batch finishes, if
    * at least one file succeeded (a real status transition to `Submitted` happened server-side).
    */
+  /**
+   * `comment` (2026-09-28: not every task produces a file, e.g. "call the parents") is attached to the
+   * LAST file's upload call, or sent as its own comment-only call when `files` is empty — never
+   * duplicated across every version, since it describes the submission as a whole, not each file.
+   */
   submitFiles: (
     assignmentId: string,
     files: PendingFile[],
+    comment: string | null,
     onFileUpdate: (id: string, patch: Partial<Pick<PendingFile, 'status' | 'progress' | 'errorMessage'>>) => void,
   ) => Promise<SubmitFileResult[]>;
 }
@@ -69,6 +75,7 @@ export function useSubmitAssignment(): UseSubmitAssignmentResult {
     async (
       assignmentId: string,
       files: PendingFile[],
+      comment: string | null,
       onFileUpdate: (id: string, patch: Partial<Pick<PendingFile, 'status' | 'progress' | 'errorMessage'>>) => void,
     ): Promise<SubmitFileResult[]> => {
       setIsSubmitting(true);
@@ -76,12 +83,21 @@ export function useSubmitAssignment(): UseSubmitAssignmentResult {
       let anySucceeded = false;
 
       try {
-        for (const pending of files) {
+        if (files.length === 0) {
+          // Comment-only submission (2026-09-28): no file to iterate, so this is the single call.
+          await uploadSubmission(assignmentId, null, comment);
+          anySucceeded = true;
+          return results;
+        }
+
+        for (const [index, pending] of files.entries()) {
           onFileUpdate(pending.id, { status: 'uploading', progress: 0, errorMessage: undefined });
           try {
             // Intentionally sequential (not `Promise.all`): the backend builds each new version on top
             // of the previous one, so concurrent POSTs for the same assignment would race.
-            await uploadSubmission(assignmentId, pending.file, (percent) => {
+            // The comment describes the submission as a whole, so it rides along with only the last
+            // file's call, not every one of them.
+            await uploadSubmission(assignmentId, pending.file, index === files.length - 1 ? comment : null, (percent) => {
               onFileUpdate(pending.id, { progress: percent });
             });
             onFileUpdate(pending.id, { status: 'ready', progress: 100 });

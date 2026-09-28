@@ -46,13 +46,29 @@ public sealed class SubmissionService(
 
     public async Task<SubmissionDto> UploadAsync(
         Guid assignmentId,
-        UploadedFile file,
+        UploadedFile? file,
+        string? comment,
         CancellationToken cancellationToken)
     {
+        var trimmedComment = string.IsNullOrWhiteSpace(comment) ? null : comment.Trim();
+
+        if (file is null && trimmedComment is null)
+        {
+            throw new ValidationAppException("file", "Нужно приложить файл или написать комментарий.");
+        }
+
         // Steps 0a–7: everything decidable without reading the body. Cheapest first, and none of it
         // touches storage.
         var actor = RequireMentor();
         var assignment = await FindSubmittableAsync(assignmentId, actor, cancellationToken);
+
+        // Comment-only (2026-09-28): none of the file-specific steps (8–11: inspection, dedup, upload)
+        // apply — there is nothing to inspect, hash or store.
+        if (file is null)
+        {
+            return await PersistAsync(assignment, Guid.CreateVersion7(), null, trimmedComment, actor, cancellationToken);
+        }
+
         var extension = UploadedFileInspector.ResolveExtension(file.FileName, file.ContentType);
 
         // Steps 8 and 9: size, signature and structure. The file is spooled to a temporary handle that
@@ -82,15 +98,15 @@ public sealed class SubmissionService(
         // the direction of that trade is deliberate (SUB-030, SUB-032).
         await storage.PutAsync(storageKey, inspected.Content, Submission.ContentTypeOf(extension), cancellationToken);
 
-        // Step 12.
-        return await PersistAsync(
-            assignment,
-            submissionId,
+        var submittedFile = new SubmittedFile(
             storageKey,
             SanitiseFileName(file.FileName, extension),
-            inspected,
-            actor,
-            cancellationToken);
+            extension,
+            inspected.SizeBytes,
+            inspected.Sha256Hash);
+
+        // Step 12.
+        return await PersistAsync(assignment, submissionId, submittedFile, trimmedComment, actor, cancellationToken);
     }
 
     /// <summary>
@@ -203,9 +219,8 @@ public sealed class SubmissionService(
     private Task<SubmissionDto> PersistAsync(
         Assignment assignment,
         Guid submissionId,
-        string storageKey,
-        string originalFileName,
-        InspectedFile inspected,
+        SubmittedFile? file,
+        string? comment,
         ICurrentUserContext actor,
         CancellationToken cancellationToken)
     {
@@ -250,11 +265,8 @@ public sealed class SubmissionService(
                 submissionId,
                 tracked,
                 version + 1,
-                storageKey,
-                originalFileName,
-                inspected.Extension,
-                inspected.SizeBytes,
-                inspected.Sha256Hash,
+                file,
+                comment,
                 isLate,
                 actor.UserId,
                 now);
@@ -361,11 +373,15 @@ public sealed class SubmissionService(
     {
         var submission = await FindDownloadableAsync(submissionId, cancellationToken);
 
-        var url = await storage.GetDownloadUrlAsync(
-            submission.StorageKey,
-            submission.ContentType,
-            submission.OriginalFileName,
-            cancellationToken);
+        // 2026-09-28: a comment-only submission has no file at all. 404 rather than a conflict — same
+        // reasoning as the missing-preview case just below: the resource genuinely does not exist.
+        if (submission.StorageKey is not { } storageKey || submission.ContentType is not { } contentType
+            || submission.OriginalFileName is not { } originalFileName)
+        {
+            throw new NotFoundException("К этой версии не приложен файл.");
+        }
+
+        var url = await storage.GetDownloadUrlAsync(storageKey, contentType, originalFileName, cancellationToken);
 
         return Expiring(url);
     }
@@ -376,12 +392,14 @@ public sealed class SubmissionService(
 
         // 17.5: a PPTX has no preview in Release 1.0. 404 rather than a conflict — the resource does
         // not exist, and saying so is not a refusal.
-        if (submission.PreviewStorageKey is not { } previewKey)
+        // A non-null PreviewStorageKey only ever comes from a Pdf-extension file (see Submission.Record),
+        // which ck_submissions_file_fields_consistent guarantees means ContentType is non-null too.
+        if (submission is not { PreviewStorageKey: { } previewKey, ContentType: { } contentType })
         {
             throw new NotFoundException("Предпросмотр доступен только для PDF.");
         }
 
-        var url = await storage.GetPreviewUrlAsync(previewKey, submission.ContentType, cancellationToken);
+        var url = await storage.GetPreviewUrlAsync(previewKey, contentType, cancellationToken);
 
         return Expiring(url);
     }
@@ -480,9 +498,10 @@ public sealed class SubmissionService(
         submission.VersionNumber,
         submission.OriginalFileName,
         submission.ContentType,
-        submission.FileExtension.ToString(),
+        submission.FileExtension?.ToString(),
         submission.FileSizeBytes,
         submission.Sha256Hash,
+        submission.Comment,
         submission.IsLate,
         submission.SubmittedById,
         submission.SubmittedAt,

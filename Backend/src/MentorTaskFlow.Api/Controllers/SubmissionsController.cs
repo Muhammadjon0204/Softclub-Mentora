@@ -22,7 +22,7 @@ namespace MentorTaskFlow.Api.Controllers;
 public sealed class SubmissionsController(ISubmissionService submissions) : ControllerBase
 {
     /// <summary>
-    /// <c>POST /assignments/{id}/submissions</c> — a new version of the work.
+    /// <c>POST /assignments/{id}/submissions</c> — a new version of the work: a file, a comment, or both.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -31,9 +31,14 @@ public sealed class SubmissionsController(ISubmissionService submissions) : Cont
     /// is refused (<c>API-015</c>, <c>SUB-028</c>).
     /// </para>
     /// <para>
-    /// The form carries the file and nothing else. Organization, branch and category come from the
-    /// assignment on the server; accepting them here would let a caller choose which branch's prefix
-    /// to write into (<c>TEN-061</c>, <c>SEC-003</c>).
+    /// The form carries the file, an optional comment, and nothing else. Organization, branch and
+    /// category come from the assignment on the server; accepting them here would let a caller choose
+    /// which branch's prefix to write into (<c>TEN-061</c>, <c>SEC-003</c>).
+    /// </para>
+    /// <para>
+    /// <c>file</c> is optional (2026-09-28): not every task produces a file to hand in (e.g. "call the
+    /// parents"), but the request must carry at least one of <c>file</c>/<c>comment</c> — both empty is
+    /// refused with 422.
     /// </para>
     /// </remarks>
     [HttpPost("assignments/{id:guid}/submissions", Name = RouteNames.UploadSubmission)]
@@ -47,12 +52,13 @@ public sealed class SubmissionsController(ISubmissionService submissions) : Cont
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<SubmissionDto>> UploadAsync(
         Guid id,
-        IFormFile file,
+        IFormFile? file,
+        [FromForm] string? comment,
         CancellationToken cancellationToken)
     {
-        if (file is null)
+        if (file is null && string.IsNullOrWhiteSpace(comment))
         {
-            throw new ValidationAppException("file", "Файл обязателен.");
+            throw new ValidationAppException("file", "Нужно приложить файл или написать комментарий.");
         }
 
         // TEN-061: any attempt to supply scope through the form is refused rather than ignored.
@@ -68,11 +74,19 @@ public sealed class SubmissionsController(ISubmissionService submissions) : Cont
                 "Арендный scope определяется сервером и не принимается в запросе.");
         }
 
+        if (file is null)
+        {
+            var created = await submissions.UploadAsync(id, null, comment, cancellationToken);
+
+            return CreatedAtRoute(RouteNames.ListSubmissions, new { id = created.AssignmentId }, created);
+        }
+
         await using var content = file.OpenReadStream();
 
         var submission = await submissions.UploadAsync(
             id,
             new UploadedFile(content, file.FileName, file.ContentType, file.Length),
+            comment,
             cancellationToken);
 
         return CreatedAtRoute(

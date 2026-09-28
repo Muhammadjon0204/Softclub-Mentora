@@ -11,15 +11,21 @@ import { apiClient } from '../client';
  * multiple files in the old UI model become multiple sequential submission versions in the real one,
  * see `useSubmitAssignment.ts`).
  */
+/**
+ * The five file fields are `null` together on a comment-only submission (2026-09-28) — not every task
+ * produces a file to attach (e.g. "call the parents"). `comment` is the only content in that case, and
+ * optional context alongside a file otherwise.
+ */
 export interface SubmissionDto {
   id: string;
   assignmentId: string;
   versionNumber: number;
-  originalFileName: string;
-  contentType: string;
-  fileExtension: string;
-  fileSizeBytes: number;
-  sha256Hash: string;
+  originalFileName: string | null;
+  contentType: string | null;
+  fileExtension: string | null;
+  fileSizeBytes: number | null;
+  sha256Hash: string | null;
+  comment: string | null;
   isLate: boolean;
   submittedById: string;
   submittedAt: string;
@@ -60,10 +66,10 @@ export async function getSubmissionPreviewUrl(submissionId: string): Promise<Fil
  * `MentorAssignmentDetailsDrawer.tsx`'s `SubmissionForm` now call this via
  * `features/mentor-assignments/useSubmitAssignment.ts`).
  *
- * Exactly one multipart field (`file`) — never `organizationId`/`branchId`/`categoryId`/`assignmentId`
- * (hard 400 `VALIDATION_FAILED`, `TEN-061`) and never a `comment` field (Phase 1E contract map, Open
- * Question #1 — resolved: the real contract has nowhere for it to land, so it's dropped here rather
- * than silently ignored server-side).
+ * `file` is optional (2026-09-28): not every task produces a file to hand in (e.g. "call the parents"),
+ * so a mentor may submit a comment alone — the caller must supply at least one of `file`/`comment`, the
+ * server rejects both empty with 422. Still never `organizationId`/`branchId`/`categoryId`/`assignmentId`
+ * (hard 400 `VALIDATION_FAILED`, `TEN-061`).
  *
  * `apiClient`'s instance default is `Content-Type: application/json` (`api/client.ts`) — axios's
  * `transformRequest` only leaves a `FormData` body untouched when the header at request-build time is
@@ -74,11 +80,13 @@ export async function getSubmissionPreviewUrl(submissionId: string): Promise<Fil
  */
 export async function uploadSubmission(
   assignmentId: string,
-  file: File,
+  file: File | null,
+  comment: string | null,
   onProgress?: (percent: number) => void,
 ): Promise<SubmissionDto> {
   const formData = new FormData();
-  formData.append('file', file);
+  if (file !== null) formData.append('file', file);
+  if (comment !== null && comment.trim().length > 0) formData.append('comment', comment.trim());
 
   const { data } = await apiClient.post<SubmissionDto>(`/api/v1/assignments/${assignmentId}/submissions`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

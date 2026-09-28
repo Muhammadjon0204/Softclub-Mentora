@@ -69,14 +69,16 @@ export function toAssignmentRecord(dto: AssignmentDto): LeadAssignmentRecord {
 }
 
 /**
- * One `SubmissionDto` = one submission version = one file (Phase 1E contract map, Open Question #2 —
- * "resolved": multi-file submissions in the old UI model become multiple submission versions in the
- * real one, which SB2's list already naturally gives). Wrapping the single real file in a one-element
- * `files` array keeps every existing `.files.map(...)` render call site unchanged.
+ * One `SubmissionDto` = one submission version = at most one file (Phase 1E contract map, Open
+ * Question #2 — "resolved": multi-file submissions in the old UI model become multiple submission
+ * versions in the real one, which SB2's list already naturally gives). Wrapping the single real file in
+ * a one-element `files` array keeps every existing `.files.map(...)` render call site unchanged; an
+ * empty array is a comment-only submission (2026-09-28) — not every task produces a file (e.g. "call
+ * the parents"), mirrored from `dto.fileExtension`/`dto.originalFileName`/`dto.fileSizeBytes` being
+ * `null` together.
  *
- * `comment` is always `null`: the real `SubmissionDto` has no comment field at all (Open Question #1,
- * "resolved" — not solved here since SB1/the upload contract is out of scope, but rendered honestly as
- * absent rather than showing stale/fake preview text). Logged in `docs/INTEGRATION_UI_ISSUES.md`.
+ * `comment` now comes straight from the real `SubmissionDto.comment` field (added 2026-09-28) instead
+ * of the old hardcoded `null` placeholder from before SB1 carried one.
  */
 export function toSubmissionRecord(dto: SubmissionDto, review: LeadReviewRecord | null): LeadSubmissionRecord {
   return {
@@ -84,15 +86,18 @@ export function toSubmissionRecord(dto: SubmissionDto, review: LeadReviewRecord 
     versionNumber: dto.versionNumber,
     submittedAt: toMsRequired(dto.submittedAt),
     isLate: dto.isLate,
-    comment: null,
-    files: [
-      {
-        id: dto.id,
-        name: dto.originalFileName,
-        extension: dto.fileExtension.replace(/^\./, '').toLowerCase() as 'pdf' | 'pptx',
-        sizeLabel: formatFileSizeLabel(dto.fileSizeBytes),
-      },
-    ],
+    comment: dto.comment,
+    files:
+      dto.fileExtension === null
+        ? []
+        : [
+            {
+              id: dto.id,
+              name: dto.originalFileName ?? '',
+              extension: dto.fileExtension.replace(/^\./, '').toLowerCase() as 'pdf' | 'pptx',
+              sizeLabel: formatFileSizeLabel(dto.fileSizeBytes ?? 0),
+            },
+          ],
     review,
   };
 }
