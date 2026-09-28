@@ -79,6 +79,13 @@ export function toAssignmentRecord(dto: AssignmentDto): LeadAssignmentRecord {
  *
  * `comment` now comes straight from the real `SubmissionDto.comment` field (added 2026-09-28) instead
  * of the old hardcoded `null` placeholder from before SB1 carried one.
+ *
+ * A `null` field is checked with `== null` (not `=== null`), not just style: the API's global
+ * `JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`
+ * (`Program.cs`) drops a null property from the response body entirely rather than sending it as
+ * `null` — so `dto.fileExtension` on a comment-only submission arrives as `undefined`, not `null`, and
+ * an `=== null` check let it fall through to `.replace()` and crash the whole tree (2026-09-28 prod
+ * incident: white screen for both Lead and Mentor right after a comment-only submission).
  */
 export function toSubmissionRecord(dto: SubmissionDto, review: LeadReviewRecord | null): LeadSubmissionRecord {
   return {
@@ -86,9 +93,9 @@ export function toSubmissionRecord(dto: SubmissionDto, review: LeadReviewRecord 
     versionNumber: dto.versionNumber,
     submittedAt: toMsRequired(dto.submittedAt),
     isLate: dto.isLate,
-    comment: dto.comment,
+    comment: dto.comment ?? null,
     files:
-      dto.fileExtension === null
+      dto.fileExtension == null
         ? []
         : [
             {
