@@ -106,6 +106,23 @@ public sealed class SubmissionsController(ISubmissionService submissions) : Cont
         Ok(await submissions.ListAsync(id, cancellationToken));
 
     /// <summary>
+    /// <c>POST /submissions/query</c> — the versions of up to 200 assignments in one call, newest first
+    /// within each assignment.
+    /// </summary>
+    /// <remarks>
+    /// A read, despite the verb: it changes nothing and carries no idempotency key. POST only because
+    /// the identifier list does not fit a URL (see <see cref="SubmissionsQueryRequest"/>).
+    /// </remarks>
+    [HttpPost("submissions/query")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<IReadOnlyList<SubmissionDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<IReadOnlyList<SubmissionDto>>> QueryAsync(
+        SubmissionsQueryRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await submissions.ListForAssignmentsAsync(request.AssignmentIds ?? [], cancellationToken));
+
+    /// <summary>
     /// <c>GET /submissions/{id}/download-url</c> — a presigned URL, valid for ten minutes.
     /// </summary>
     /// <remarks>

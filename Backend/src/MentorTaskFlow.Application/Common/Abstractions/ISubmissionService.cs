@@ -34,6 +34,18 @@ public interface ISubmissionService
     Task<IReadOnlyList<SubmissionDto>> ListAsync(Guid assignmentId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// The versions of several assignments at once, grouped by assignment and newest first within
+    /// each, under exactly the visibility rule of <see cref="ListAsync"/>.
+    /// </summary>
+    /// <remarks>
+    /// An identifier the caller may not see — or that does not exist — contributes nothing rather than
+    /// failing the batch, which also reveals less than the per-assignment 404 does.
+    /// </remarks>
+    Task<IReadOnlyList<SubmissionDto>> ListForAssignmentsAsync(
+        IReadOnlyList<Guid> assignmentIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Issues a download URL after repeating the visibility checks in full (<c>SUB-006</c>).
     /// </summary>
     /// <remarks>

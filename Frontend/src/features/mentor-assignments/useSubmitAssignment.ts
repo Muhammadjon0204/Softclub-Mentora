@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { uploadSubmission } from '../../api/lead/submissions';
 import { getGenericErrorMessage } from '../../api/problemDetails';
-import { submissionsQueryKey } from '../lead/assignments/useSubmissions';
+import { SUBMISSIONS_ROOT_KEY } from '../lead/assignments/useSubmissions';
 import { mentorAssignmentHistoryQueryKey, mentorAssignmentsListQueryKey } from '../mentor/scope/useScopedMentorAssignments';
 import { useMentorScope } from '../mentor/scope/useMentorScope';
 import type { PendingFile } from '../../shared/ui/FileDropzone';
@@ -66,7 +66,8 @@ export function useSubmitAssignment(): UseSubmitAssignmentResult {
     (assignmentId: string): void => {
       void queryClient.invalidateQueries({ queryKey: mentorAssignmentsListQueryKey(scope.organizationId, scope.mentorId) });
       void queryClient.invalidateQueries({ queryKey: mentorAssignmentHistoryQueryKey(assignmentId) });
-      void queryClient.invalidateQueries({ queryKey: submissionsQueryKey(assignmentId) });
+      // Root, not this assignment's key: list views read submissions through a batch entry.
+      void queryClient.invalidateQueries({ queryKey: SUBMISSIONS_ROOT_KEY });
     },
     [queryClient, scope.organizationId, scope.mentorId],
   );

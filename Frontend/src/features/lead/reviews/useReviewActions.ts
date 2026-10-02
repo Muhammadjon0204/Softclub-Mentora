@@ -8,7 +8,7 @@ import { toAssignmentRecord } from '../assignments/assignmentAdapter';
 import { getAssignment } from '../../../api/lead/assignments';
 import { assignmentHistoryQueryKey, leadAssignmentsListQueryKey } from '../scope/useScopedLeadAssignments';
 import { useLeadScope } from '../scope/useLeadScope';
-import { reviewQueryKey, submissionsQueryKey } from '../assignments/useSubmissions';
+import { reviewQueryKey, SUBMISSIONS_ROOT_KEY } from '../assignments/useSubmissions';
 
 /**
  * RV1: `POST /submissions/{id}/reviews` — replaces `approvePreview`/`requestReworkPreview` from
@@ -42,7 +42,8 @@ export function useReviewActions(): UseReviewActionsResult {
     (assignment: LeadAssignmentRecord, submissionId: string): void => {
       void queryClient.invalidateQueries({ queryKey: leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId) });
       void queryClient.invalidateQueries({ queryKey: assignmentHistoryQueryKey(assignment.id) });
-      void queryClient.invalidateQueries({ queryKey: submissionsQueryKey(assignment.id) });
+      // Root, not this assignment's key: list views read submissions through a batch entry.
+      void queryClient.invalidateQueries({ queryKey: SUBMISSIONS_ROOT_KEY });
       void queryClient.invalidateQueries({ queryKey: reviewQueryKey(submissionId) });
     },
     [queryClient, scope.organizationId, scope.categoryId],

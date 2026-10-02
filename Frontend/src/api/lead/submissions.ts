@@ -44,6 +44,19 @@ export async function listSubmissions(assignmentId: string): Promise<SubmissionD
   return data;
 }
 
+/** Server-side cap of `POST /submissions/query` (`SubmissionsQueryRequest.MaxAssignmentIds`). */
+export const SUBMISSIONS_QUERY_MAX_IDS = 200;
+
+/**
+ * `POST /submissions/query` — the submissions of many assignments in one request (newest first within
+ * each assignment), for list views. Same visibility as SB2; ids the caller can't see just contribute
+ * nothing.
+ */
+export async function querySubmissions(assignmentIds: string[]): Promise<SubmissionDto[]> {
+  const { data } = await apiClient.post<SubmissionDto[]>('/api/v1/submissions/query', { assignmentIds });
+  return data;
+}
+
 /** SB3: `GET /submissions/{id}/download-url` — presigned, ~10 minute TTL (`PresignedUrlMinutes`, configurable 1–60). */
 export async function getSubmissionDownloadUrl(submissionId: string): Promise<FileUrlDto> {
   const { data } = await apiClient.get<FileUrlDto>(`/api/v1/submissions/${submissionId}/download-url`, {
