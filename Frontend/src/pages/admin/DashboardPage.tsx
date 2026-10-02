@@ -43,7 +43,9 @@ export function DashboardPage(): JSX.Element {
         ) : (
           // Смена периода/филиала не должна резко «стирать» экран (раздел 4 полироли):
           // старые данные остаются на месте с мягким затемнением, пока не придёт ответ.
-          <div className={`transition-opacity duration-200 ${query.isFetching ? 'opacity-60' : 'opacity-100'}`}>
+          // Только на смене ключа (placeholder), не на фоновом realtime-обновлении — иначе
+          // экран мигал бы на каждое событие.
+          <div className={`transition-opacity duration-200 ${query.isPlaceholderData ? 'opacity-60' : 'opacity-100'}`}>
             <DashboardContent data={query.data} />
           </div>
         )}
