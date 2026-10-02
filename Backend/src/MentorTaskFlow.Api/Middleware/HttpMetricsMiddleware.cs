@@ -24,6 +24,15 @@ public sealed class HttpMetricsMiddleware(RequestDelegate next, HttpMetrics metr
 {
     public async Task InvokeAsync(HttpContext context)
     {
+        // The realtime transport request lives as long as the tab is open; recorded as a request it
+        // would read as hours of latency. Negotiate (`/realtime/negotiate`) is an ordinary request and
+        // is still measured.
+        if (context.Request.Path.Equals(Realtime.RealtimeHub.Path, StringComparison.OrdinalIgnoreCase))
+        {
+            await next(context);
+            return;
+        }
+
         var timestamp = Stopwatch.GetTimestamp();
 
         try

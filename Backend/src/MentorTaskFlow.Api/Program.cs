@@ -12,6 +12,7 @@ using Minio;
 using Minio.DataModel.Args;
 using Prometheus;
 using MentorTaskFlow.Api.Options;
+using MentorTaskFlow.Api.Realtime;
 using MentorTaskFlow.Api.Tenancy;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Tenancy;
@@ -76,6 +77,16 @@ builder.Services
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     })
     .AddMentorTaskFlowValidationProblem();
+
+// ---------------------------------------------------------------------------
+// Realtime. Browsers get "assignment X changed" pushes and refetch through the
+// ordinary endpoints; RealtimeNotificationListener relays PostgreSQL NOTIFYs
+// published by RealtimeChangeInterceptor, from this process and the worker alike.
+// ---------------------------------------------------------------------------
+builder.Services.AddSignalR(options => options.EnableDetailedErrors = isDevelopment);
+builder.Services.AddOptions<RealtimeOptions>()
+    .Bind(builder.Configuration.GetSection(RealtimeOptions.SectionName));
+builder.Services.AddHostedService<RealtimeNotificationListener>();
 
 // ---------------------------------------------------------------------------
 // OpenAPI (API-002)
@@ -373,6 +384,11 @@ if (isDevelopment)
 app.UseMiddleware<HttpMetricsMiddleware>();
 
 app.MapControllers();
+
+// A connection is authorized once, at connect. Closing it when the access token expires makes the
+// client reconnect with a fresh one, so a deactivated user or a revoked token version stops receiving
+// signals within one token lifetime rather than for as long as the tab stays open.
+app.MapHub<RealtimeHub>(RealtimeHub.Path, options => options.CloseOnAuthenticationExpiration = true);
 
 // Liveness never touches a dependency: a failing database must not restart the process (OBS-003).
 app.MapHealthChecks("/health/live", new()

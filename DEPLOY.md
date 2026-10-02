@@ -206,6 +206,13 @@ docker compose --env-file .env.api -f docker-compose.api.yml logs mentora-migrat
 ## 5. nginx на хосте
 
 ```nginx
+# Один раз на весь nginx (в http-контексте, например /etc/nginx/conf.d/websocket-upgrade.conf).
+# Нужен realtime-обновлениям (/api/v1/realtime): браузер держит с API WebSocket.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
 server {
     server_name tms.softclub.tj;                      # пользователи заходят сюда
     location / {
@@ -232,6 +239,11 @@ server {
         proxy_set_header   X-Real-IP         $remote_addr;
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
+        # WebSocket для realtime. Без этих двух строк обновления всё равно работают,
+        # но через long polling — медленнее и с лишними запросами. Таймаут 120s не мешает:
+        # сервер шлёт ping каждые 15 секунд.
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        $connection_upgrade;
         proxy_read_timeout 120s;
     }
 }

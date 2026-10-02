@@ -25,8 +25,34 @@ public sealed class MtfJwtBearerEvents : JwtBearerEvents
 
     public MtfJwtBearerEvents()
     {
+        OnMessageReceived = ReadRealtimeTokenAsync;
         OnTokenValidated = ValidateAsync;
         OnChallenge = ChallengeAsync;
+    }
+
+    /// <summary>
+    /// Accepts the token from the <c>access_token</c> query parameter on the realtime hub, and nowhere
+    /// else.
+    /// </summary>
+    /// <remarks>
+    /// Browsers cannot set an <c>Authorization</c> header on a WebSocket or EventSource request, so the
+    /// SignalR client sends it in the query string there. Every other endpoint keeps refusing a token
+    /// from the URL, where proxies and browser history would record it; the hub's own query string is
+    /// kept out of the technical log by <c>SensitiveEndpoints</c>.
+    /// </remarks>
+    private static Task ReadRealtimeTokenAsync(MessageReceivedContext context)
+    {
+        var request = context.HttpContext.Request;
+
+        if (request.Path.StartsWithSegments(Realtime.RealtimeHub.Path, StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrEmpty(request.Headers.Authorization)
+            && request.Query.TryGetValue("access_token", out var token)
+            && !string.IsNullOrEmpty(token))
+        {
+            context.Token = token;
+        }
+
+        return Task.CompletedTask;
     }
 
     private static async Task ValidateAsync(TokenValidatedContext context)

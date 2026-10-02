@@ -28,14 +28,18 @@ public sealed class HttpCurrentUserAccessor(IHttpContextAccessor httpContextAcce
             }
 
             _resolved = true;
-            _cached = Resolve(httpContextAccessor.HttpContext?.User);
+            _cached = FromPrincipal(httpContextAccessor.HttpContext?.User);
             return _cached;
         }
     }
 
     public bool IsAuthenticated => Current is not null;
 
-    private static ICurrentUserContext? Resolve(ClaimsPrincipal? principal)
+    /// <summary>
+    /// The same resolution for callers that hold a principal but no request scope — a realtime hub
+    /// connection outlives the HTTP request that opened it.
+    /// </summary>
+    public static ICurrentUserContext? FromPrincipal(ClaimsPrincipal? principal)
     {
         if (principal?.Identity is not { IsAuthenticated: true })
         {
