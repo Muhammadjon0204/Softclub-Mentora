@@ -84,6 +84,7 @@ describe('Маршрутизация и guard-ы', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/mentor/dashboard');
     });
-    expect(screen.getByRole('heading', { name: 'Обзор' })).toBeInTheDocument();
+    // Pages are loaded on demand, so the dashboard renders a moment after the redirect.
+    expect(await screen.findByRole('heading', { name: 'Обзор' })).toBeInTheDocument();
   });
 });

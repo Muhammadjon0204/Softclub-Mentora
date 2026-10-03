@@ -1,7 +1,7 @@
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 
 import { getReviewOrNull } from '../../../api/lead/reviews';
-import { listSubmissions } from '../../../api/lead/submissions';
+import { listSubmissions, querySubmissions, SUBMISSIONS_QUERY_MAX_IDS, type SubmissionDto } from '../../../api/lead/submissions';
 import type { LeadSubmissionRecord } from '../../../mocks/ui-preview/leadAssignments.preview';
 import { toReviewRecord, toSubmissionRecord } from './assignmentAdapter';
 
@@ -18,8 +18,21 @@ import { toReviewRecord, toSubmissionRecord } from './assignmentAdapter';
  *   `MentorAssignmentDetailsDrawer`.
  */
 
+/** Root of every submissions query — single-assignment and batch alike. Invalidate this after a write. */
+export const SUBMISSIONS_ROOT_KEY = ['lead-submissions'] as const;
+
 export function submissionsQueryKey(assignmentId: string): readonly unknown[] {
   return ['lead-submissions', assignmentId] as const;
+}
+
+function submissionsBatchQueryKey(sortedAssignmentIds: string[]): readonly unknown[] {
+  return ['lead-submissions', 'batch', ...sortedAssignmentIds] as const;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
 }
 
 export function reviewQueryKey(submissionId: string): readonly unknown[] {
@@ -32,25 +45,46 @@ function toAscending<T>(newestFirst: T[]): T[] {
 }
 
 /**
- * Tier 1 — one lightweight `GET .../submissions` per assignment id, no review fetch. Safe to call with
- * an empty array (renders nothing, no network calls). Submissions carry no `review`/`comment` at this
- * tier (`null`) — callers needing those must be looking at exactly one assignment and should use
- * `useSubmissionsDetailed` instead.
+ * Tier 1 — the submissions of every assignment in a scoped list, no review fetch. One
+ * `POST /submissions/query` per 200 assignments — it used to be one `GET` per assignment, a request
+ * per Kanban card at ~200 ms of network latency each. Safe to call with an empty array (no network
+ * calls). Submissions carry no `review` at this tier (`null`) — callers needing reviews must be looking
+ * at exactly one assignment and should use `useSubmissionsDetailed` instead.
+ *
+ * An assignment with no submissions gets an empty array once its batch has loaded, and no entry while
+ * it is still loading — the same "absent until known" contract the per-assignment version had.
  */
 export function useSubmissionSummaries(assignmentIds: string[]): Map<string, LeadSubmissionRecord[]> {
+  // Sorted so the same set of assignments always maps to the same cache entry, whatever order the
+  // list arrived in.
+  const batches = chunk([...new Set(assignmentIds)].sort(), SUBMISSIONS_QUERY_MAX_IDS);
+
   const results = useQueries({
-    queries: assignmentIds.map((id) => ({
-      queryKey: submissionsQueryKey(id),
-      queryFn: () => listSubmissions(id),
+    queries: batches.map((ids) => ({
+      queryKey: submissionsBatchQueryKey(ids),
+      queryFn: () => querySubmissions(ids),
       staleTime: 30_000,
+      // A refetch for a slightly different set (one card added) keeps the previous rows on screen
+      // instead of blanking every version badge until it lands.
+      placeholderData: keepPreviousData,
     })),
   });
 
   const map = new Map<string, LeadSubmissionRecord[]>();
-  assignmentIds.forEach((id, index) => {
+  batches.forEach((ids, index) => {
     const data = results[index]?.data;
     if (data === undefined) return;
-    map.set(id, toAscending(data).map((dto) => toSubmissionRecord(dto, null)));
+
+    const byAssignment = new Map<string, SubmissionDto[]>();
+    for (const dto of data) {
+      const list = byAssignment.get(dto.assignmentId);
+      if (list === undefined) byAssignment.set(dto.assignmentId, [dto]);
+      else list.push(dto);
+    }
+
+    for (const id of ids) {
+      map.set(id, toAscending(byAssignment.get(id) ?? []).map((dto) => toSubmissionRecord(dto, null)));
+    }
   });
   return map;
 }

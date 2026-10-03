@@ -369,6 +369,57 @@ public sealed class SubmissionService(
         return submissions.Select(ToDto).ToList();
     }
 
+    public async Task<IReadOnlyList<SubmissionDto>> ListForAssignmentsAsync(
+        IReadOnlyList<Guid> assignmentIds,
+        CancellationToken cancellationToken)
+    {
+        var actor = RequireActor();
+
+        if (assignmentIds.Count > SubmissionsQueryRequest.MaxAssignmentIds)
+        {
+            throw new ValidationAppException(
+                "assignmentIds",
+                $"Не более {SubmissionsQueryRequest.MaxAssignmentIds} заданий за один запрос.");
+        }
+
+        var ids = assignmentIds.Distinct().ToArray();
+
+        if (ids.Length == 0)
+        {
+            return [];
+        }
+
+        var organizationId = branchContext.EffectiveOrganizationId;
+
+        // The per-assignment rule of EnsureAssignmentVisibleAsync, expressed as a filter so the whole
+        // batch is one query: same roles, same comparisons, nothing loosened.
+        var visibleAssignments = dbContext.Assignments
+            .AsNoTracking()
+            .Where(a => ids.Contains(a.Id) && a.OrganizationId == organizationId);
+
+        visibleAssignments = actor switch
+        {
+            { Role: UserRole.Admin, AdminScope: AdminScope.Organization } => visibleAssignments,
+            { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => visibleAssignments.Where(a => a.BranchId == actor.BranchId),
+            { Role: UserRole.Lead } => visibleAssignments.Where(a => a.CategoryId == actor.CategoryId),
+            _ => visibleAssignments.Where(a =>
+                a.AssignedToId == actor.UserId
+                && a.Status != AssignmentStatus.Draft
+                && a.Status != AssignmentStatus.Suggested),
+        };
+
+        var visibleIds = visibleAssignments.Select(a => a.Id);
+
+        var submissions = await dbContext.Submissions
+            .AsNoTracking()
+            .Where(s => visibleIds.Contains(s.AssignmentId))
+            .OrderBy(s => s.AssignmentId)
+            .ThenByDescending(s => s.VersionNumber)
+            .ToListAsync(cancellationToken);
+
+        return submissions.Select(ToDto).ToList();
+    }
+
     public async Task<FileUrlDto> GetDownloadUrlAsync(Guid submissionId, CancellationToken cancellationToken)
     {
         var submission = await FindDownloadableAsync(submissionId, cancellationToken);

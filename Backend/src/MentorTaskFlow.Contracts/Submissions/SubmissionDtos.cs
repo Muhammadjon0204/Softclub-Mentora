@@ -29,6 +29,19 @@ public sealed record SubmissionDto(
     bool HasPreview);
 
 /// <summary>
+/// <c>POST /submissions/query</c> — the submissions of several assignments in one round trip, for list
+/// views that otherwise issued one <c>GET /assignments/{id}/submissions</c> per row.
+/// </summary>
+/// <remarks>
+/// A POST body rather than a query string: a page of a hundred identifiers would overrun the 8 KB
+/// request-line limit of Kestrel and nginx alike.
+/// </remarks>
+public sealed record SubmissionsQueryRequest(IReadOnlyList<Guid> AssignmentIds)
+{
+    public const int MaxAssignmentIds = 200;
+}
+
+/// <summary>
 /// A presigned URL and the moment it stops working.
 /// </summary>
 /// <remarks>
