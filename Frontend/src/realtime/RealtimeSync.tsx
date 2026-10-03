@@ -14,7 +14,9 @@ export function RealtimeSync(): null {
   const userId = status === 'authenticated' ? (user?.id ?? null) : null;
 
   useEffect(() => {
-    if (userId === null) return undefined;
+    // With MSW mocks (tests, backend-less dev) there is no hub to connect to; trying would only
+    // leave a retry loop running in the background.
+    if (userId === null || import.meta.env.VITE_USE_MOCKS === 'true') return undefined;
 
     const scheduler = createRefetchScheduler(queryClient);
     const disconnect = connect(import.meta.env.VITE_API_BASE_URL ?? '', scheduler.schedule);

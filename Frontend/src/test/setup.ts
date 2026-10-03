@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest';
 
 import { clearAccessToken } from '../auth/tokenStore';
@@ -34,6 +34,11 @@ window.matchMedia ??= ((query: string) => ({
   removeEventListener: () => {},
   dispatchEvent: () => false,
 })) as unknown as typeof window.matchMedia;
+
+// Страницы грузятся лениво (`routes/lazyPage.ts`): первый `findBy*` на странице ждёт, пока vitest
+// на лету скомпилирует её модуль — для дашборда с recharts это под нагрузкой параллельного прогона
+// больше дефолтной секунды. Ожидание — про холодную компиляцию, а не про поведение приложения.
+configure({ asyncUtilTimeout: 5_000 });
 
 beforeAll(() => {
   server.listen({ onUnhandledRequest: 'error' });
