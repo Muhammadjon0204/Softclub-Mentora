@@ -154,6 +154,9 @@ services:
       Notifications__EnableWorker: "true"
       # Процесс не обслуживает HTTP, собирать с него /metrics нечего.
       Metrics__Enabled: "false"
+      # Браузеры подключаются к realtime только через mentora-api. Воркер свои
+      # изменения публикует (NOTIFY), но слушать ему некому — лишнее соединение с БД.
+      Realtime__ListenerEnabled: "false"
     volumes:
       - mentora_dataprotection_keys:/home/mentortaskflow/.aspnet/DataProtection-Keys
     depends_on:

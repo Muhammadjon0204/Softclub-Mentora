@@ -61,6 +61,11 @@ public sealed partial class SecretRedactionEnricher : ILogEventEnricher
         // parameter name stays, so a request is still recognisable in an incident review (SEC-023).
         RedactQueryString(logEvent, "RequestPath");
         RedactQueryString(logEvent, "Path");
+
+        // ASP.NET Core's own "Request starting/finished" lines carry the query in a property of its
+        // own. A browser's realtime connection puts the access token there, since it cannot send a
+        // header on a WebSocket.
+        RedactQueryString(logEvent, "QueryString");
     }
 
     private static void RedactQueryString(LogEvent logEvent, string propertyName)
@@ -80,8 +85,9 @@ public sealed partial class SecretRedactionEnricher : ILogEventEnricher
         }
     }
 
+    // `access_token` is listed on its own: `\btoken` cannot match inside it, `_` being a word character.
     [GeneratedRegex(
-        @"\b(token|code|signature|X-Amz-Signature|X-Amz-Credential)=[^&\s]*",
+        @"\b(token|access_token|code|signature|X-Amz-Signature|X-Amz-Credential)=[^&\s]*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex SensitiveQueryParameter();
 }
@@ -100,6 +106,9 @@ public static class SensitiveEndpoints
     [
         "/api/v1/auth",
         "/api/v1/telegram/bind-token",
+
+        // The SignalR client puts the access token and the connection token in the query string.
+        "/api/v1/realtime",
     ];
 
     public static bool CarriesCredentials(PathString path) =>

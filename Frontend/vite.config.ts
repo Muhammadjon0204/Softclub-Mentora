@@ -45,6 +45,8 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        // The realtime hub (/api/v1/realtime) upgrades to a WebSocket.
+        ws: true,
       },
     },
   },

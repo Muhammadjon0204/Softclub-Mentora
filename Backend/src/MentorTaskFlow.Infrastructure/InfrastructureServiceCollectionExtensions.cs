@@ -23,6 +23,7 @@ using MentorTaskFlow.Infrastructure.Users;
 using MentorTaskFlow.Infrastructure.Observability;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Realtime;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -67,6 +68,8 @@ public static class InfrastructureServiceCollectionExtensions
             // snake_case for every table, column, index and constraint (DEPLOY-001).
             options.UseSnakeCaseNamingConvention();
 
+            options.AddInterceptors(serviceProvider.GetRequiredService<RealtimeChangeInterceptor>());
+
             if (isDevelopment)
             {
                 options.EnableDetailedErrors();
@@ -75,6 +78,10 @@ public static class InfrastructureServiceCollectionExtensions
             // EnableSensitiveDataLogging is never switched on: parameter values would reach the
             // technical log and violate SEC-021 / AUD-022 even in Development.
         });
+
+        // Singleton: one instance for every context keeps EF from building a new internal service
+        // provider per scope, which a per-scope interceptor instance would trigger.
+        services.AddSingleton<RealtimeChangeInterceptor>();
 
         services.AddSingleton<IClock, SystemClock>();
 
