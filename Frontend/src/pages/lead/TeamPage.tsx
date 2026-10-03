@@ -9,17 +9,20 @@ import { MentorDetailsDrawer } from '../../features/lead/team/MentorDetailsDrawe
 import { useResolvedLeadMentor, useScopedLeadMentors } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
+import { pluralizeRu } from '../../features/lead/assignments/leadAssignmentPresentation';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { MentorDirectoryEntry } from '../../features/lead/scope/leadWorkspace';
 
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'Все статусы' },
-  { value: 'Active', label: 'Активен' },
-  { value: 'Invited', label: 'Приглашён' },
-  { value: 'Locked', label: 'Заблокирован' },
+// Deactivated mentors are not listed at all: a Lead cannot reactivate them (an admin action) and they
+// only cluttered the roster. Invited ones stay one click away — they were just added and are waiting
+// to set a password.
+type VisibleStatus = 'Active' | 'Invited';
+const STATUS_OPTIONS: { value: VisibleStatus; label: string }[] = [
+  { value: 'Active', label: 'Активные' },
+  { value: 'Invited', label: 'Приглашённые' },
 ];
 
 const STATUS_TONE: Record<MentorDirectoryEntry['status'], 'success' | 'neutral' | 'danger'> = { Active: 'success', Invited: 'neutral', Locked: 'danger' };
@@ -42,7 +45,7 @@ export function TeamPage(): JSX.Element {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState<VisibleStatus>('Active');
   const [createOpen, setCreateOpen] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
@@ -72,14 +75,20 @@ export function TeamPage(): JSX.Element {
     window.requestAnimationFrame(() => { if (idToFocus !== null) rowRefs.current.get(idToFocus)?.focus(); });
   }
 
+  const pool = useMemo(() => mentors.filter((m) => m.status === status), [mentors, status]);
+
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return mentors.filter((m) => {
-      if (query.length > 0 && !m.fullName.toLowerCase().includes(query) && !m.email.toLowerCase().includes(query)) return false;
-      if (status !== 'all' && m.status !== status) return false;
-      return true;
-    });
-  }, [mentors, search, status]);
+    if (query.length === 0) return pool;
+    return pool.filter((m) => m.fullName.toLowerCase().includes(query) || m.email.toLowerCase().includes(query));
+  }, [pool, search]);
+
+  const invitedCount = useMemo(() => mentors.filter((m) => m.status === 'Invited').length, [mentors]);
+  const emptyTitle = status === 'Active' ? 'Активных менторов пока нет' : 'Приглашённых менторов нет';
+  const emptyDescription =
+    status === 'Active' && invitedCount > 0
+      ? 'Приглашённые ещё не завершили регистрацию — они в фильтре «Приглашённые».'
+      : 'Добавьте ментора кнопкой выше.';
 
   return (
     <div className="space-y-6">
@@ -95,16 +104,24 @@ export function TeamPage(): JSX.Element {
 
       <Card padded={false} className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6">
-          <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-ink-secondary">{mentors.length} менторов</span>
+          <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-ink-secondary">
+            {pool.length} {pluralizeRu(pool.length, 'ментор', 'ментора', 'менторов')}
+          </span>
           <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} className="!min-w-[260px]" />
-          <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} className="w-[160px]" />
+          <PreviewSelect
+            label="Статус"
+            value={status}
+            onChange={(value) => { setStatus(value === 'Invited' ? 'Invited' : 'Active'); }}
+            options={STATUS_OPTIONS}
+            className="w-[160px]"
+          />
         </div>
 
         {rows.length === 0 ? (
           <EmptyState
             icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />}
-            title={mentors.length === 0 ? 'В направлении пока нет менторов' : 'Ничего не найдено'}
-            description={mentors.length === 0 ? 'Добавьте первого ментора кнопкой выше.' : 'Попробуйте изменить фильтры.'}
+            title={pool.length === 0 ? emptyTitle : 'Ничего не найдено'}
+            description={pool.length === 0 ? emptyDescription : 'Попробуйте изменить поиск.'}
           />
         ) : (
           <ul className="divide-y divide-divider">

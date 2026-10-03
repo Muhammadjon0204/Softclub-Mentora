@@ -54,9 +54,13 @@ export function useScopedLeadMentors(): RealLeadMentor[] {
   );
 }
 
-/** Same filtering semantics as the old `scopedActiveMentors()` — excludes `Invited` (no password set yet, not a legitimate assignment target). */
+/**
+ * Mentors who can actually work: signed up and not deactivated. Feeds every picker and filter of the
+ * Lead section (new task, reassign, mentor filters, report breakdown). It used to drop only `Invited`,
+ * so a deactivated (`Locked`) mentor was still offered as an assignee.
+ */
 export function useActiveLeadMentors(): RealLeadMentor[] {
-  return useScopedLeadMentors().filter((mentor) => mentor.status !== 'Invited');
+  return useScopedLeadMentors().filter((mentor) => mentor.status === 'Active');
 }
 
 /** id -> display name, `'Ментор'` fallback for a stale/foreign id — the real, hook-based replacement for `mentorNameOf()` from `leadScopedData.ts` (kept as a plain function there only for the out-of-scope Dashboard/Reports consumers). */
