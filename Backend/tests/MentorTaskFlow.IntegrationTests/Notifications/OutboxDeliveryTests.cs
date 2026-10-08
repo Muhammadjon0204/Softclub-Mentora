@@ -455,7 +455,7 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
             new SecureTokenService(),
             new JwtTokenService(authOptions, clock),
             new TokenVersionValidator(context, new MemoryCache(new MemoryCacheOptions()), authOptions),
-            new PasswordPolicy(new EmbeddedCommonPasswordCatalog()),
+            new PasswordPolicy(),
             new AuditWriter(context, new StubCurrentUserAccessor(), new StubBranchContext(Guid.Empty, Guid.Empty), new StubRequestContext(), clock),
             authOptions,
             clock);

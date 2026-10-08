@@ -259,7 +259,7 @@ export function SettingsPage(): JSX.Element {
         <ReadOnlyRow label="Длительность сессии" value="30 дней (refresh-токен)" />
         <ReadOnlyRow label="Время жизни access-токена" value="15 минут" />
         <ReadOnlyRow label="Блокировка аккаунта" value="5 неудачных попыток входа" />
-        <ReadOnlyRow label="Политика паролей" value="Минимум 12 символов, заглавная буква, цифра" />
+        <ReadOnlyRow label="Политика паролей" value="От 5 до 8 символов, любые буквы и цифры" />
       </SectionCard>
     );
   } else if (tab === 'notifications') {

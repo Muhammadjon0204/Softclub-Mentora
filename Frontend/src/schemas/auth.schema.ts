@@ -14,37 +14,23 @@ export const forgotPasswordSchema = z.object({ email: emailField });
 
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
-/**
- * Требования, которые проверяются на клиенте.
- *
- * Проверка по списку top-10000 паролей здесь СОЗНАТЕЛЬНО отсутствует —
- * она серверная и приходит как `400 VALIDATION_FAILED`.
- */
+/** Совпадает с серверной `PasswordPolicy`: 5–8 любых символов, без требований к составу. */
+export const PASSWORD_MIN_LENGTH = 5;
+export const PASSWORD_MAX_LENGTH = 8;
+
 export const PASSWORD_RULES = [
   {
     id: 'length',
-    label: 'От 12 до 128 символов',
-    test: (value: string): boolean => value.length >= 12 && value.length <= 128,
-  },
-  {
-    id: 'uppercase',
-    label: 'Хотя бы одна заглавная буква',
-    test: (value: string): boolean => /[A-Z]/.test(value),
-  },
-  {
-    id: 'digit',
-    label: 'Хотя бы одна цифра',
-    test: (value: string): boolean => /\d/.test(value),
+    label: `От ${String(PASSWORD_MIN_LENGTH)} до ${String(PASSWORD_MAX_LENGTH)} символов — любые буквы и цифры`,
+    test: (value: string): boolean => value.length >= PASSWORD_MIN_LENGTH && value.length <= PASSWORD_MAX_LENGTH,
   },
 ] as const;
 
 export const newPasswordSchema = z
   .string()
   .min(1, 'Введите пароль')
-  .min(12, 'Пароль должен содержать минимум 12 символов')
-  .max(128, 'Пароль должен содержать не более 128 символов')
-  .regex(/[A-Z]/, 'Пароль должен содержать заглавную букву')
-  .regex(/\d/, 'Пароль должен содержать цифру');
+  .min(PASSWORD_MIN_LENGTH, `Пароль должен содержать минимум ${String(PASSWORD_MIN_LENGTH)} символов`)
+  .max(PASSWORD_MAX_LENGTH, `Пароль должен содержать не более ${String(PASSWORD_MAX_LENGTH)} символов`);
 
 export const passwordSetupSchema = z
   .object({

@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 
@@ -14,9 +14,18 @@ import { applyServerValidation } from './applyServerValidation';
 import { AuthError } from './AuthError';
 import { SubmitButton } from './SubmitButton';
 
+function prefilledEmail(state: unknown): string {
+  if (typeof state !== 'object' || state === null || !('email' in state)) return '';
+  const { email } = state as { email: unknown };
+  return typeof email === 'string' ? email : '';
+}
+
 export function LoginForm(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  // Приходит со страницы установки/сброса пароля: человек только что задал пароль для этого адреса.
+  const initialEmail = prefilledEmail(location.state);
   const isOnline = useOnlineStatus();
   const countdown = useRateLimitCountdown();
 
@@ -29,7 +38,7 @@ export function LoginForm(): JSX.Element {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     mode: 'onTouched',
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: initialEmail, password: '' },
   });
 
   const mutation = useMutation({
@@ -76,7 +85,7 @@ export function LoginForm(): JSX.Element {
           inputMode="email"
           autoComplete="email"
           placeholder="name@company.com"
-          autoFocus
+          autoFocus={initialEmail.length === 0}
           tone="auth"
           disabled={mutation.isPending}
           error={errors.email?.message}
@@ -87,6 +96,7 @@ export function LoginForm(): JSX.Element {
           <PasswordField
             label="Пароль"
             autoComplete="current-password"
+            autoFocus={initialEmail.length > 0}
             tone="auth"
             disabled={mutation.isPending}
             error={errors.password?.message}

@@ -27,3 +27,14 @@ public sealed record ResetPasswordRequest(string Token, string NewPassword);
 
 /// <summary><c>POST /auth/set-password</c> — the invitation flow, TTL 24 hours (<c>AUTH-020</c>).</summary>
 public sealed record SetPasswordRequest(string Token, string NewPassword);
+
+/// <summary>
+/// Answer to a successful set/reset of a password: the account's email, so the sign-in form can be
+/// pre-filled.
+/// </summary>
+/// <remarks>
+/// Returned only after the token has been redeemed, so it tells the caller nothing they did not
+/// already have — the link arrived in that very mailbox. Not a session: signing in stays a separate
+/// step.
+/// </remarks>
+public sealed record PasswordSetResponse(string Email);

@@ -107,31 +107,9 @@ function okHeaders(correlationId: string, noStore = false): Record<string, strin
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/**
- * Фрагмент списка top-10000. Полный словарь живёт только на сервере —
- * клиенту его не отдают и клиент эту проверку не дублирует.
- */
-const COMMON_PASSWORDS = new Set([
-  'Password1234',
-  'Qwerty123456',
-  'Welcome12345',
-  'Admin1234567',
-  'Passw0rd1234',
-  'Football1234',
-  'Iloveyou1234',
-]);
-
+/** Та же политика, что `PasswordPolicy` на сервере: 5–8 любых символов. */
 function validateNewPassword(password: string): string[] {
-  const problems: string[] = [];
-  if (password.length < 12 || password.length > 128) {
-    problems.push('Пароль должен содержать от 12 до 128 символов');
-  }
-  if (!/[A-Z]/.test(password)) problems.push('Пароль должен содержать заглавную букву');
-  if (!/\d/.test(password)) problems.push('Пароль должен содержать цифру');
-  if (COMMON_PASSWORDS.has(password)) {
-    problems.push('Этот пароль встречается в списке часто используемых');
-  }
-  return problems;
+  return password.length < 5 || password.length > 8 ? ['Пароль должен содержать от 5 до 8 символов.'] : [];
 }
 
 function asString(value: unknown): string {
@@ -591,11 +569,11 @@ async function handlePasswordByToken(request: Request, purpose: 'ResetPassword' 
   clearSessionCookies();
   audit(isReset ? 'password_reset' : 'password_set', user.id, user.email);
 
-  // Тело успешного ответа пустое — API-функция на него не опирается.
-  return new HttpResponse(null, {
-    status: 200,
-    headers: { ...okHeaders(correlationId), 'Set-Cookie': EXPIRED_CSRF_SET_COOKIE },
-  });
+  // Как и реальный API: email аккаунта, чтобы страница входа подставила его сама.
+  return HttpResponse.json(
+    { email: user.email },
+    { status: 200, headers: { ...okHeaders(correlationId), 'Set-Cookie': EXPIRED_CSRF_SET_COOKIE } },
+  );
 }
 
 const resetPasswordHandler = http.post(route('reset-password'), ({ request }) =>

@@ -22,11 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- AUTH-013: the deny list travels with the assembly, so no deployment step can forget it. -->
-    <EmbeddedResource Include="Identity\common-passwords.txt" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\MentorTaskFlow.Application\MentorTaskFlow.Application.csproj" />
     <ProjectReference Include="..\MentorTaskFlow.Domain\MentorTaskFlow.Domain.csproj" />
   </ItemGroup>
