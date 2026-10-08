@@ -52,14 +52,41 @@ public sealed class TelegramNotificationSender(
             notificationOptions.Value.AppBaseUrl,
             message.ActionUrl);
 
+        return await SendRenderedAsync(message.RecipientTelegramChatId, rendered, cancellationToken);
+    }
+
+    /// <summary>
+    /// Sends one message: bold title, details, and a button that opens the task.
+    /// </summary>
+    /// <remarks>
+    /// Telegram refuses an inline button whose URL it does not consider public — <c>localhost</c>, a
+    /// bare host, plain http in some clients — and refuses the <b>whole</b> message with it. So the
+    /// button is used only for an https link to a dotted host; otherwise the link goes into the text,
+    /// where any URL is fine.
+    /// </remarks>
+    internal async Task<DeliveryResult> SendRenderedAsync(string chatId, RenderedMessage rendered, CancellationToken cancellationToken)
+    {
         var client = httpClientFactory.CreateClient(HttpClientName);
+        var buttonUrl = IsButtonUrl(rendered.ActionUrl) ? rendered.ActionUrl : null;
+
+        var text = buttonUrl is null && rendered.ActionUrl is { } link
+            ? $"{rendered.TelegramHtml}\n\n{NotificationTemplates.TelegramEscape(rendered.ActionLabel)}: {NotificationTemplates.TelegramEscape(link)}"
+            : rendered.TelegramHtml;
+
+        object body = buttonUrl is null
+            ? new { chat_id = chatId, text, parse_mode = "HTML", disable_web_page_preview = true }
+            : new
+            {
+                chat_id = chatId,
+                text,
+                parse_mode = "HTML",
+                disable_web_page_preview = true,
+                reply_markup = new { inline_keyboard = new[] { new[] { new { text = rendered.ActionLabel, url = buttonUrl } } } },
+            };
 
         try
         {
-            var response = await client.PostAsJsonAsync(
-                $"/bot{_options.BotToken}/sendMessage",
-                new { chat_id = message.RecipientTelegramChatId, text = rendered.PlainText },
-                cancellationToken);
+            var response = await client.PostAsJsonAsync($"/bot{_options.BotToken}/sendMessage", body, cancellationToken);
 
             return await ClassifyAsync(response, cancellationToken);
         }
@@ -115,6 +142,11 @@ public sealed class TelegramNotificationSender(
 
         return DeliveryResult.Retryable(description);
     }
+
+    private static bool IsButtonUrl(string? url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && uri.Host.Contains('.', StringComparison.Ordinal);
 
     private static string? TryReadDescription(string body)
     {

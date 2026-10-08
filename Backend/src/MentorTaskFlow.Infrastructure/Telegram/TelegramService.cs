@@ -7,6 +7,7 @@ using MentorTaskFlow.Contracts.Common;
 using MentorTaskFlow.Contracts.Telegram;
 using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Identity;
+using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,8 @@ public sealed class TelegramService(
     IAuditWriter auditWriter,
     IMemoryCache cache,
     IOptions<TelegramOptions> options,
+    IOptions<NotificationOptions> notificationOptions,
+    TelegramNotificationSender sender,
     ILogger<TelegramService> logger,
     IClock clock) : ITelegramService
 {
@@ -103,6 +106,59 @@ public sealed class TelegramService(
             .FirstOrDefaultAsync(cancellationToken);
 
         return new TelegramStatusDto(true, boundAt);
+    }
+
+    /// <remarks>
+    /// Sent directly rather than through the outbox: the person pressing the button is waiting for an
+    /// answer now, and the point is to surface Telegram's own error (a blocked bot, a wrong token)
+    /// instead of a row that quietly retries. Limited to one per half minute per person — it is a
+    /// check, not a messaging channel.
+    /// </remarks>
+    public async Task<TelegramTestResultDto> SendTestAsync(CancellationToken cancellationToken)
+    {
+        var actor = RequireActor();
+
+        var chatId = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.Id == actor.UserId)
+            .Select(u => u.TelegramChatId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(chatId))
+        {
+            return new TelegramTestResultDto(false, "Telegram ещё не подключён к вашему аккаунту.");
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.BotToken))
+        {
+            return new TelegramTestResultDto(false, "На сервере не задан токен бота (Telegram__BotToken).");
+        }
+
+        var throttleKey = $"telegram-test:{actor.UserId:N}";
+
+        if (cache.TryGetValue(throttleKey, out _))
+        {
+            return new TelegramTestResultDto(false, "Тестовое сообщение уже отправлено — повторить можно через полминуты.");
+        }
+
+        cache.Set(throttleKey, true, TimeSpan.FromSeconds(30));
+
+        var link = notificationOptions.Value.AppBaseUrl;
+        var rendered = new RenderedMessage(
+            "Проверка связи",
+            string.Empty,
+            string.Empty,
+            "<b>Проверка связи</b>\n\nTelegram подключён к Mentora. Сюда будут приходить уведомления о заданиях: "
+            + "новые задания, сданные работы, решения по проверке и напоминания о сроках.",
+            link,
+            "Открыть Mentora");
+
+        var result = await sender.SendRenderedAsync(chatId, rendered, cancellationToken);
+
+        return result.Succeeded
+            ? new TelegramTestResultDto(true, null)
+            : new TelegramTestResultDto(false, result.Error ?? "Telegram не принял сообщение.");
     }
 
     public async Task UnbindAsync(CancellationToken cancellationToken)
@@ -216,7 +272,7 @@ public sealed class TelegramService(
 
         await RecordAttemptAsync(chatId, user.Id, AuditResult.Success, reason: null, now, cancellationToken);
 
-        return "Готово. Уведомления MentorTaskFlow будут приходить сюда.";
+        return "Готово! Telegram подключён к Mentora. Сюда будут приходить уведомления о заданиях.";
     }
 
     private const string BindFailureReply =

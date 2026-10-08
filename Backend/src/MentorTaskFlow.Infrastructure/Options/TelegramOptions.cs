@@ -23,6 +23,13 @@ public sealed class TelegramOptions
     public string? BotToken { get; init; }
 
     /// <summary>
+    /// The Bot API host. Only ever changed to point a local or test run at a stand-in, so no real chat
+    /// receives test traffic.
+    /// </summary>
+    [Url]
+    public string ApiBaseUrl { get; init; } = "https://api.telegram.org";
+
+    /// <summary>
     /// Compared constant-time against <c>X-Telegram-Bot-Api-Secret-Token</c> (<c>TG-002</c>).
     /// </summary>
     /// <remarks>
