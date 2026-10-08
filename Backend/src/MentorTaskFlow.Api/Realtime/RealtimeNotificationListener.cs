@@ -19,7 +19,7 @@ public sealed class RealtimeOptions
 }
 
 /// <summary>
-/// Forwards <see cref="AssignmentChangeSignal"/>s from PostgreSQL <c>LISTEN</c> to the connected
+/// Forwards <see cref="RealtimeSignal"/>s from PostgreSQL <c>LISTEN</c> to the connected
 /// browsers allowed to hear them.
 /// </summary>
 /// <remarks>
@@ -83,7 +83,7 @@ public sealed class RealtimeNotificationListener(
                 await connection.OpenAsync(stoppingToken);
                 connection.Notification += (_, notification) => queue.Writer.TryWrite(notification.Payload);
 
-                await using (var listen = new NpgsqlCommand($"LISTEN {AssignmentChangeSignal.Channel}", connection))
+                await using (var listen = new NpgsqlCommand($"LISTEN {RealtimeSignal.Channel}", connection))
                 {
                     await listen.ExecuteNonQueryAsync(stoppingToken);
                 }
@@ -140,16 +140,21 @@ public sealed class RealtimeNotificationListener(
         {
             await foreach (var payload in reader.ReadAllAsync(stoppingToken))
             {
-                if (AssignmentChangeSignal.TryDeserialize(payload) is not { } signal)
+                if (RealtimeSignal.TryDeserialize(payload) is not { } signal)
                 {
                     continue;
                 }
 
                 try
                 {
-                    await hub.Clients
-                        .Groups(RealtimeGroups.For(signal))
-                        .SendAsync(RealtimeHub.AssignmentChanged, new { assignmentId = signal.AssignmentId }, stoppingToken);
+                    var recipients = hub.Clients.Groups(RealtimeGroups.For(signal));
+
+                    await recipients.SendAsync(RealtimeHub.DataChanged, new { kind = signal.Kind, id = signal.EntityId }, stoppingToken);
+
+                    if (signal.Kind == RealtimeKinds.Assignment)
+                    {
+                        await recipients.SendAsync(RealtimeHub.AssignmentChanged, new { assignmentId = signal.EntityId }, stoppingToken);
+                    }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {

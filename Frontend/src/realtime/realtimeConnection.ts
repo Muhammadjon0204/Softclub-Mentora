@@ -18,26 +18,16 @@ import { getAccessToken } from '../auth/tokenStore';
 export const REALTIME_HUB_PATH = '/api/v1/realtime';
 
 /**
- * Корни ключей, которые показывают живое состояние заданий. На событие сервера
- * они помечаются устаревшими: смонтированные запросы тихо перезапрашиваются в
- * фоне (старые данные остаются на экране до ответа), остальные — при следующем
- * открытии. Справочники вроде филиалов, категорий и `auth/me` не трогаются.
+ * Всё, кроме сессии, живое: на событие сервера запросы помечаются устаревшими —
+ * смонтированные тихо перезапрашиваются в фоне (старые данные остаются на экране
+ * до ответа), остальные — при следующем открытии. Список исключений, а не список
+ * «живых» страниц: новая страница становится живой сама, её не надо не забыть
+ * сюда вписать. `auth/*` не трогаем — профиль сессии меняется только при входе.
  */
-const LIVE_QUERY_ROOTS: ReadonlySet<unknown> = new Set([
-  'lead-assignments',
-  'lead-assignment-history',
-  'lead-submissions',
-  'lead-submission-review',
-  'mentor-assignments',
-  'mentor-assignment-history',
-  'admin-assignments',
-  'admin-dashboard',
-  'admin-notifications',
-  'admin-audit',
-]);
+const STATIC_QUERY_ROOTS: ReadonlySet<unknown> = new Set(['auth']);
 
 export function isLiveQueryKey(queryKey: readonly unknown[]): boolean {
-  return LIVE_QUERY_ROOTS.has(queryKey[0]);
+  return !STATIC_QUERY_ROOTS.has(queryKey[0]);
 }
 
 // Пачку событий (например массовую публикацию) сворачиваем в один перезапрос:
@@ -148,7 +138,9 @@ export function connect(baseUrl: string, onChange: () => void): () => void {
     .configureLogging(LogLevel.None)
     .build();
 
-  connection.on('assignmentChanged', onChange);
+  // Сервер шлёт `dataChanged` на любое изменение (задание, пользователь, категория, филиал,
+  // уведомление, расписание); `assignmentChanged` дублирует задания только для старых вкладок.
+  connection.on('dataChanged', onChange);
   connection.on('resync', onChange);
   // Пока соединения не было, события могли пройти мимо — догоняем одним перезапросом.
   connection.onreconnected(onChange);

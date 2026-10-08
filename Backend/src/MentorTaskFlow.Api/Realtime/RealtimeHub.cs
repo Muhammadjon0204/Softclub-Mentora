@@ -17,8 +17,11 @@ public sealed class RealtimeHub : Hub
 {
     public const string Path = "/api/v1/realtime";
 
-    /// <summary>Client method: <c>{ assignmentId }</c> changed.</summary>
+    /// <summary>Client method: <c>{ assignmentId }</c> changed. Kept alongside <see cref="DataChanged"/> for tabs still running the previous frontend.</summary>
     public const string AssignmentChanged = "assignmentChanged";
+
+    /// <summary>Client method: <c>{ kind, id }</c> changed — any kind of <c>RealtimeKinds</c>.</summary>
+    public const string DataChanged = "dataChanged";
 
     /// <summary>Client method: signals may have been missed — refetch everything live.</summary>
     public const string Resync = "resync";
@@ -33,7 +36,10 @@ public sealed class RealtimeHub : Hub
             return;
         }
 
-        await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.For(user));
+        foreach (var group in RealtimeGroups.For(user))
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, group);
+        }
         await base.OnConnectedAsync();
     }
 }

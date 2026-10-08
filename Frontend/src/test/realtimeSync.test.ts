@@ -40,14 +40,17 @@ describe('realtime refetch scheduling', () => {
     expect(invalidate).toHaveBeenCalledTimes(1);
   });
 
-  it('refetches assignment data but leaves reference data and the session alone', () => {
+  it('refetches everything a page shows, but never the session', () => {
     expect(isLiveQueryKey(['lead-assignments', 'list', 'org', 'cat'])).toBe(true);
     expect(isLiveQueryKey(['mentor-assignments', 'list', 'org', 'm'])).toBe(true);
     expect(isLiveQueryKey(['lead-submissions', 'a1'])).toBe(true);
     expect(isLiveQueryKey(['admin-dashboard', 'branch-scoped', 'org', 'all', '30d'])).toBe(true);
+    // An invited user who set a password, a renamed category, a delivered invite.
+    expect(isLiveQueryKey(['admin-users', 'list', 'org'])).toBe(true);
+    expect(isLiveQueryKey(['admin-categories', 'settings', 'c'])).toBe(true);
+    expect(isLiveQueryKey(['user-invitation-notification', 'u1'])).toBe(true);
+    expect(isLiveQueryKey(['branches', 'org'])).toBe(true);
 
     expect(isLiveQueryKey(['auth', 'me'])).toBe(false);
-    expect(isLiveQueryKey(['branches', 'org'])).toBe(false);
-    expect(isLiveQueryKey(['admin-categories', 'settings', 'c'])).toBe(false);
   });
 });
