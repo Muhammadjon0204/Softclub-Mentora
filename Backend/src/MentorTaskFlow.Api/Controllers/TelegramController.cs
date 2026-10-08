@@ -56,6 +56,18 @@ public sealed class TelegramController(
         return StatusCode(StatusCodes.Status201Created, token);
     }
 
+    /// <summary><c>POST /telegram/test</c> — sends a test message to the caller's own chat and reports the outcome.</summary>
+    [HttpPost("test")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<TelegramTestResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TelegramTestResultDto>> SendTestAsync(CancellationToken cancellationToken)
+    {
+        EnsureEnabled();
+
+        return Ok(await telegram.SendTestAsync(cancellationToken));
+    }
+
     [HttpGet("status")]
     [Authorize(Policy = MtfPolicies.Authenticated)]
     [ProducesResponseType<TelegramStatusDto>(StatusCodes.Status200OK)]
@@ -134,7 +146,7 @@ public sealed class TelegramController(
     }
 
     private const string HelpReply =
-        "Этот бот доставляет уведомления MentorTaskFlow. "
+        "Этот бот доставляет уведомления Mentora. "
         + "Чтобы привязать аккаунт, откройте ссылку из личного кабинета. "
         + "Действия по задачам выполняются в приложении.";
 

@@ -3,7 +3,7 @@ import { CheckCircle2, ExternalLink, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { getStatus, getGenericErrorMessage } from '../api/problemDetails';
-import { getTelegramStatus, issueTelegramBindToken, unbindTelegram } from '../api/telegram';
+import { getTelegramStatus, issueTelegramBindToken, sendTelegramTest, unbindTelegram } from '../api/telegram';
 import type { TelegramBindTokenDto } from '../api/telegram';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../shared/overlays';
@@ -44,6 +44,7 @@ export function ProfilePage(): JSX.Element | null {
   const [pendingBind, setPendingBind] = useState<TelegramBindTokenDto | null>(null);
   const [isIssuing, setIsIssuing] = useState(false);
   const [isUnbinding, setIsUnbinding] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const statusQuery = useQuery({
     queryKey: TELEGRAM_STATUS_QUERY_KEY,
@@ -75,6 +76,19 @@ export function ProfilePage(): JSX.Element | null {
       toast.error(getGenericErrorMessage(error));
     } finally {
       setIsIssuing(false);
+    }
+  }
+
+  async function handleTest(): Promise<void> {
+    setIsTesting(true);
+    try {
+      const result = await sendTelegramTest();
+      if (result.delivered) toast.success('Тестовое сообщение отправлено — проверьте Telegram');
+      else toast.error(result.error ?? 'Telegram не принял сообщение');
+    } catch (error) {
+      toast.error(getGenericErrorMessage(error));
+    } finally {
+      setIsTesting(false);
     }
   }
 
@@ -135,16 +149,28 @@ export function ProfilePage(): JSX.Element | null {
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 Подключено
               </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                isLoading={isUnbinding}
-                onClick={() => {
-                  void handleDisconnect();
-                }}
-              >
-                Отключить
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  isLoading={isTesting}
+                  onClick={() => {
+                    void handleTest();
+                  }}
+                >
+                  Отправить тестовое сообщение
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  isLoading={isUnbinding}
+                  onClick={() => {
+                    void handleDisconnect();
+                  }}
+                >
+                  Отключить
+                </Button>
+              </div>
             </div>
           ) : pendingBind !== null ? (
             <div className="space-y-3">

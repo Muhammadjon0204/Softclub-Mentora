@@ -25,6 +25,9 @@ public interface ITelegramService
     /// </remarks>
     Task UnbindAsync(CancellationToken cancellationToken);
 
+    /// <summary>Sends a test message to the caller's own bound chat, directly — not through the outbox.</summary>
+    Task<TelegramTestResultDto> SendTestAsync(CancellationToken cancellationToken);
+
     /// <summary>
     /// Redeems a token presented as <c>/start &lt;token&gt;</c> and returns the reply for the chat.
     /// </summary>

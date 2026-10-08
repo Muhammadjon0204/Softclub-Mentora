@@ -286,11 +286,12 @@ public static class InfrastructureServiceCollectionExtensions
 
         // Registered alongside the SMTP sender: the dispatcher picks by channel, so a Telegram row
         // stops being rescheduled the moment this exists.
-        services.AddScoped<INotificationSender, TelegramNotificationSender>();
+        services.AddScoped<TelegramNotificationSender>();
+        services.AddScoped<INotificationSender>(sp => sp.GetRequiredService<TelegramNotificationSender>());
 
-        services.AddHttpClient(TelegramNotificationSender.HttpClientName, client =>
+        services.AddHttpClient(TelegramNotificationSender.HttpClientName, (serviceProvider, client) =>
         {
-            client.BaseAddress = new Uri("https://api.telegram.org");
+            client.BaseAddress = new Uri(serviceProvider.GetRequiredService<IOptions<TelegramOptions>>().Value.ApiBaseUrl);
 
             // Bounded so a hung provider cannot hold a worker slot: the row is retried on the next
             // pass instead.

@@ -18,3 +18,10 @@ public sealed record TelegramBindTokenDto(string Token, string DeepLink, DateTim
 /// identifier itself is of no use to the account holder and would be one more thing to leak.
 /// </remarks>
 public sealed record TelegramStatusDto(bool IsBound, DateTimeOffset? BoundAt);
+
+/// <summary>
+/// <c>POST /telegram/test</c> — whether a test message reached the caller's chat, and Telegram's own
+/// reason when it did not (a blocked bot, a wrong token), so a broken link is visible at once rather
+/// than after a real task goes unannounced.
+/// </summary>
+public sealed record TelegramTestResultDto(bool Delivered, string? Error);

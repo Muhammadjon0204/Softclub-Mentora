@@ -48,6 +48,7 @@ public sealed class OutboxWriter(
     {
         var policy = ChannelPolicies.For(entry.EventType);
         var now = clock.UtcNow;
+        var payload = await NotificationPayloadEnricher.EnrichAsync(dbContext, entry, now, cancellationToken);
 
         var telegramBound = policy is not ChannelPolicy.EmailOnly
                             && await HasTelegramAsync(entry.RecipientUserId, cancellationToken);
@@ -77,7 +78,7 @@ public sealed class OutboxWriter(
                 entry.CategoryId,
                 channel,
                 entry.EventType,
-                entry.Payload,
+                payload,
                 key,
                 now,
                 entry.IsSystemAlert));
