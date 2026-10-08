@@ -366,11 +366,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddOptions<BootstrapOptions>()
             .Bind(configuration.GetSection(BootstrapOptions.SectionName));
 
-        // Stateless and thread-safe, so a singleton. The password catalog in particular parses its
-        // embedded resource once instead of on every login.
+        // Stateless and thread-safe, so singletons.
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ISecureTokenService, SecureTokenService>();
-        services.AddSingleton<ICommonPasswordCatalog, EmbeddedCommonPasswordCatalog>();
         services.AddSingleton<PasswordPolicy>();
 
         services.AddMemoryCache();

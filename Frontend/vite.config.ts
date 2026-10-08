@@ -54,6 +54,9 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Above Testing Library's 5 s asyncUtilTimeout (setup.ts): with the default 5 s a test that waits
+    // for a lazily compiled page under a loaded machine died on the test timeout instead.
+    testTimeout: 15_000,
     css: false,
     restoreMocks: true,
     include: ['src/**/*.test.{ts,tsx}'],

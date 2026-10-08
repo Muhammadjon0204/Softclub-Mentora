@@ -139,24 +139,24 @@ public sealed class AuthController(
     [HttpPost("reset-password")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.PasswordToken)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType<PasswordSetResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PasswordSetResponse>> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken)
     {
-        await authService.ResetPasswordAsync(request, RemoteIp, cancellationToken);
+        var email = await authService.ResetPasswordAsync(request, RemoteIp, cancellationToken);
         NoStore();
-        return Ok();
+        return Ok(new PasswordSetResponse(email));
     }
 
     /// <summary><c>POST /auth/set-password</c> — the invitation flow, TTL 24 hours (<c>AUTH-020</c>).</summary>
     [HttpPost("set-password")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.PasswordToken)]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<IActionResult> SetPasswordAsync(SetPasswordRequest request, CancellationToken cancellationToken)
+    [ProducesResponseType<PasswordSetResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PasswordSetResponse>> SetPasswordAsync(SetPasswordRequest request, CancellationToken cancellationToken)
     {
-        await authService.SetPasswordAsync(request, RemoteIp, cancellationToken);
+        var email = await authService.SetPasswordAsync(request, RemoteIp, cancellationToken);
         NoStore();
-        return Ok();
+        return Ok(new PasswordSetResponse(email));
     }
 
     private ActionResult<LoginResponse> IssueSession(AuthenticationResult result)

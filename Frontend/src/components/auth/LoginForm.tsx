@@ -1,10 +1,10 @@
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 
 import { AUTH_ERROR_CODE, getProblemCode, getRetryAfter } from '../../api/problemDetails';
-import { dashboardPathForRole } from '../../auth/roleRedirect';
+import { postLoginPath } from '../../auth/roleRedirect';
 import { useAuth } from '../../auth/useAuth';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useRateLimitCountdown } from '../../hooks/useRateLimitCountdown';
@@ -14,9 +14,18 @@ import { applyServerValidation } from './applyServerValidation';
 import { AuthError } from './AuthError';
 import { SubmitButton } from './SubmitButton';
 
+function prefilledEmail(state: unknown): string {
+  if (typeof state !== 'object' || state === null || !('email' in state)) return '';
+  const { email } = state as { email: unknown };
+  return typeof email === 'string' ? email : '';
+}
+
 export function LoginForm(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
+  // Приходит со страницы установки/сброса пароля: человек только что задал пароль для этого адреса.
+  const initialEmail = prefilledEmail(location.state);
   const isOnline = useOnlineStatus();
   const countdown = useRateLimitCountdown();
 
@@ -29,15 +38,17 @@ export function LoginForm(): JSX.Element {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     mode: 'onTouched',
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: initialEmail, password: '' },
   });
 
   const mutation = useMutation({
     mutationFn: (values: LoginFormValues) => login(values),
     retry: false,
     onSuccess: (user) => {
-      // Роль берём исключительно из ответа API.
-      navigate(dashboardPathForRole(user.role), { replace: true });
+      // Роль берём исключительно из ответа API; `from` (RequireAuth) лишь возвращает на ту страницу
+      // её раздела, куда человек шёл до входа — например, задание по ссылке из Telegram.
+      const from = (location.state as { from?: unknown } | null)?.from;
+      navigate(postLoginPath(user.role, from), { replace: true });
     },
     onError: (error: unknown) => {
       const code = getProblemCode(error);
@@ -76,7 +87,7 @@ export function LoginForm(): JSX.Element {
           inputMode="email"
           autoComplete="email"
           placeholder="name@company.com"
-          autoFocus
+          autoFocus={initialEmail.length === 0}
           tone="auth"
           disabled={mutation.isPending}
           error={errors.email?.message}
@@ -87,6 +98,7 @@ export function LoginForm(): JSX.Element {
           <PasswordField
             label="Пароль"
             autoComplete="current-password"
+            autoFocus={initialEmail.length > 0}
             tone="auth"
             disabled={mutation.isPending}
             error={errors.password?.message}

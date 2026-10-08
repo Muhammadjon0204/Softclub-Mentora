@@ -65,8 +65,10 @@ public interface IAuthService
     /// <returns>The reset link, or null when nothing was issued. Callers must never return it to the client.</returns>
     Task<string?> ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
 
-    Task ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
+    /// <returns>The account's email, for pre-filling the sign-in form.</returns>
+    Task<string> ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
 
     /// <summary>Sets the first password through the invitation flow (<c>AUTH-020</c>).</summary>
-    Task SetPasswordAsync(SetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
+    /// <returns>The account's email, for pre-filling the sign-in form.</returns>
+    Task<string> SetPasswordAsync(SetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
 }

@@ -66,12 +66,19 @@ export async function forgotPassword(
 }
 
 /** Успешный ответ без тела — намеренно ничего не возвращаем. */
-export async function resetPassword(payload: ResetPasswordRequest): Promise<void> {
-  await publicClient.post(AUTH_ENDPOINTS.resetPassword, payload);
+/** Ответ set/reset-password: email аккаунта, чтобы подставить его на странице входа. */
+export interface PasswordSetResult {
+  email: string;
 }
 
-export async function setPassword(payload: SetPasswordRequest): Promise<void> {
-  await publicClient.post(AUTH_ENDPOINTS.setPassword, payload);
+export async function resetPassword(payload: ResetPasswordRequest): Promise<PasswordSetResult> {
+  const { data } = await publicClient.post<PasswordSetResult>(AUTH_ENDPOINTS.resetPassword, payload);
+  return data;
+}
+
+export async function setPassword(payload: SetPasswordRequest): Promise<PasswordSetResult> {
+  const { data } = await publicClient.post<PasswordSetResult>(AUTH_ENDPOINTS.setPassword, payload);
+  return data;
 }
 
 /* ----------------------------- apiClient ------------------------------ */

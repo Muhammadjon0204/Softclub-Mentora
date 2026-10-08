@@ -23,7 +23,8 @@ export interface PasswordSetupTexts {
 interface PasswordSetupFormProps {
   /** Значение `?token=`. Не отображается и не декодируется. */
   token: string | null;
-  submit: (payload: { token: string; newPassword: string }) => Promise<void>;
+  /** Сервер возвращает email аккаунта — его подставляем на странице входа. */
+  submit: (payload: { token: string; newPassword: string }) => Promise<{ email?: string } | undefined>;
   texts: PasswordSetupTexts;
   /** Заголовок карточки задаёт страница; здесь он нужен для success/invalid экранов. */
   onScreenChange?: (screen: 'form' | 'success' | 'invalid-link') => void;
@@ -51,6 +52,7 @@ export function PasswordSetupForm({
   // Токена в URL нет — экран-заглушка сразу, без обращения к API.
   const [isLinkInvalid, setIsLinkInvalid] = useState(token === null || token.length === 0);
   const [isDone, setIsDone] = useState(false);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
 
   const {
     register,
@@ -69,12 +71,13 @@ export function PasswordSetupForm({
   const confirmPassword = watch('confirmPassword');
 
   const mutation = useMutation({
-    mutationFn: async (values: PasswordSetupFormValues): Promise<void> => {
+    mutationFn: async (values: PasswordSetupFormValues): Promise<{ email?: string } | undefined> => {
       if (token === null) throw new Error('Токен отсутствует');
-      await submit({ token, newPassword: values.newPassword });
+      return submit({ token, newPassword: values.newPassword });
     },
     retry: false,
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setAccountEmail(typeof result?.email === 'string' && result.email.length > 0 ? result.email : null);
       setIsDone(true);
       onScreenChange?.('success');
     },
@@ -126,11 +129,19 @@ export function PasswordSetupForm({
   }
 
   if (isDone) {
-    // Auto-login после установки пароля не выполняется намеренно.
+    // Auto-login после установки пароля не выполняется намеренно — но email на странице входа уже
+    // подставлен (через state роутера, не через URL: адрес не попадает в историю и логи), так что
+    // остаётся ввести только что заданный пароль. Заодно это перекрывает автозаполнение браузера
+    // чужой сохранённой учёткой на общем компьютере.
     return (
       <div className="space-y-5" aria-live="polite">
         <p className="text-sm leading-relaxed text-slate-600">{texts.successText}</p>
-        <Link to="/login" className={PRIMARY_BUTTON}>
+        {accountEmail !== null ? (
+          <p className="text-sm text-slate-600">
+            Ваш логин: <span className="font-medium text-slate-900">{accountEmail}</span>
+          </p>
+        ) : null}
+        <Link to="/login" state={accountEmail !== null ? { email: accountEmail } : undefined} className={PRIMARY_BUTTON}>
           Перейти ко входу
         </Link>
       </div>

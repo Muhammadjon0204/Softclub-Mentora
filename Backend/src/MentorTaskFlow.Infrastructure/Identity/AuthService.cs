@@ -233,7 +233,7 @@ public sealed class AuthService(
         return BuildPasswordLink("reset-password", plainToken);
     }
 
-    public Task ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken) =>
+    public Task<string> ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken) =>
         ApplyTokenPasswordAsync(
             request.Token,
             request.NewPassword,
@@ -242,7 +242,7 @@ public sealed class AuthService(
             ipAddress,
             cancellationToken);
 
-    public Task SetPasswordAsync(SetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken) =>
+    public Task<string> SetPasswordAsync(SetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken) =>
         ApplyTokenPasswordAsync(
             request.Token,
             request.NewPassword,
@@ -255,7 +255,7 @@ public sealed class AuthService(
     // Internals
     // -----------------------------------------------------------------
 
-    private async Task ApplyTokenPasswordAsync(
+    private async Task<string> ApplyTokenPasswordAsync(
         string? plainToken,
         string? newPassword,
         SecurityTokenPurpose purpose,
@@ -300,6 +300,8 @@ public sealed class AuthService(
 
         await dbContext.SaveChangesAsync(cancellationToken);
         tokenVersionValidator.Invalidate(user.Id);
+
+        return user.Email;
     }
 
     /// <summary>
