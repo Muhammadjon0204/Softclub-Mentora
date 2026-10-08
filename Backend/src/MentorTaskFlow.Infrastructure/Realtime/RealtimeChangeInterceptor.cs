@@ -1,8 +1,14 @@
 using System.Runtime.CompilerServices;
 using MentorTaskFlow.Domain.Assignments;
+using MentorTaskFlow.Domain.Categories;
+using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Reviews;
+using MentorTaskFlow.Domain.Schedule;
 using MentorTaskFlow.Domain.Submissions;
+using MentorTaskFlow.Domain.Tenancy;
+using MentorTaskFlow.Domain.Users;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
@@ -12,7 +18,7 @@ using NpgsqlTypes;
 namespace MentorTaskFlow.Infrastructure.Realtime;
 
 /// <summary>
-/// Publishes an <see cref="AssignmentChangeSignal"/> for every assignment a save touched, through
+/// Publishes a <see cref="RealtimeSignal"/> for every user-visible entity a save touched, through
 /// PostgreSQL <c>NOTIFY</c>.
 /// </summary>
 /// <remarks>
@@ -37,7 +43,7 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
 {
     // Keyed by context instance: the interceptor is a singleton shared by every DbContext, and the
     // signals collected before a save must reach exactly that context's after-save callback.
-    private readonly ConditionalWeakTable<DbContext, List<AssignmentChangeSignal>> _pending = new();
+    private readonly ConditionalWeakTable<DbContext, List<RealtimeSignal>> _pending = new();
 
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -96,7 +102,9 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
         // still read as Unchanged here without this.
         context.ChangeTracker.DetectChanges();
 
-        var byAssignment = new Dictionary<Guid, AssignmentChangeSignal>();
+        // Keyed by kind, entity and scope: several rows of one save about the same thing collapse into
+        // one signal, while a user who moved category yields one for the old scope and one for the new.
+        var signals = new Dictionary<(string, Guid, Guid?, Guid?), RealtimeSignal>();
 
         foreach (var entry in context.ChangeTracker.Entries())
         {
@@ -105,44 +113,101 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
                 continue;
             }
 
-            var signal = entry.Entity switch
+            foreach (var signal in SignalsFor(entry))
             {
-                Assignment assignment => ForAssignment(
-                    assignment,
-                    entry.State == EntityState.Modified
-                        ? (entry.Property(nameof(Assignment.AssignedToId)).OriginalValue as Guid?,
-                            entry.Property(nameof(Assignment.Status)).OriginalValue as AssignmentStatus?)
-                        : null),
-                Submission submission => new AssignmentChangeSignal(
-                    submission.OrganizationId,
-                    submission.BranchId,
-                    submission.CategoryId,
-                    submission.AssignmentId,
-                    [submission.SubmittedById]),
-                Review review => new AssignmentChangeSignal(
-                    review.OrganizationId,
-                    review.BranchId,
-                    review.CategoryId,
-                    review.AssignmentId,
-                    []),
-                _ => null,
-            };
+                var key = (signal.Kind, signal.EntityId, signal.BranchId, signal.CategoryId);
 
-            if (signal is null)
-            {
-                continue;
+                signals[key] = signals.TryGetValue(key, out var existing)
+                    ? existing with { UserIds = existing.UserIds.Union(signal.UserIds).ToArray() }
+                    : signal;
             }
-
-            byAssignment[signal.AssignmentId] = byAssignment.TryGetValue(signal.AssignmentId, out var existing)
-                ? existing with { UserIds = existing.UserIds.Union(signal.UserIds).ToArray() }
-                : signal;
         }
 
-        if (byAssignment.Count > 0)
+        if (signals.Count > 0)
         {
-            _pending.AddOrUpdate(context, [.. byAssignment.Values]);
+            _pending.AddOrUpdate(context, [.. signals.Values]);
         }
     }
+
+    private static IEnumerable<RealtimeSignal> SignalsFor(EntityEntry entry)
+    {
+        switch (entry.Entity)
+        {
+            case Assignment assignment:
+                yield return ForAssignment(
+                    assignment,
+                    entry.State == EntityState.Modified
+                        ? (Original<Guid>(entry, nameof(Assignment.AssignedToId)), Original<AssignmentStatus>(entry, nameof(Assignment.Status)))
+                        : null);
+                break;
+
+            case Submission submission:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Assignment, submission.OrganizationId, submission.BranchId, submission.CategoryId,
+                    submission.AssignmentId, [submission.SubmittedById]);
+                break;
+
+            case Review review:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Assignment, review.OrganizationId, review.BranchId, review.CategoryId,
+                    review.AssignmentId, []);
+                break;
+
+            case User user:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.User, user.OrganizationId, user.BranchId, user.CategoryId, user.Id, [user.Id]);
+
+                // Moved to another branch or category: the team they left must drop them too.
+                if (entry.State == EntityState.Modified)
+                {
+                    var previousBranch = Original<Guid>(entry, nameof(User.BranchId));
+                    var previousCategory = Original<Guid>(entry, nameof(User.CategoryId));
+
+                    if (previousBranch != user.BranchId || previousCategory != user.CategoryId)
+                    {
+                        yield return new RealtimeSignal(
+                            RealtimeKinds.User, user.OrganizationId, previousBranch, previousCategory, user.Id, []);
+                    }
+                }
+
+                break;
+
+            case Category category:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Category, category.OrganizationId, category.BranchId, category.Id, category.Id, []);
+                break;
+
+            case CategorySettings settings:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Category, settings.OrganizationId, settings.BranchId, settings.CategoryId, settings.CategoryId, []);
+                break;
+
+            case Branch branch:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Branch, branch.OrganizationId, branch.Id, null, branch.Id, []);
+                break;
+
+            // Category deliberately dropped: delivery status is an administrator's view, not a Lead's.
+            case NotificationOutbox notification:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Notification, notification.OrganizationId, notification.BranchId, null, notification.Id, []);
+                break;
+
+            case Topic topic:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Schedule, topic.OrganizationId, topic.BranchId, topic.CategoryId, topic.Id, []);
+                break;
+
+            case TopicAssignment template:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Schedule, template.OrganizationId, template.BranchId, template.CategoryId, template.TopicId, []);
+                break;
+        }
+    }
+
+    private static T? Original<T>(EntityEntry entry, string property)
+        where T : struct =>
+        entry.Property(property).OriginalValue as T?;
 
     /// <remarks>
     /// A mentor is signalled exactly when the change is visible in their own list, which hides
@@ -150,7 +215,7 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
     /// current assignee if the assignment is visible now, the previous one if it was visible before.
     /// Otherwise a Lead's unpublished draft would announce itself to the mentor it is meant for.
     /// </remarks>
-    private static AssignmentChangeSignal ForAssignment(
+    private static RealtimeSignal ForAssignment(
         Assignment assignment,
         (Guid? AssigneeId, AssignmentStatus? Status)? original)
     {
@@ -168,7 +233,8 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
             users.Add(previousAssignee);
         }
 
-        return new AssignmentChangeSignal(
+        return new RealtimeSignal(
+            RealtimeKinds.Assignment,
             assignment.OrganizationId,
             assignment.BranchId,
             assignment.CategoryId,
@@ -179,7 +245,7 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
     private static bool IsVisibleToMentor(AssignmentStatus status) =>
         status is not (AssignmentStatus.Draft or AssignmentStatus.Suggested);
 
-    private List<AssignmentChangeSignal>? Take(DbContext? context)
+    private List<RealtimeSignal>? Take(DbContext? context)
     {
         if (context is null || !_pending.TryGetValue(context, out var signals))
         {
@@ -190,11 +256,11 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
         return signals;
     }
 
-    private async ValueTask PublishAsync(DbContext context, List<AssignmentChangeSignal> signals)
+    private async ValueTask PublishAsync(DbContext context, List<RealtimeSignal> signals)
     {
         var payloads = signals
             .Select(signal => signal.Serialize())
-            .Where(payload => System.Text.Encoding.UTF8.GetByteCount(payload) <= AssignmentChangeSignal.MaxPayloadBytes)
+            .Where(payload => System.Text.Encoding.UTF8.GetByteCount(payload) <= RealtimeSignal.MaxPayloadBytes)
             .ToArray();
 
         if (payloads.Length == 0)
@@ -225,7 +291,7 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
         catch (Exception exception)
 #pragma warning restore CA1031
         {
-            logger.LogWarning(exception, "Failed to publish {Count} realtime assignment signal(s).", payloads.Length);
+            logger.LogWarning(exception, "Failed to publish {Count} realtime signal(s).", payloads.Length);
         }
     }
 
@@ -249,7 +315,7 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
             await using var command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = "SELECT pg_notify(@channel, payload) FROM unnest(@payloads) AS payload";
-            command.Parameters.Add(new NpgsqlParameter("channel", NpgsqlDbType.Text) { Value = AssignmentChangeSignal.Channel });
+            command.Parameters.Add(new NpgsqlParameter("channel", NpgsqlDbType.Text) { Value = RealtimeSignal.Channel });
             command.Parameters.Add(new NpgsqlParameter("payloads", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = payloads });
 
             // Not the caller's token: cancelling mid-command inside a transaction would abort it.
