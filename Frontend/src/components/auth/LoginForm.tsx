@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 
 import { AUTH_ERROR_CODE, getProblemCode, getRetryAfter } from '../../api/problemDetails';
-import { dashboardPathForRole } from '../../auth/roleRedirect';
+import { postLoginPath } from '../../auth/roleRedirect';
 import { useAuth } from '../../auth/useAuth';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useRateLimitCountdown } from '../../hooks/useRateLimitCountdown';
@@ -45,8 +45,10 @@ export function LoginForm(): JSX.Element {
     mutationFn: (values: LoginFormValues) => login(values),
     retry: false,
     onSuccess: (user) => {
-      // Роль берём исключительно из ответа API.
-      navigate(dashboardPathForRole(user.role), { replace: true });
+      // Роль берём исключительно из ответа API; `from` (RequireAuth) лишь возвращает на ту страницу
+      // её раздела, куда человек шёл до входа — например, задание по ссылке из Telegram.
+      const from = (location.state as { from?: unknown } | null)?.from;
+      navigate(postLoginPath(user.role, from), { replace: true });
     },
     onError: (error: unknown) => {
       const code = getProblemCode(error);
