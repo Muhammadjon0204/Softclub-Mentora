@@ -9,7 +9,12 @@ namespace MentorTaskFlow.Application.Common.Abstractions;
 /// never share a block. Review comments are user-written text; a prompt that interleaves them with
 /// instructions has no way to tell the model which sentences it is meant to obey.
 /// </remarks>
-public sealed record AiSummaryPrompt(string SystemInstructions, string Data);
+/// <param name="JsonSchema">
+/// When set, the model is asked for JSON matching this schema instead of prose — for reports whose
+/// narrative is rendered section by section. Providers without native support fall back to asking
+/// for it in the instructions.
+/// </param>
+public sealed record AiSummaryPrompt(string SystemInstructions, string Data, string? JsonSchema = null);
 
 /// <summary>
 /// What came back, plus what it cost (<c>AI-021</c>).
@@ -19,7 +24,16 @@ public sealed record AiSummaryPrompt(string SystemInstructions, string Data);
 /// trail: <c>AI-004</c> asks for a result that can be traced back, and the model, the prompt version
 /// and this id are what a support request is answered with.
 /// </remarks>
-public sealed record AiSummaryCompletion(string Content, int? InputTokens, int? OutputTokens, string? RequestId);
+/// <param name="Model">
+/// The model that actually answered, when it differs from the configured one — a provider may fall
+/// back to a second model when the first is overloaded or out of quota.
+/// </param>
+public sealed record AiSummaryCompletion(
+    string Content,
+    int? InputTokens,
+    int? OutputTokens,
+    string? RequestId,
+    string? Model = null);
 
 /// <summary>
 /// The model provider, behind an interface so the domain never sees one (<c>AI-001</c>).

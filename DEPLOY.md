@@ -120,7 +120,7 @@ git update-index --skip-worktree .env.api .env.web
 | `Bootstrap__AdminEmail` | почта первого администратора | **да** |
 | `Notifications__SmtpHost` и остальные `Smtp*` | учётка почтового провайдера | для писем |
 | `Telegram__BotToken` | выдаёт @BotFather | только при `Telegram__Enabled=true` |
-| `Ai__ApiKey` | ключ Anthropic | только при `Ai__Enabled=true` |
+| `Ai__ApiKey` | ключ Gemini из [Google AI Studio](https://aistudio.google.com/apikey) (или Anthropic при `Ai__Provider=Anthropic`) | только при `Ai__Enabled=true` |
 
 Без `Bootstrap__AdminEmail` мигратор пропустит создание первой организации и напишет об
 этом в лог — упасть не упадёт, но и учётной записи, под которой войти, не появится.
@@ -193,6 +193,22 @@ curl http://127.0.0.1:8093/health/ready    # база, хранилище, AI
 
 `/health/ready` показывает `ai` как `Degraded` — это норма, AI-сводки выключены
 (`Ai__Enabled=false`) и на работоспособность не влияют.
+
+**Включить ИИ-отчёты (Gemini).** `.env.api` на сервере помечен `skip-worktree`, поэтому
+новые строки в него нужно дописать руками — `git pull` их не принесёт:
+
+```bash
+Ai__Enabled=true
+Ai__Provider=Gemini
+Ai__ApiKey=<ключ из aistudio.google.com/apikey>
+Ai__ModelId=gemini-3.8-flash
+Ai__FallbackModelId=gemini-3.5-flash
+```
+
+Затем `docker compose -f docker-compose.api.yml up -d mentora-api` — после этого `/health/ready`
+показывает `ai` как `Healthy`. Если осталась старая строка `Ai__ModelId=claude-sonnet-5`,
+API не стартует и пишет в лог, что модель не подходит к провайдеру. Ключ — секрет: только в
+`.env.api` на сервере, никогда в репозитории.
 
 **Ссылка на установку пароля администратора** печатается в лог мигратора и больше
 нигде не появляется:

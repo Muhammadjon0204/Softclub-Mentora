@@ -87,7 +87,9 @@ Database__MigrateOnStartup          # true только в Development (DEPLOY-0
 Cors__AllowedOrigins__0             # точный origin SPA; wildcard запрещён (SEC-006)
 AUTH__JWT_SIGNING_KEY               # ≥256 бит, только из secret manager (SEC-010)
 Ai__Enabled                         # false — метрики работают, блок резюме отсутствует (AI-018)
+Ai__Provider                        # Gemini (по умолчанию) или Anthropic
 Ai__ApiKey                          # секрет; обязателен при Ai__Enabled=true
+Ai__ModelId / Ai__FallbackModelId   # gemini-3.8-flash / gemini-3.5-flash — запасная при 503/429/404
 Metrics__AllowedNetworks__0         # CIDR, кому доступен /metrics; по умолчанию только приватные сети
 ```
 

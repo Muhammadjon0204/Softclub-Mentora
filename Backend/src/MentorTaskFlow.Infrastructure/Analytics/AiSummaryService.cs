@@ -597,6 +597,9 @@ public sealed class AiSummaryService(
             {
                 scope = summary.Scope.ToString(),
                 modelId = summary.ModelId,
+
+                // Set only when a fallback model answered instead of the configured one.
+                answeredBy = completion?.Model,
                 promptVersion = summary.PromptVersion,
                 inputTokens = completion?.InputTokens,
                 outputTokens = completion?.OutputTokens,

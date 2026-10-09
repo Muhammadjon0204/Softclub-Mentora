@@ -119,6 +119,7 @@ public sealed class MentorTaskFlowApiFactory : WebApplicationFactory<Program>
 
                 ["Ai:Enabled"] = AiEnabled ? "true" : "false",
                 ["Ai:PromptVersion"] = "v1.0",
+                ["Ai:Provider"] = "Anthropic",
                 ["Ai:ModelId"] = "claude-sonnet-5",
             });
         });
