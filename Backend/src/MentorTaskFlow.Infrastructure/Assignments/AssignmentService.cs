@@ -60,6 +60,18 @@ public sealed class AssignmentService(
             source = source.Where(a => a.CategoryId == categoryId);
         }
 
+        if (query.DueFrom is { } dueFrom)
+        {
+            var from = dueFrom.ToUniversalTime();
+            source = source.Where(a => a.CurrentDueAt >= from);
+        }
+
+        if (query.DueTo is { } dueTo)
+        {
+            var to = dueTo.ToUniversalTime();
+            source = source.Where(a => a.CurrentDueAt < to);
+        }
+
         // Applied after the ownership narrowing above, so for a Mentor it can only ever shrink the
         // result further — never widen it past their own tasks.
         if (query.AssignedToId is { } assignedToId && actor.Role is not UserRole.Mentor)

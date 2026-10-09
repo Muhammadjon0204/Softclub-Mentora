@@ -68,6 +68,10 @@ export interface AssignmentListQuery {
   categoryId?: string;
   assignedToId?: string;
   source?: string;
+  /** ISO instant, inclusive — narrows by `currentDueAt` (the deadline calendar's visible range). */
+  dueFrom?: string;
+  /** ISO instant, exclusive. */
+  dueTo?: string;
   sort?: string;
   order?: string;
 }
@@ -113,6 +117,8 @@ function toQueryParams(query: AssignmentListQuery): Record<string, string | numb
   if (query.categoryId !== undefined) params.categoryId = query.categoryId;
   if (query.assignedToId !== undefined) params.assignedToId = query.assignedToId;
   if (query.source !== undefined) params.source = query.source;
+  if (query.dueFrom !== undefined) params.dueFrom = query.dueFrom;
+  if (query.dueTo !== undefined) params.dueTo = query.dueTo;
   if (query.sort !== undefined) params.sort = query.sort;
   if (query.order !== undefined) params.order = query.order;
   return params;
