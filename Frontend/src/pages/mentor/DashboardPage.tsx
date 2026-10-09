@@ -2,6 +2,7 @@ import { CheckCircle2, ClipboardCheck, ClipboardList, TriangleAlert, Wrench } fr
 
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
+import { DeadlineCountdownCard } from '../../features/mentor-dashboard/DeadlineCountdownCard';
 import { AttentionRequiredCard } from '../../features/mentor-dashboard/AttentionRequiredCard';
 import { RecentActivityCard } from '../../features/mentor-dashboard/RecentActivityCard';
 import { useMentorDashboard } from '../../features/mentor-dashboard/useMentorDashboard';
@@ -42,6 +43,8 @@ export function DashboardPage(): JSX.Element {
   return (
     <div className="space-y-5">
       <PreviewPageHeader title="Обзор" subtitle={`${greeting} — вот что происходит с вашими заданиями.`} />
+
+      <DeadlineCountdownCard />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные задания" value={String(kpis.activeAssignments)} />

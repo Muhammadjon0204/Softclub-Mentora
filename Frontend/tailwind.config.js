@@ -97,12 +97,34 @@ export default {
           from: { transform: 'translateX(-100%)' },
           to: { transform: 'translateX(0)' },
         },
+        // Листание месяца в календаре дедлайнов: сетка въезжает с той стороны, куда листают.
+        'calendar-next': {
+          from: { opacity: '0', transform: 'translateX(14px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        'calendar-prev': {
+          from: { opacity: '0', transform: 'translateX(-14px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        // Смена цифры в счётчике дедлайна: новая падает сверху.
+        'digit-in': {
+          from: { opacity: '0', transform: 'translateY(-40%)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'colon-blink': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 180ms ease-out',
         'scale-in': 'scale-in 160ms ease-out',
         'slide-in-right': 'slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1)',
         'slide-in-left-panel': 'slide-in-left-panel 220ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'calendar-next': 'calendar-next 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'calendar-prev': 'calendar-prev 260ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'digit-in': 'digit-in 320ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'colon-blink': 'colon-blink 1s ease-in-out infinite',
       },
     },
   },

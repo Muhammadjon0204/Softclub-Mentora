@@ -116,6 +116,15 @@ public sealed record AssignmentListQuery
 
     public string? Source { get; init; }
 
+    /// <summary>
+    /// Inclusive lower bound on <c>currentDueAt</c> — the deadline calendar asks for one visible month
+    /// at a time instead of paging through every assignment the caller can see.
+    /// </summary>
+    public DateTimeOffset? DueFrom { get; init; }
+
+    /// <summary>Exclusive upper bound on <c>currentDueAt</c>.</summary>
+    public DateTimeOffset? DueTo { get; init; }
+
     /// <summary>Whitelisted: <c>currentDueAt</c>, <c>createdAt</c>, <c>status</c> (<c>API-004</c>).</summary>
     public string? Sort { get; init; }
 

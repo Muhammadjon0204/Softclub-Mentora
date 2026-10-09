@@ -28,6 +28,7 @@ const AdminBranchesPage = lazyPage(() => import('../pages/admin/BranchesPage'), 
 const AdminUsersPage = lazyPage(() => import('../pages/admin/UsersPage'), (m) => m.UsersPage);
 const AdminCategoriesPage = lazyPage(() => import('../pages/admin/CategoriesPage'), (m) => m.CategoriesPage);
 const AdminAssignmentsPage = lazyPage(() => import('../pages/admin/AssignmentsPage'), (m) => m.AssignmentsPage);
+const AdminCalendarPage = lazyPage(() => import('../pages/admin/CalendarPage'), (m) => m.CalendarPage);
 const AdminReportsPage = lazyPage(() => import('../pages/admin/ReportsPage'), (m) => m.ReportsPage);
 const AdminAuditPage = lazyPage(() => import('../pages/admin/AuditPage'), (m) => m.AuditPage);
 const AdminNotificationsPage = lazyPage(() => import('../pages/admin/NotificationsPage'), (m) => m.NotificationsPage);
@@ -38,21 +39,23 @@ const LeadDashboardPage = lazyPage(() => import('../pages/lead/DashboardPage'), 
 const LeadAssignmentsPage = lazyPage(() => import('../pages/lead/AssignmentsPage'), (m) => m.AssignmentsPage);
 const LeadReviewQueuePage = lazyPage(() => import('../pages/lead/ReviewQueuePage'), (m) => m.ReviewQueuePage);
 const LeadTeamPage = lazyPage(() => import('../pages/lead/TeamPage'), (m) => m.TeamPage);
+const LeadCalendarPage = lazyPage(() => import('../pages/lead/CalendarPage'), (m) => m.CalendarPage);
 const LeadReportsPage = lazyPage(() => import('../pages/lead/ReportsPage'), (m) => m.ReportsPage);
 
 const MentorDashboardPage = lazyPage(() => import('../pages/mentor/DashboardPage'), (m) => m.DashboardPage);
 const MentorAssignmentsPage = lazyPage(() => import('../pages/mentor/AssignmentsPage'), (m) => m.AssignmentsPage);
+const MentorCalendarPage = lazyPage(() => import('../pages/mentor/CalendarPage'), (m) => m.CalendarPage);
 const MentorHistoryPage = lazyPage(() => import('../pages/mentor/HistoryPage'), (m) => m.HistoryPage);
 const MentorReportsPage = lazyPage(() => import('../pages/mentor/ReportsPage'), (m) => m.ReportsPage);
 const MentorNotificationsPage = lazyPage(() => import('../pages/mentor/NotificationsPage'), (m) => m.NotificationsPage);
 
 const ADMIN_PAGES = [
   AdminDashboardPage, AdminBranchesPage, AdminUsersPage, AdminCategoriesPage, AdminAssignmentsPage,
-  AdminReportsPage, AdminAuditPage, AdminNotificationsPage, AdminHealthPage, AdminSettingsPage, ProfilePage,
+  AdminCalendarPage, AdminReportsPage, AdminAuditPage, AdminNotificationsPage, AdminHealthPage, AdminSettingsPage, ProfilePage,
 ];
-const LEAD_PAGES = [LeadDashboardPage, LeadAssignmentsPage, LeadReviewQueuePage, LeadTeamPage, LeadReportsPage, ProfilePage];
+const LEAD_PAGES = [LeadDashboardPage, LeadAssignmentsPage, LeadReviewQueuePage, LeadTeamPage, LeadCalendarPage, LeadReportsPage, ProfilePage];
 const MENTOR_PAGES = [
-  MentorDashboardPage, MentorAssignmentsPage, MentorHistoryPage, MentorReportsPage,
+  MentorDashboardPage, MentorAssignmentsPage, MentorCalendarPage, MentorHistoryPage, MentorReportsPage,
   MentorNotificationsPage, ProfilePage,
 ];
 
@@ -127,6 +130,7 @@ export function AppRouter(): JSX.Element {
         <Route path="users" element={page(AdminUsersPage)} />
         <Route path="categories" element={page(AdminCategoriesPage)} />
         <Route path="assignments" element={page(AdminAssignmentsPage)} />
+        <Route path="calendar" element={page(AdminCalendarPage)} />
         <Route path="reports" element={page(AdminReportsPage)} />
         <Route path="audit" element={page(AdminAuditPage)} />
         <Route path="notifications" element={page(AdminNotificationsPage)} />
@@ -159,6 +163,7 @@ export function AppRouter(): JSX.Element {
         <Route path="assignments" element={page(LeadAssignmentsPage)} />
         <Route path="review-queue" element={page(LeadReviewQueuePage)} />
         <Route path="team" element={page(LeadTeamPage)} />
+        <Route path="calendar" element={page(LeadCalendarPage)} />
         <Route path="reports" element={page(LeadReportsPage)} />
         <Route path="profile" element={page(ProfilePage)} />
       </Route>
@@ -180,6 +185,7 @@ export function AppRouter(): JSX.Element {
       >
         <Route path="dashboard" element={page(MentorDashboardPage)} />
         <Route path="tasks" element={page(MentorAssignmentsPage)} />
+        <Route path="calendar" element={page(MentorCalendarPage)} />
         <Route path="history" element={page(MentorHistoryPage)} />
         <Route path="reports" element={page(MentorReportsPage)} />
         <Route path="notifications" element={page(MentorNotificationsPage)} />
