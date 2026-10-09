@@ -26,14 +26,64 @@ public sealed class AiOptions
 {
     public const string SectionName = "Ai";
 
+    public const string GeminiProvider = "Gemini";
+
+    public const string AnthropicProvider = "Anthropic";
+
     public bool Enabled { get; init; }
+
+    /// <summary>
+    /// Which API <see cref="ApiKey"/> belongs to: <c>Gemini</c> (the default) or <c>Anthropic</c>.
+    /// </summary>
+    [Required]
+    [RegularExpression("^(Gemini|Anthropic)$", ErrorMessage = "Ai:Provider — Gemini или Anthropic.")]
+    public string Provider { get; init; } = GeminiProvider;
 
     /// <summary>From the environment only, like every other secret (<c>SEC-010</c>).</summary>
     public string? ApiKey { get; init; }
 
     /// <summary>Named by <c>AI-002</c>; recorded on every report so the result is reproducible.</summary>
     [Required]
-    public string ModelId { get; init; } = "claude-sonnet-5";
+    public string ModelId { get; init; } = "gemini-3.8-flash";
+
+    /// <summary>
+    /// Gemini only: tried when <see cref="ModelId"/> is overloaded (503) or out of quota (429).
+    /// </summary>
+    /// <remarks>
+    /// Quotas are per model, so a second model is a second allowance — the cheapest way to keep a
+    /// report working through a busy hour. Empty disables the fallback.
+    /// </remarks>
+    public string? FallbackModelId { get; init; } = "gemini-3.5-flash";
+
+    /// <summary>
+    /// Gemini only: how much the model reasons before answering.
+    /// </summary>
+    /// <remarks>
+    /// <c>low</c>, because the figures arrive already computed and the task is to describe them.
+    /// Thinking tokens are billed and count against <see cref="MaxOutputTokens"/>; <c>minimal</c> is
+    /// rejected by the current flash models with 400.
+    /// </remarks>
+    [RegularExpression("^(low|medium|high)$", ErrorMessage = "Ai:ThinkingLevel — low, medium или high.")]
+    public string ThinkingLevel { get; init; } = "low";
+
+    /// <summary>Gemini only. Overridden in tests to point at a local fake.</summary>
+    [Required]
+    [Url]
+    public string GeminiBaseUrl { get; init; } = "https://generativelanguage.googleapis.com/v1beta/";
+
+    /// <summary>
+    /// Calls per minute this installation allows itself, across every user (Gemini only).
+    /// </summary>
+    /// <remarks>
+    /// Below the provider's own per-minute quota, so a burst of clicks is queued or refused here with a
+    /// clear message instead of turning into a 429 from the provider. Cached reports do not count.
+    /// </remarks>
+    [Range(1, 1_000)]
+    public int MaxRequestsPerMinute { get; init; } = 8;
+
+    /// <summary>Calls per UTC day this installation allows itself (Gemini only).</summary>
+    [Range(1, 100_000)]
+    public int MaxRequestsPerDay { get; init; } = 200;
 
     /// <summary>Bumped whenever the prompt changes, which invalidates every cached report.</summary>
     [Required]
@@ -43,8 +93,12 @@ public sealed class AiOptions
     [Range(1_000, 200_000)]
     public int MaxInputTokens { get; init; } = 12_000;
 
-    [Range(256, 8_000)]
-    public int MaxOutputTokens { get; init; } = 1_500;
+    /// <summary>
+    /// The response cap. On Gemini it includes the thinking tokens, hence the larger default — at
+    /// 1 500 a structured report could be cut off mid-sentence by reasoning the reader never sees.
+    /// </summary>
+    [Range(256, 32_000)]
+    public int MaxOutputTokens { get; init; } = 6_000;
 
     /// <summary>One attempt (<c>AI-002</c>).</summary>
     [Range(1, 120)]
@@ -86,4 +140,16 @@ public sealed class AiOptions
 
     /// <summary>Whether the provider can actually be called.</summary>
     public bool IsConfigured => Enabled && !string.IsNullOrWhiteSpace(ApiKey);
+
+    public bool IsGemini => string.Equals(Provider, GeminiProvider, StringComparison.Ordinal);
+
+    /// <summary>
+    /// A model id that plainly belongs to the other provider — the classic leftover of switching
+    /// <see cref="Provider"/> and forgetting <see cref="ModelId"/>, which would otherwise surface as a
+    /// 404 on the first report rather than at startup.
+    /// </summary>
+    public bool ModelMatchesProvider =>
+        IsGemini
+            ? !ModelId.StartsWith("claude", StringComparison.OrdinalIgnoreCase)
+            : !ModelId.StartsWith("gemini", StringComparison.OrdinalIgnoreCase);
 }

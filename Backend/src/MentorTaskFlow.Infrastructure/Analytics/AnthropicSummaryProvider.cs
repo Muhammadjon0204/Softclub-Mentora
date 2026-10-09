@@ -106,7 +106,7 @@ public sealed class AnthropicSummaryProvider(
                 Model = _options.ModelId,
                 MaxTokens = _options.MaxOutputTokens,
                 Thinking = new ThinkingConfigDisabled(),
-                System = new List<TextBlockParam> { new() { Text = prompt.SystemInstructions } },
+                System = new List<TextBlockParam> { new() { Text = Instructions(prompt) } },
                 Messages = [new() { Role = Role.User, Content = prompt.Data }],
             },
             attemptSource.Token);
@@ -130,6 +130,15 @@ public sealed class AnthropicSummaryProvider(
             (int?)response.Usage?.OutputTokens,
             response.ID);
     }
+
+    /// <summary>
+    /// The system prompt, with the requested JSON shape spelled out when there is one — this API has
+    /// no schema-constrained output to pass it to.
+    /// </summary>
+    private static string Instructions(AiSummaryPrompt prompt) =>
+        prompt.JsonSchema is null
+            ? prompt.SystemInstructions
+            : $"{prompt.SystemInstructions}\n\nОтветь только JSON-объектом по этой JSON Schema, без markdown и пояснений:\n{prompt.JsonSchema}";
 
     /// <summary>
     /// 429, 5xx and timeouts are retried; everything else is not (<c>AI-003</c>).

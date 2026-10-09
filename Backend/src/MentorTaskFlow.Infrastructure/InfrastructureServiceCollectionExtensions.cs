@@ -157,6 +157,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddOptions<AiOptions>()
             .Bind(configuration.GetSection(AiOptions.SectionName))
             .ValidateDataAnnotations()
+            .Validate(
+                ai => !ai.IsConfigured || ai.ModelMatchesProvider,
+                "Ai:ModelId не подходит к Ai:Provider — например, claude-* при Provider=Gemini.")
             .ValidateOnStart();
 
         services.AddSingleton<AiMetrics>();
@@ -171,6 +174,23 @@ public static class InfrastructureServiceCollectionExtensions
             // one must still boot and still serve every metric. It gets a provider that refuses,
             // not a missing registration that would fail at resolution time.
             services.AddScoped<IAiSummaryProvider, UnconfiguredSummaryProvider>();
+            return;
+        }
+
+        if (options.IsGemini)
+        {
+            services.AddSingleton<AiRequestLimiter>();
+            services.AddHttpClient(GeminiSummaryProvider.HttpClientName, (serviceProvider, client) =>
+            {
+                var ai = serviceProvider.GetRequiredService<IOptions<AiOptions>>().Value;
+
+                client.BaseAddress = new Uri(ai.GeminiBaseUrl.EndsWith('/') ? ai.GeminiBaseUrl : ai.GeminiBaseUrl + "/");
+
+                // Each attempt has its own timeout inside GeminiSummaryProvider, counted against the
+                // ninety-second budget of AI-003; a second clock here would only cut it short.
+                client.Timeout = Timeout.InfiniteTimeSpan;
+            });
+            services.AddScoped<IAiSummaryProvider, GeminiSummaryProvider>();
             return;
         }
 
