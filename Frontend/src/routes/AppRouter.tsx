@@ -41,7 +41,6 @@ const LeadTeamPage = lazyPage(() => import('../pages/lead/TeamPage'), (m) => m.T
 const LeadReportsPage = lazyPage(() => import('../pages/lead/ReportsPage'), (m) => m.ReportsPage);
 
 const MentorDashboardPage = lazyPage(() => import('../pages/mentor/DashboardPage'), (m) => m.DashboardPage);
-const MentorSchedulePage = lazyPage(() => import('../pages/mentor/SchedulePage'), (m) => m.SchedulePage);
 const MentorAssignmentsPage = lazyPage(() => import('../pages/mentor/AssignmentsPage'), (m) => m.AssignmentsPage);
 const MentorHistoryPage = lazyPage(() => import('../pages/mentor/HistoryPage'), (m) => m.HistoryPage);
 const MentorReportsPage = lazyPage(() => import('../pages/mentor/ReportsPage'), (m) => m.ReportsPage);
@@ -53,7 +52,7 @@ const ADMIN_PAGES = [
 ];
 const LEAD_PAGES = [LeadDashboardPage, LeadAssignmentsPage, LeadReviewQueuePage, LeadTeamPage, LeadReportsPage, ProfilePage];
 const MENTOR_PAGES = [
-  MentorDashboardPage, MentorSchedulePage, MentorAssignmentsPage, MentorHistoryPage, MentorReportsPage,
+  MentorDashboardPage, MentorAssignmentsPage, MentorHistoryPage, MentorReportsPage,
   MentorNotificationsPage, ProfilePage,
 ];
 
@@ -180,7 +179,6 @@ export function AppRouter(): JSX.Element {
         }
       >
         <Route path="dashboard" element={page(MentorDashboardPage)} />
-        <Route path="schedule" element={page(MentorSchedulePage)} />
         <Route path="tasks" element={page(MentorAssignmentsPage)} />
         <Route path="history" element={page(MentorHistoryPage)} />
         <Route path="reports" element={page(MentorReportsPage)} />
