@@ -13,6 +13,7 @@ import { DeactivateUserDialog } from '../../features/admin-users/DeactivateUserD
 import { ResendInvitationDialog } from '../../features/admin-users/ResendInvitationDialog';
 import { SendPasswordResetDialog } from '../../features/admin-users/SendPasswordResetDialog';
 import { TransferUserDialog } from '../../features/admin-users/TransferUserDialog';
+import { ChangeCategoryDialog } from '../../features/admin-users/ChangeCategoryDialog';
 import { UnblockUserDialog } from '../../features/admin-users/UnblockUserDialog';
 import { UserActionMenu } from '../../features/admin-users/UserActionMenu';
 import { UserDetailsDrawer } from '../../features/admin-users/UserDetailsDrawer';
@@ -143,6 +144,7 @@ function LastLoginCell({ label }: { label: string }): JSX.Element {
 type ActionDialogState =
   | { type: 'changeRole'; user: PreviewUserDetails }
   | { type: 'transfer'; user: PreviewUserDetails }
+  | { type: 'changeCategory'; user: PreviewUserDetails }
   | { type: 'resendInvitation'; user: PreviewUserDetails }
   | { type: 'passwordReset'; user: PreviewUserDetails }
   | { type: 'block'; user: PreviewUserDetails }
@@ -375,6 +377,7 @@ export function UsersPage(): JSX.Element {
                     onActivate={() => { void handleActivate(rowUser); }}
                     onChangeRole={() => { setActionDialog({ type: 'changeRole', user: rowUser }); }}
                     onTransfer={() => { setActionDialog({ type: 'transfer', user: rowUser }); }}
+                    onChangeCategory={() => { setActionDialog({ type: 'changeCategory', user: rowUser }); }}
                     onResendInvitation={() => { setActionDialog({ type: 'resendInvitation', user: rowUser }); }}
                     onRequestPasswordReset={() => { setActionDialog({ type: 'passwordReset', user: rowUser }); }}
                     onBlock={() => { setActionDialog({ type: 'block', user: rowUser }); }}
@@ -401,6 +404,7 @@ export function UsersPage(): JSX.Element {
         onActivate={(target) => { void handleActivate(target); }}
         onChangeRole={(target) => { setActionDialog({ type: 'changeRole', user: target }); }}
         onTransfer={(target) => { setActionDialog({ type: 'transfer', user: target }); }}
+        onChangeCategory={(target) => { setActionDialog({ type: 'changeCategory', user: target }); }}
         onResendInvitation={(target) => { setActionDialog({ type: 'resendInvitation', user: target }); }}
         onRequestPasswordReset={(target) => { setActionDialog({ type: 'passwordReset', user: target }); }}
         onBlock={(target) => { setActionDialog({ type: 'block', user: target }); }}
@@ -428,6 +432,17 @@ export function UsersPage(): JSX.Element {
         isSubmitting={actions.isSubmitting}
         onConfirm={async (input) => {
           if (actionDialog?.type === 'transfer') await actions.transferUser(actionDialog.user.id, actionDialog.user.concurrencyToken ?? '', input);
+        }}
+      />
+
+      <ChangeCategoryDialog
+        user={actionDialog?.type === 'changeCategory' ? actionDialog.user : null}
+        open={actionDialog?.type === 'changeCategory'}
+        onOpenChange={(next) => { if (!next) setActionDialog(null); }}
+        isOrgAdmin={isOrgAdmin}
+        isSubmitting={actions.isSubmitting}
+        onConfirm={async (input) => {
+          if (actionDialog?.type === 'changeCategory') await actions.changeCategory(actionDialog.user.id, actionDialog.user.concurrencyToken ?? '', input);
         }}
       />
 

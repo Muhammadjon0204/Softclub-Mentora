@@ -188,7 +188,10 @@ export async function startAssignmentReview(id: string, request: AssignmentActio
  * separately as `AS8`). `cancelReason` 5–500 chars. Ordinary Lead cancel writes a `TaskEvent` and a
  * notification but no `AuditLog` row — `AuditLog` is reserved for the Admin force-cancel path.
  */
-export async function cancelAssignment(id: string, request: CancelAssignmentRequest): Promise<AssignmentDto> {
-  const { data } = await apiClient.post<AssignmentDto>(`/api/v1/assignments/${id}/cancel`, request);
+export async function cancelAssignment(id: string, request: CancelAssignmentRequest, branchId?: string): Promise<AssignmentDto> {
+  // `branchId` — явный X-MTF-Branch-Id для Organization Admin в контексте «Все филиалы»: запись
+  // без выбранного филиала сервер отклоняет (BRANCH_CONTEXT_REQUIRED).
+  const headers = branchId !== undefined ? { 'X-MTF-Branch-Id': branchId } : undefined;
+  const { data } = await apiClient.post<AssignmentDto>(`/api/v1/assignments/${id}/cancel`, request, { headers });
   return data;
 }
