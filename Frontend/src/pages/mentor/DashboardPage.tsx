@@ -52,13 +52,18 @@ export function DashboardPage(): JSX.Element {
         <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Принято за 30 дней" value={String(kpis.approvedPeriod)} />
       </div>
 
-      {/* Слева — лента событий, справа — что сделать сейчас: срочное и обратный отсчёт до
-          ближайшего дедлайна. На телефоне правая колонка идёт первой: она про «сейчас». */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <RecentActivityCard items={recentActivity} />
-        <div className="order-first flex min-w-0 flex-col gap-4 xl:order-none">
-          <AttentionRequiredCard items={attentionItems} />
+      {/* Десктоп: слева лента событий на всю высоту, справа «Требует внимания» и под ним трекер.
+          Телефон: трекер → лента → «Требует внимания». Порядок задают order-* на одной сетке,
+          а на xl каждая карточка встаёт в свою клетку явно. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2 xl:grid-rows-[auto_1fr]">
+        <div className="order-1 min-w-0 xl:col-start-2 xl:row-start-2">
           <DeadlineCountdownCard />
+        </div>
+        <div className="order-2 min-w-0 xl:col-start-1 xl:row-span-2 xl:row-start-1">
+          <RecentActivityCard items={recentActivity} />
+        </div>
+        <div className="order-3 min-w-0 xl:col-start-2 xl:row-start-1">
+          <AttentionRequiredCard items={attentionItems} />
         </div>
       </div>
     </div>
