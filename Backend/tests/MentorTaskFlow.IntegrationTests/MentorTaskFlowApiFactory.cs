@@ -117,6 +117,9 @@ public sealed class MentorTaskFlowApiFactory : WebApplicationFactory<Program>
                 ["Telegram:BotToken"] = "test-bot-token",
                 ["Telegram:WebhookSecret"] = TelegramWebhookSecret,
 
+                // No test talks to the real Bot API: the webhook is exercised directly.
+                ["Telegram:ReceiveUpdates"] = "false",
+
                 ["Ai:Enabled"] = AiEnabled ? "true" : "false",
                 ["Ai:PromptVersion"] = "v1.0",
                 ["Ai:Provider"] = "Anthropic",

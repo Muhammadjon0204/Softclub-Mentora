@@ -317,6 +317,20 @@ public static class InfrastructureServiceCollectionExtensions
             // pass instead.
             client.Timeout = TimeSpan.FromSeconds(15);
         });
+
+        // Receiving updates: without it /start reaches nobody and no account is ever bound.
+        services.AddHttpClient(TelegramBotApi.LongPollClientName, (serviceProvider, client) =>
+        {
+            var telegram = serviceProvider.GetRequiredService<IOptions<TelegramOptions>>().Value;
+            client.BaseAddress = new Uri(telegram.ApiBaseUrl);
+
+            // getUpdates holds the request open for PollTimeoutSeconds; the margin covers the network.
+            client.Timeout = TimeSpan.FromSeconds(telegram.PollTimeoutSeconds + 20);
+        });
+        services.AddSingleton<TelegramBotIdentity>();
+        services.AddSingleton<TelegramBotApi>();
+        services.AddScoped<TelegramUpdateHandler>();
+        services.AddHostedService<TelegramUpdatesService>();
     }
 
     /// <summary>Object storage and the file limits of TZ 17.</summary>

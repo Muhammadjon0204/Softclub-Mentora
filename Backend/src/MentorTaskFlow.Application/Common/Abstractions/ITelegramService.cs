@@ -35,5 +35,19 @@ public interface ITelegramService
     /// The account bound is the one that issued the token, taken from the stored row and never from
     /// anything Telegram sent: the chat says who is asking, not whom to bind (<c>TG-009</c>).
     /// </remarks>
-    Task<string> RedeemBindTokenAsync(string chatId, string? plainToken, CancellationToken cancellationToken);
+    Task<TelegramBindOutcome> RedeemBindTokenAsync(string chatId, string? plainToken, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// The result of <c>/start &lt;token&gt;</c>: the bound account, or the reply explaining why not.
+/// </summary>
+/// <remarks>
+/// A failure carries only text, and the same text for every cause that would otherwise confirm a
+/// guessed token (TG-012).
+/// </remarks>
+public sealed record TelegramBindOutcome(Guid? BoundUserId, string? FailureReply)
+{
+    public static TelegramBindOutcome Bound(Guid userId) => new(userId, null);
+
+    public static TelegramBindOutcome Failed(string reply) => new(null, reply);
 }

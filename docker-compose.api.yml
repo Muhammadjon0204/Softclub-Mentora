@@ -157,6 +157,9 @@ services:
       # Браузеры подключаются к realtime только через mentora-api. Воркер свои
       # изменения публикует (NOTIFY), но слушать ему некому — лишнее соединение с БД.
       Realtime__ListenerEnabled: "false"
+      # Сообщения боту принимает только mentora-api: второй процесс, опрашивающий Telegram,
+      # получил бы 409 и мешал первому.
+      Telegram__ReceiveUpdates: "false"
     volumes:
       - mentora_dataprotection_keys:/home/mentortaskflow/.aspnet/DataProtection-Keys
     depends_on:
