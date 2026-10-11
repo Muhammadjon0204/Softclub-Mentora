@@ -129,6 +129,18 @@ public sealed class OutboxWriter(
 
                 break;
 
+            case ChannelPolicy.TelegramOnly:
+                if (telegramBound)
+                {
+                    yield return NotificationChannel.Telegram;
+                }
+                else
+                {
+                    metrics.SkippedTelegram(eventType);
+                }
+
+                break;
+
             case ChannelPolicy.Both:
                 yield return NotificationChannel.Email;
 

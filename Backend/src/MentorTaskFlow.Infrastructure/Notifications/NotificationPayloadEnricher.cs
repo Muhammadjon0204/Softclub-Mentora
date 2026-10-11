@@ -36,6 +36,7 @@ internal static class NotificationPayloadEnricher
         NotificationEventTypes.AssignmentReassigned,
         NotificationEventTypes.SubmissionUploaded,
         NotificationEventTypes.LateSubmissionUploaded,
+        NotificationEventTypes.SubmissionReceipt,
         NotificationEventTypes.ReviewApproved,
         NotificationEventTypes.ReviewNeedsRework,
         NotificationEventTypes.DeadlineReminder,
@@ -47,6 +48,7 @@ internal static class NotificationPayloadEnricher
     {
         NotificationEventTypes.SubmissionUploaded,
         NotificationEventTypes.LateSubmissionUploaded,
+        NotificationEventTypes.SubmissionReceipt,
     };
 
     public static async Task<JsonDocument> EnrichAsync(

@@ -65,6 +65,11 @@ public static class NotificationTemplates
                     ? $"Ментор сдал задание {quotedTitle} после дедлайна. Зайдите и проверьте."
                     : $"Ваш ментор {mentor} сдал задание {quotedTitle} после дедлайна. Зайдите и проверьте.", "Открыть и проверить"),
 
+            NotificationEventTypes.SubmissionReceipt =>
+                ("Работа отправлена на проверку", TryGetString(body, "leadFullName") is { } leadName
+                    ? $"Работа по заданию {quotedTitle} отправлена на проверку руководителю {leadName}."
+                    : $"Работа по заданию {quotedTitle} сохранена. В команде сейчас нет руководителя — проверка начнётся, когда его назначат.", "Открыть задание"),
+
             NotificationEventTypes.ReviewApproved =>
                 ("Работа принята", $"Ваша работа по заданию {quotedTitle} принята.", "Открыть задание"),
 
@@ -121,10 +126,25 @@ public static class NotificationTemplates
 
         if (body.TryGetProperty("versionNumber", out var version) && version.TryGetInt32(out var versionNumber) && versionNumber > 1)
         {
-            details.Add($"Версия: {versionNumber}");
+            details.Add($"Версия {versionNumber} — после доработки");
         }
 
-        if (TryGetString(body, "dueAtLocal") is { } dueAt)
+        if (eventType is NotificationEventTypes.SubmissionReceipt
+            && body.TryGetProperty("isLate", out var late) && late.ValueKind is JsonValueKind.True or JsonValueKind.False)
+        {
+            details.Add(late.GetBoolean() ? "Сдано с опозданием" : "Сдано вовремя");
+        }
+
+        if (TryGetString(body, "fileName") is { } fileName)
+        {
+            var size = body.TryGetProperty("fileSizeBytes", out var bytes) && bytes.TryGetInt64(out var length)
+                ? $" ({FormatSize(length)})"
+                : string.Empty;
+            details.Add($"Файл: {fileName}{size}");
+        }
+
+        // An accepted task has no deadline left to watch.
+        if (eventType is not NotificationEventTypes.ReviewApproved && TryGetString(body, "dueAtLocal") is { } dueAt)
         {
             details.Add(eventType is NotificationEventTypes.ReviewNeedsRework ? $"Новый срок: {dueAt}" : $"Срок: {dueAt}");
         }
@@ -164,7 +184,35 @@ public static class NotificationTemplates
                    + (details.Count > 0 ? $"<p>{string.Join("<br/>", details.Select(WebUtility.HtmlEncode))}</p>" : string.Empty)
                    + $"<p><a href=\"{WebUtility.HtmlEncode(link)}\">{WebUtility.HtmlEncode(actionLabel)}</a></p>";
 
-        var telegram = $"<b>{TelegramEscape(subject)}</b>\n\n{TelegramEscape(lead)}"
+        // Comments go to Telegram only: a chat is where a mentor reads «what to fix» on the move, while
+        // the email keeps pointing to the application as NTF-005 intends for that channel.
+        var (quoteLabel, quote) = eventType switch
+        {
+            NotificationEventTypes.SubmissionUploaded or NotificationEventTypes.LateSubmissionUploaded
+                => ("Комментарий ментора", TryGetString(body, "comment")),
+            NotificationEventTypes.SubmissionReceipt => ("Ваш комментарий", TryGetString(body, "comment")),
+            NotificationEventTypes.ReviewApproved or NotificationEventTypes.ReviewNeedsRework
+                => ("Комментарий руководителя", TryGetString(body, "reviewComment")),
+            _ => (null, null),
+        };
+
+        var telegramLead = eventType is NotificationEventTypes.ReviewNeedsRework && quote is not null
+            ? $"Работу по заданию {quotedTitle} нужно доработать."
+            : lead;
+
+        var marker = eventType switch
+        {
+            NotificationEventTypes.SubmissionReceipt => "✅ ",
+            NotificationEventTypes.SubmissionUploaded => "📥 ",
+            NotificationEventTypes.LateSubmissionUploaded => "⏰ ",
+            NotificationEventTypes.ReviewApproved => "🎉 ",
+            NotificationEventTypes.ReviewNeedsRework => "🔁 ",
+            NotificationEventTypes.AssignmentAssigned => "📌 ",
+            _ => string.Empty,
+        };
+
+        var telegram = $"{marker}<b>{TelegramEscape(subject)}</b>\n\n{TelegramEscape(telegramLead)}"
+                       + (quote is not null ? $"\n\n<b>{quoteLabel}:</b>\n<blockquote>{TelegramEscape(quote)}</blockquote>" : string.Empty)
                        + (details.Count > 0 ? "\n\n" + string.Join("\n", details.Select(TelegramEscape)) : string.Empty);
 
         return new RenderedMessage(subject, string.Join("\n", plainLines), html, telegram, link, actionLabel);
@@ -178,6 +226,34 @@ public static class NotificationTemplates
         .Replace("&", "&amp;", StringComparison.Ordinal)
         .Replace("<", "&lt;", StringComparison.Ordinal)
         .Replace(">", "&gt;", StringComparison.Ordinal);
+
+    /// <summary>The text as a chat shows it: at most <paramref name="limit"/> characters, cut at a word.</summary>
+    public static string? ShortenForChat(string? text, int limit = 500)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var trimmed = text.Trim();
+
+        if (trimmed.Length <= limit)
+        {
+            return trimmed;
+        }
+
+        var cut = trimmed[..limit];
+        var space = cut.LastIndexOf(' ');
+
+        return (space > limit / 2 ? cut[..space] : cut).TrimEnd() + "…";
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 => $"{bytes / 1024d / 1024d:0.#} МБ".Replace('.', ','),
+        >= 1024 => $"{bytes / 1024d:0} КБ",
+        _ => $"{bytes} Б",
+    };
 
     private static string ForMentor(string? mentor) => mentor is null ? string.Empty : $" для {mentor}";
 

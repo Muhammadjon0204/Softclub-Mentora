@@ -9,6 +9,7 @@ using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
 using MentorTaskFlow.Infrastructure.Storage;
@@ -318,6 +319,38 @@ public sealed class SubmissionService(
             .Select(u => (Guid?)u.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var leadName = leadId is { } id
+            ? await dbContext.Users.IgnoreQueryFilters().AsNoTracking().Where(u => u.Id == id).Select(u => u.FullName).FirstOrDefaultAsync(cancellationToken)
+            : null;
+
+        // What was handed in, for the chat: the comment shortened, the file by name. The file itself
+        // never travels — it is opened in the application, where access is checked (NTF-017).
+        var comment = NotificationTemplates.ShortenForChat(submission.Comment);
+
+        // The mentor's own receipt — sent whether or not the category has a Lead, and saying so.
+        await outboxWriter.EnqueueSystemAsync(
+            new OutboxEntry
+            {
+                RecipientUserId = submission.SubmittedById,
+                EventType = NotificationEventTypes.SubmissionReceipt,
+                EntityId = assignment.Id,
+                Discriminator = submission.VersionNumber.ToString(),
+                CategoryId = assignment.CategoryId,
+                Payload = JsonSerializer.SerializeToDocument(new
+                {
+                    assignmentTitle = assignment.Title,
+                    versionNumber = submission.VersionNumber,
+                    isLate = submission.IsLate,
+                    comment,
+                    fileName = submission.OriginalFileName,
+                    fileSizeBytes = submission.FileSizeBytes,
+                    leadFullName = leadName,
+                }),
+            },
+            assignment.OrganizationId,
+            assignment.BranchId,
+            cancellationToken);
+
         if (leadId is not { } recipient)
         {
             // A category without an active Lead is a valid, observable state — deactivating the last
@@ -344,6 +377,9 @@ public sealed class SubmissionService(
                     assignmentTitle = assignment.Title,
                     versionNumber = submission.VersionNumber,
                     isLate = submission.IsLate,
+                    comment,
+                    fileName = submission.OriginalFileName,
+                    fileSizeBytes = submission.FileSizeBytes,
                 }),
             },
             assignment.OrganizationId,

@@ -16,6 +16,10 @@ public enum ChannelPolicy
     TelegramPreferred = 1,
 
     EmailOnly = 2,
+
+    /// <summary>Only to a bound Telegram chat; nothing at all otherwise. For confirmations of the
+    /// recipient's own actions, where an email would only repeat what they just did.</summary>
+    TelegramOnly = 3,
 }
 
 /// <summary>
@@ -36,6 +40,7 @@ public static class ChannelPolicies
             [NotificationEventTypes.AssignmentReassigned] = ChannelPolicy.Both,
             [NotificationEventTypes.SubmissionUploaded] = ChannelPolicy.Both,
             [NotificationEventTypes.LateSubmissionUploaded] = ChannelPolicy.Both,
+            [NotificationEventTypes.SubmissionReceipt] = ChannelPolicy.TelegramOnly,
             [NotificationEventTypes.ReviewApproved] = ChannelPolicy.Both,
             [NotificationEventTypes.ReviewNeedsRework] = ChannelPolicy.Both,
             [NotificationEventTypes.DeadlineReminder] = ChannelPolicy.TelegramPreferred,
