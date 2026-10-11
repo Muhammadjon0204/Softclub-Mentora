@@ -10,6 +10,7 @@ using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -231,9 +232,9 @@ public sealed class ReviewService(
     /// Tells the mentor what was decided, and — on rework — by when.
     /// </summary>
     /// <remarks>
-    /// The comment itself is not in the payload. Review text can be long and blunt, and email is not
-    /// the place for it; the notification says a decision exists and the interface shows it
-    /// (<c>NTF-005</c>).
+    /// The comment travels in the payload for the Telegram message only (requested 2026-10-11): a
+    /// mentor sent back for rework needs to know what to fix without opening the app. The email still
+    /// says a decision exists and points to the interface, as <c>NTF-005</c> intends for that channel.
     /// </remarks>
     private Task NotifyAssigneeAsync(Assignment assignment, Review review, CancellationToken cancellationToken) =>
         outboxWriter.EnqueueSystemAsync(
@@ -253,6 +254,7 @@ public sealed class ReviewService(
                 {
                     assignmentTitle = assignment.Title,
                     currentDueAt = assignment.CurrentDueAt,
+                    reviewComment = NotificationTemplates.ShortenForChat(review.Comment),
                 }),
             },
             assignment.OrganizationId,

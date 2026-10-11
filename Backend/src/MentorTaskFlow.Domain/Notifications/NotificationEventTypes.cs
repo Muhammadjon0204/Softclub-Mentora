@@ -1,7 +1,7 @@
 namespace MentorTaskFlow.Domain.Notifications;
 
 /// <summary>
-/// The 19 notification event types of Приложение E.
+/// The notification event types: the 19 of Приложение E plus <see cref="SubmissionReceipt"/>.
 /// </summary>
 /// <remarks>
 /// Section 18.2 and Приложение E must agree; a divergence is a defect in the document. The list is
@@ -15,6 +15,13 @@ public static class NotificationEventTypes
     public const string AssignmentReassigned = "AssignmentReassigned";
     public const string SubmissionUploaded = "SubmissionUploaded";
     public const string LateSubmissionUploaded = "LateSubmissionUploaded";
+
+    /// <summary>
+    /// Confirmation to the mentor that their work went to review — what was sent and to whom.
+    /// </summary>
+    /// <remarks>An addition to Приложение E, requested on 2026-10-11. Telegram only: an email about
+    /// one's own action a second ago is noise.</remarks>
+    public const string SubmissionReceipt = "SubmissionReceipt";
     public const string ReviewApproved = "ReviewApproved";
     public const string ReviewNeedsRework = "ReviewNeedsRework";
     public const string DeadlineReminder = "DeadlineReminder";

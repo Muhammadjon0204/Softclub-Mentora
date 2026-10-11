@@ -35,7 +35,11 @@ public sealed class NotificationCatalogTests
     /// The 19 of Приложение E, counted so an addition to one list without the other is caught.
     /// </summary>
     [Fact]
-    public void The_catalog_holds_nineteen_events() => EventTypes.Length.ShouldBe(19);
+    public void The_catalog_holds_the_nineteen_events_and_the_submission_receipt() => EventTypes.Length.ShouldBe(20);
+
+    [Fact]
+    public void The_submission_receipt_never_becomes_an_email() =>
+        ChannelPolicies.For(NotificationEventTypes.SubmissionReceipt).ShouldBe(ChannelPolicy.TelegramOnly);
 
     /// <summary>
     /// <c>TEN-042</c>: exactly three event types may carry a null branch, plus the invitation, whose

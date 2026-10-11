@@ -21,13 +21,14 @@ const STATUS_LABEL: Record<string, string> = {
   DeadLetter: 'Ошибка доставки',
 };
 
-/** `Backend/src/MentorTaskFlow.Domain/Notifications/NotificationEventTypes.cs` — все 19 типов события. */
+/** `Backend/src/MentorTaskFlow.Domain/Notifications/NotificationEventTypes.cs` — все типы событий (19 из ТЗ + подтверждение отправки ментору). */
 const EVENT_TYPE_LABEL: Record<string, string> = {
   AssignmentAssigned: 'Задание назначено',
   AssignmentSuggested: 'Предложено задание',
   AssignmentReassigned: 'Задание переназначено',
   SubmissionUploaded: 'Загружено решение',
   LateSubmissionUploaded: 'Загружено решение с опозданием',
+  SubmissionReceipt: 'Подтверждение отправки ментору',
   ReviewApproved: 'Решение одобрено',
   ReviewNeedsRework: 'Решение отправлено на доработку',
   DeadlineReminder: 'Напоминание о дедлайне',
