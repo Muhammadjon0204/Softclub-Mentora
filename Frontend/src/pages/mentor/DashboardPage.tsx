@@ -44,8 +44,6 @@ export function DashboardPage(): JSX.Element {
     <div className="space-y-5">
       <PreviewPageHeader title="Обзор" subtitle={`${greeting} — вот что происходит с вашими заданиями.`} />
 
-      <DeadlineCountdownCard />
-
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные задания" value={String(kpis.activeAssignments)} />
         <PreviewMetricCard icon={<ClipboardCheck className="h-5 w-5" aria-hidden="true" />} label="На проверке" value={String(kpis.awaitingReview)} />
@@ -54,9 +52,14 @@ export function DashboardPage(): JSX.Element {
         <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Принято за 30 дней" value={String(kpis.approvedPeriod)} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <AttentionRequiredCard items={attentionItems} />
+      {/* Слева — лента событий, справа — что сделать сейчас: срочное и обратный отсчёт до
+          ближайшего дедлайна. На телефоне правая колонка идёт первой: она про «сейчас». */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <RecentActivityCard items={recentActivity} />
+        <div className="order-first flex min-w-0 flex-col gap-4 xl:order-none">
+          <AttentionRequiredCard items={attentionItems} />
+          <DeadlineCountdownCard />
+        </div>
       </div>
     </div>
   );
