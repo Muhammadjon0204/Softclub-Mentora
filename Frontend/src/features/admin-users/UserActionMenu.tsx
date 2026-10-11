@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Pencil,
   ShieldOff,
+  Shuffle,
   UserCheck,
   UserCog,
   UserX,
@@ -29,6 +30,7 @@ export interface UserActionMenuProps {
   onActivate: () => void;
   onChangeRole: () => void;
   onTransfer: () => void;
+  onChangeCategory: () => void;
   onResendInvitation: () => void;
   onRequestPasswordReset: () => void;
   onBlock: () => void;
@@ -52,6 +54,7 @@ export function UserActionMenu({
   onActivate,
   onChangeRole,
   onTransfer,
+  onChangeCategory,
   onResendInvitation,
   onRequestPasswordReset,
   onBlock,
@@ -92,6 +95,17 @@ export function UserActionMenu({
           icon: <UserCog className="h-full w-full" aria-hidden="true" />,
           onSelect: onChangeRole,
         });
+
+        // Внутри филиала — обоим контурам администратора (`AnyAdmin`); у администраторов
+        // направления нет, им пункт не нужен.
+        if (user.role === 'Mentor' || user.role === 'Lead') {
+          items.push({
+            id: 'change-category',
+            label: 'Сменить направление',
+            icon: <Shuffle className="h-full w-full" aria-hidden="true" />,
+            onSelect: onChangeCategory,
+          });
+        }
 
         if (isOrgAdmin && user.role !== 'OrgAdmin') {
           items.push({

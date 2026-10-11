@@ -36,6 +36,7 @@ export interface UserDetailsDrawerProps {
   onActivate: (user: PreviewUserDetails) => void;
   onChangeRole: (user: PreviewUserDetails) => void;
   onTransfer: (user: PreviewUserDetails) => void;
+  onChangeCategory: (user: PreviewUserDetails) => void;
   onResendInvitation: (user: PreviewUserDetails) => void;
   onRequestPasswordReset: (user: PreviewUserDetails) => void;
   onBlock: (user: PreviewUserDetails) => void;
@@ -59,6 +60,7 @@ export function UserDetailsDrawer({
   onActivate,
   onChangeRole,
   onTransfer,
+  onChangeCategory,
   onResendInvitation,
   onRequestPasswordReset,
   onBlock,
@@ -101,6 +103,7 @@ export function UserDetailsDrawer({
               onActivate={() => onActivate(user)}
               onChangeRole={() => onChangeRole(user)}
               onTransfer={() => onTransfer(user)}
+              onChangeCategory={() => onChangeCategory(user)}
               onResendInvitation={() => onResendInvitation(user)}
               onRequestPasswordReset={() => onRequestPasswordReset(user)}
               onBlock={() => onBlock(user)}

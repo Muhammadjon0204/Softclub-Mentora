@@ -37,15 +37,22 @@ export function isProblemDetails(value: unknown): value is ApiProblemDetails {
     typeof value['detail'] === 'string' &&
     typeof value['instance'] === 'string' &&
     typeof value['traceId'] === 'string' &&
-    isRecord(value['errors'])
+    // Сервер присылает `errors` только для ошибок валидации; у 403/409 и прочих бизнес-ошибок его нет.
+    // Требовать его — значит терять `detail` («у пользователя есть незавершённые задачи» и т.п.) и
+    // показывать вместо него общее «Не удалось выполнить запрос».
+    (value['errors'] === undefined || isRecord(value['errors']))
   );
+}
+
+function withErrors(problem: ApiProblemDetails): ApiProblemDetails {
+  return problem.errors === undefined ? { ...problem, errors: {} } : problem;
 }
 
 /** Достаёт ProblemDetails из ошибки axios либо из уже распакованного тела. */
 export function toProblemDetails(error: unknown): ApiProblemDetails | null {
-  if (isProblemDetails(error)) return error;
+  if (isProblemDetails(error)) return withErrors(error);
   if (axios.isAxiosError(error) && isProblemDetails(error.response?.data)) {
-    return error.response.data;
+    return withErrors(error.response.data);
   }
   return null;
 }

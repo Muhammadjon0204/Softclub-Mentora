@@ -4,16 +4,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   activateUser as activateUserApi,
   changeUserBranch as changeUserBranchApi,
+  changeUserCategory as changeUserCategoryApi,
   changeUserRole as changeUserRoleApi,
   createUser as createUserApi,
   deactivateUser as deactivateUserApi,
   patchUser as patchUserApi,
   resendInvitation as resendInvitationApi,
 } from '../../api/admin/users';
+import { cancelAssignment } from '../../api/lead/assignments';
 import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useAuth } from '../../auth/useAuth';
 import { useToast } from '../../shared/overlays';
 import type { PreviewUserRole } from '../../mocks/ui-preview/users.preview';
+import type { ChangeCategoryInput } from './ChangeCategoryDialog';
 import type { NotificationLanguage, PreviewUserDetails } from './userPresentation';
 import { fromAssignableRole, toUserDetails, usersListQueryKey } from './useUsersQuery';
 import type { BranchNameLookup } from './useUsersQuery';
@@ -68,6 +71,7 @@ export interface UseUserActionsResult {
   deactivateUser: (id: string, concurrencyToken: string) => Promise<PreviewUserDetails>;
   changeRole: (id: string, concurrencyToken: string, input: ChangeUserRoleInput) => Promise<PreviewUserDetails>;
   transferUser: (id: string, concurrencyToken: string, input: TransferUserInput) => Promise<PreviewUserDetails>;
+  changeCategory: (id: string, concurrencyToken: string, input: ChangeCategoryInput) => Promise<PreviewUserDetails>;
   resendInvitation: (id: string) => Promise<void>;
   /** TODO(docs §3.4): admin-инициированный сброс пароля уже активного пользователя — Product Decision Required, `resend-invitation` для этого случая семантически неверен. */
   requestPasswordReset: (id: string) => Promise<void>;
@@ -196,6 +200,25 @@ export function useUserActions(): UseUserActionsResult {
     [run, invalidateList, toast],
   );
 
+  const changeCategory = useCallback(
+    async (id: string, concurrencyToken: string, input: ChangeCategoryInput): Promise<PreviewUserDetails> => {
+      const updated = await run(async () => {
+        // Сначала задания: пока они не закрыты, сервер перевод не пропустит (USER-012). По одному —
+        // у каждого свой concurrencyToken, и ошибка на одном не должна молча пропустить остальные.
+        const cancelReason = `Перевод исполнителя в направление «${input.newCategoryName}»: ${input.reason}`.slice(0, 500);
+        for (const assignment of input.assignmentsToCancel) {
+          await cancelAssignment(assignment.id, { cancelReason, concurrencyToken: assignment.concurrencyToken }, input.branchOverride ?? undefined);
+        }
+        return changeUserCategoryApi(id, { newCategoryId: input.newCategoryId, reason: input.reason, concurrencyToken });
+      });
+      invalidateList();
+      if (input.assignmentsToCancel.length > 0) void queryClient.invalidateQueries();
+      toast.success(`Пользователь переведён в направление «${input.newCategoryName}»`);
+      return toUserDetails(updated, noBranchNameLookup, new Map());
+    },
+    [run, invalidateList, toast, queryClient],
+  );
+
   const resendInvitation = useCallback(
     async (id: string): Promise<void> => {
       await run(() => resendInvitationApi(id));
@@ -231,6 +254,7 @@ export function useUserActions(): UseUserActionsResult {
     deactivateUser,
     changeRole,
     transferUser,
+    changeCategory,
     resendInvitation,
     requestPasswordReset,
     blockUser,
