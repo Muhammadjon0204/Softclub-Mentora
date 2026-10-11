@@ -28,6 +28,7 @@ public sealed class TelegramService(
     IOptions<TelegramOptions> options,
     IOptions<NotificationOptions> notificationOptions,
     TelegramNotificationSender sender,
+    TelegramBotIdentity botIdentity,
     ILogger<TelegramService> logger,
     IClock clock) : ITelegramService
 {
@@ -78,7 +79,9 @@ public sealed class TelegramService(
         // and no metric (TG-013).
         return new TelegramBindTokenDto(
             plainToken,
-            $"https://t.me/{_options.BotUsername}?start={plainToken}",
+            // The username Telegram reported for the token, when known: a stale BotUsername setting would
+            // otherwise send people to a different bot, where /start binds nothing.
+            $"https://t.me/{botIdentity.Username ?? _options.BotUsername}?start={plainToken}",
             issued.ExpiresAt);
     }
 
@@ -203,7 +206,7 @@ public sealed class TelegramService(
     /// chooses it.
     /// </para>
     /// </remarks>
-    public async Task<string> RedeemBindTokenAsync(
+    public async Task<TelegramBindOutcome> RedeemBindTokenAsync(
         string chatId,
         string? plainToken,
         CancellationToken cancellationToken)
@@ -212,14 +215,14 @@ public sealed class TelegramService(
 
         if (string.IsNullOrWhiteSpace(plainToken))
         {
-            return BindFailureReply;
+            return TelegramBindOutcome.Failed(BindFailureReply);
         }
 
         if (!WithinAttemptRate(chatId))
         {
             logger.LogWarning("Telegram bind attempts exceeded the hourly limit for a chat.");
 
-            return "Слишком много попыток. Повторите через час.";
+            return TelegramBindOutcome.Failed("Слишком много попыток. Повторите через час.");
         }
 
         var candidate = await dbContext.TelegramBindTokens
@@ -231,14 +234,14 @@ public sealed class TelegramService(
         {
             await RecordAttemptAsync(chatId, null, AuditResult.Failure, "token_invalid", now, cancellationToken);
 
-            return BindFailureReply;
+            return TelegramBindOutcome.Failed(BindFailureReply);
         }
 
         if (!candidate.IsRedeemable(now))
         {
             await RecordAttemptAsync(chatId, candidate.UserId, AuditResult.Failure, "token_expired", now, cancellationToken);
 
-            return BindFailureReply;
+            return TelegramBindOutcome.Failed(BindFailureReply);
         }
 
         // TG-008: one chat, one account. Otherwise two people sharing a device would silently receive
@@ -251,7 +254,8 @@ public sealed class TelegramService(
         {
             await RecordAttemptAsync(chatId, candidate.UserId, AuditResult.Failure, "chat_already_bound", now, cancellationToken);
 
-            return "Этот Telegram-аккаунт уже привязан к другому пользователю.";
+            return TelegramBindOutcome.Failed(
+                "Этот Telegram-аккаунт уже привязан к другому пользователю Mentora. Отключите его там в профиле и повторите.");
         }
 
         var user = await dbContext.Users
@@ -262,7 +266,7 @@ public sealed class TelegramService(
         {
             await RecordAttemptAsync(chatId, candidate.UserId, AuditResult.Failure, "user_unavailable", now, cancellationToken);
 
-            return BindFailureReply;
+            return TelegramBindOutcome.Failed(BindFailureReply);
         }
 
         // TG-007: the token is spent and the binding written in one transaction. Spending it without
@@ -272,11 +276,11 @@ public sealed class TelegramService(
 
         await RecordAttemptAsync(chatId, user.Id, AuditResult.Success, reason: null, now, cancellationToken);
 
-        return "Готово! Telegram подключён к Mentora. Сюда будут приходить уведомления о заданиях.";
+        return TelegramBindOutcome.Bound(user.Id);
     }
 
     private const string BindFailureReply =
-        "Ссылка привязки недействительна или её срок истёк. Запросите новую в личном кабинете.";
+        "Ссылка привязки недействительна или её срок истёк. Откройте профиль в Mentora и нажмите «Подключить Telegram» ещё раз.";
 
     /// <summary>
     /// <c>TG-015</c>: both outcomes are recorded, and neither record contains the token.

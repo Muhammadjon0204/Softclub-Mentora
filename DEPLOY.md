@@ -194,6 +194,23 @@ curl http://127.0.0.1:8093/health/ready    # база, хранилище, AI
 `/health/ready` показывает `ai` как `Degraded` — это норма, AI-сводки выключены
 (`Ai__Enabled=false`) и на работоспособность не влияют.
 
+**Включить Telegram-бота.** Создайте бота у @BotFather и допишите в `.env.api` на сервере:
+
+```bash
+Telegram__Enabled=true
+Telegram__BotUsername=<имя бота без @>
+Telegram__BotToken=<токен от @BotFather>
+Telegram__WebhookSecret=<openssl rand -hex 32>
+Telegram__WebhookUrl=https://tmsapi.softclub.tj/api/v1/telegram/webhook
+```
+
+После `docker compose -f docker-compose.api.yml up -d mentora-api mentora-worker` сервер сам
+проверит токен, опубликует меню команд и зарегистрирует вебхук — в логе `mentora-api` появится
+`Telegram: webhook registered`. Если вебхук зарегистрировать не удалось (нет HTTPS у
+`tmsapi`, секрет с недопустимыми символами), сервер переключится на long polling и напишет
+`receiving updates by long polling` — бот работает и так. Проверка: напишите боту `/start` —
+он ответит приветствием; затем «Подключить Telegram» в профиле и кнопка «Отправить тест».
+
 **Включить ИИ-отчёты (Gemini).** `.env.api` на сервере помечен `skip-worktree`, поэтому
 новые строки в него нужно дописать руками — `git pull` их не принесёт:
 

@@ -7,6 +7,7 @@ using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Exceptions;
 using MentorTaskFlow.Contracts.Telegram;
 using MentorTaskFlow.Infrastructure.Options;
+using MentorTaskFlow.Infrastructure.Telegram;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -28,6 +29,7 @@ namespace MentorTaskFlow.Api.Controllers;
 [Produces("application/json")]
 public sealed class TelegramController(
     ITelegramService telegram,
+    TelegramUpdateHandler updates,
     IOptions<TelegramOptions> options) : ControllerBase
 {
     private readonly TelegramOptions _options = options.Value;
@@ -129,31 +131,13 @@ public sealed class TelegramController(
             return new EmptyResult();
         }
 
-        var (chatId, text) = ReadMessage(update);
+        // Answered inline: Telegram executes the sendMessage in the response body, so the reply costs
+        // no second call. Long polling sends the very same reply with an explicit call instead.
+        var reply = await updates.HandleAsync(update, cancellationToken);
 
-        if (chatId is null)
-        {
-            // An update we do not handle — an edited message, a channel post. Acknowledged so Telegram
-            // stops resending it.
-            return Ok();
-        }
-
-        var reply = ParseStartCommand(text) is { } token
-            ? await telegram.RedeemBindTokenAsync(chatId, token, cancellationToken)
-            : HelpReply;
-
-        return Ok(new { method = "sendMessage", chat_id = chatId, text = reply });
+        return reply is null ? Ok() : Ok(reply.ToWebhookResponse());
     }
 
-    private const string HelpReply =
-        "Этот бот доставляет уведомления Mentora. "
-        + "Чтобы привязать аккаунт, откройте ссылку из личного кабинета. "
-        + "Действия по задачам выполняются в приложении.";
-
-    /// <summary>
-    /// <c>TG-002</c>: constant-time comparison. Ordinary equality returns at the first differing byte,
-    /// which turns the check into an oracle for recovering the secret.
-    /// </summary>
     private bool HasValidSecret()
     {
         if (string.IsNullOrEmpty(_options.WebhookSecret))
@@ -168,42 +152,6 @@ public sealed class TelegramController(
             Encoding.UTF8.GetBytes(_options.WebhookSecret));
     }
 
-    private static (string? ChatId, string? Text) ReadMessage(JsonElement update)
-    {
-        if (!update.TryGetProperty("message", out var message))
-        {
-            return (null, null);
-        }
-
-        var chatId = message.TryGetProperty("chat", out var chat) && chat.TryGetProperty("id", out var id)
-            ? id.ValueKind is JsonValueKind.Number ? id.GetInt64().ToString() : id.GetString()
-            : null;
-
-        var text = message.TryGetProperty("text", out var value) ? value.GetString() : null;
-
-        return (chatId, text);
-    }
-
-    /// <summary>Extracts the token from <c>/start &lt;token&gt;</c>.</summary>
-    private static string? ParseStartCommand(string? text)
-    {
-        if (text is null || !text.StartsWith("/start", StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var parts = text.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        return parts.Length is 2 ? parts[1] : null;
-    }
-
-    /// <summary>
-    /// With the feature off the endpoints answer 404 rather than 403 (4.1).
-    /// </summary>
-    /// <remarks>
-    /// A capability the installation does not have should be indistinguishable from one that does not
-    /// exist; 403 would advertise that the feature is there and merely closed.
-    /// </remarks>
     private void EnsureEnabled()
     {
         if (!_options.Enabled)
