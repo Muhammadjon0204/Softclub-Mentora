@@ -5,9 +5,9 @@ import { OVERLAY_Z_INDEX } from './overlayZIndex';
 
 /**
  * Единый контейнер toast-стека — монтируется один раз через `ToastProvider`.
- * top-right на desktop с отступом от Topbar, top full-width на mobile
- * (раздел 20/23 промпта). Новые toast добавляются снизу стека и всплывают
- * вверх — старые не прыгают резко благодаря transition на каждом Toast.
+ * Сверху по центру (запрос 2026-10-12): справа он перекрывал кнопки в шапке Drawer и
+ * панели действий, а по центру над контентом не мешает ничему и сразу попадает в поле
+ * зрения. Новые toast опускаются сверху — старые не прыгают благодаря transition.
  */
 export function ToastViewport(): JSX.Element | null {
   const { toasts } = useToastContext();
@@ -18,7 +18,7 @@ export function ToastViewport(): JSX.Element | null {
     <OverlayPortal>
       <div
         style={{ zIndex: OVERLAY_Z_INDEX.toast }}
-        className="pointer-events-none fixed left-3 right-3 top-3 flex flex-col gap-2 sm:left-auto sm:right-6 sm:top-[84px] sm:w-[380px]"
+        className="pointer-events-none fixed left-1/2 top-3 flex w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 flex-col items-stretch gap-2 sm:top-5"
       >
         {toasts.map((entry) => (
           <Toast key={entry.id} entry={entry} />

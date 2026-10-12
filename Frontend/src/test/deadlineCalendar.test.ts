@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { countdownParts, dayKeyOf, gridRangeUtc, monthGrid, shiftMonth, zonedMidnightUtc } from '../features/deadline-calendar/calendarMath';
+import { countdownParts, dayKeyOf, gridRangeUtc, monthGrid, shiftMonth, zonedMidnightUtc } from '../lib/calendarMath';
 import { isCalendarVisible, toneOf } from '../features/deadline-calendar/deadlineEvents';
 import type { AssignmentDto } from '../api/lead/assignments';
 

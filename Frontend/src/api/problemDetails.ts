@@ -133,6 +133,12 @@ export function getGenericErrorMessage(error: unknown): string {
   if (code === 'SUBMISSION_DUPLICATE_CONTENT') {
     return 'Этот файл уже был отправлен ранее — повторная загрузка того же файла не создаёт новую версию.';
   }
+  // 400 VALIDATION_FAILED: в `detail` только «Запрос не прошёл валидацию», а причина — в `errors`
+  // («Новый дедлайн не может быть раньше первоначального…»). Показываем её, а не общий текст.
+  if (code === 'VALIDATION_FAILED' && problem !== null) {
+    const first = Object.values(problem.errors ?? {}).flat().find((message) => typeof message === 'string' && message.length > 0);
+    if (first !== undefined) return first;
+  }
   if (problem !== null && problem.detail.length > 0) return problem.detail;
   if (isNetworkError(error)) {
     return 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.';

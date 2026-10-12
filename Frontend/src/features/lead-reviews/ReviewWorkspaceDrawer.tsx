@@ -1,19 +1,26 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, FileText, Wrench } from 'lucide-react';
+import { CalendarClock, CheckCircle2, FileText, Hourglass, RotateCcw, Tag, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import type { ComponentType, ReactNode } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 
+import { dayKeyOf } from '../../lib/calendarMath';
 import { Drawer } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
+import { formatDayKeyRu, todayKey } from '../../lib/dayKeys';
+import { DatePicker } from '../../shared/ui/DatePicker';
+import { MetaTiles, Notice, SectionLabel } from '../../shared/ui/DetailBlocks';
 import { EmptyState } from '../../shared/ui/EmptyState';
-import { FormField, FormInput, FormTextarea } from '../../shared/ui/FormField';
+import { FormField, FormTextarea } from '../../shared/ui/FormField';
+import { TimePicker } from '../../shared/ui/TimePicker';
 import type { SubmissionFile } from '../admin-assignments/assignmentPresentation';
 import { FileDetailsModal } from '../admin-assignments/FileDetailsModal';
 import { FilePreviewModal } from '../admin-assignments/FilePreviewModal';
+import { SubmissionVersionCard } from '../assignment-details/SubmissionVersionCard';
 import { LEAD_STATUS_META, sourceLabel } from '../lead/assignments/leadAssignmentPresentation';
 import { formatCategoryDateTime, formatRelative, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
 import { useLeadScope } from '../lead/scope/useLeadScope';
-import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
+import type { LeadAssignmentRecord, LeadSubmissionFile } from '../../mocks/ui-preview/leadAssignments.preview';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
 import { approveSchema, needsReworkSchema } from './reviewDecision.schema';
 import type { ApproveFormValues, NeedsReworkFormValues } from './reviewDecision.schema';
@@ -30,62 +37,180 @@ export interface ReviewWorkspaceDrawerProps {
 
 type DecisionMode = 'none' | 'approve' | 'rework';
 
-function ApproveForm({ onSubmit }: { onSubmit: (comment: string | null) => void }): JSX.Element {
-  const { register, handleSubmit, formState: { errors } } = useForm<ApproveFormValues>({ resolver: zodResolver(approveSchema), defaultValues: { comment: '' } });
+const APPROVE_PHRASES = ['Отличная работа!', 'Всё верно, спасибо', 'Принято, так держать'];
+const COMMENT_MAX = 3000;
+
+/** Шапка формы решения: иконка в цветном круге, заголовок, кому и что уйдёт. */
+function DecisionHeader({ icon: Icon, tone, title, subtitle }: { icon: ComponentType<{ className?: string }>; tone: 'success' | 'warning'; title: string; subtitle: string }): JSX.Element {
+  return (
+    <div className="flex items-start gap-3">
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${tone === 'success' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`}>
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-[14px] font-semibold text-ink">{title}</p>
+        <p className="mt-0.5 text-[12.5px] text-ink-muted">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function DecisionPanel({ children }: { children: ReactNode }): JSX.Element {
+  return <div className="space-y-4 rounded-card border border-line bg-surface p-4 shadow-surface motion-safe:animate-fade-in sm:p-5">{children}</div>;
+}
+
+function ApproveForm({ onSubmit, onCancel }: { onSubmit: (comment: string | null) => void; onCancel: () => void }): JSX.Element {
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<ApproveFormValues>({ resolver: zodResolver(approveSchema), defaultValues: { comment: '' } });
+  const comment = watch('comment') ?? '';
+
   return (
     <form
       onSubmit={(event) => {
-        void handleSubmit((values) => { onSubmit(values.comment !== undefined && values.comment.length > 0 ? values.comment : null); })(event);
+        void handleSubmit((values) => { onSubmit(values.comment !== undefined && values.comment.trim().length > 0 ? values.comment.trim() : null); })(event);
       }}
-      className="space-y-3 rounded-control border border-success-border bg-success-soft p-4"
     >
-      <FormField label="Комментарий" htmlFor="approve-comment" hint="Необязательно" error={errors.comment?.message}>
-        <FormTextarea id="approve-comment" rows={2} {...register('comment')} />
-      </FormField>
-      <div className="flex justify-end">
-        <Button type="submit" variant="primary">Подтвердить одобрение</Button>
-      </div>
+      <DecisionPanel>
+        <DecisionHeader icon={CheckCircle2} tone="success" title="Принять работу" subtitle="Ментор сразу получит уведомление в Telegram и на почту." />
+
+        <FormField label="Комментарий для ментора" htmlFor="approve-comment" hint="Необязательно — пара тёплых слов мотивирует" error={errors.comment?.message}>
+          <FormTextarea id="approve-comment" rows={3} placeholder="Например: аккуратно и в срок, спасибо!" {...register('comment')} />
+        </FormField>
+
+        <div className="flex flex-wrap gap-1.5">
+          {APPROVE_PHRASES.map((phrase) => (
+            <button
+              key={phrase}
+              type="button"
+              onClick={() => { setValue('comment', comment.trim().length > 0 ? `${comment.trim()} ${phrase}` : phrase, { shouldDirty: true }); }}
+              className="rounded-full border border-line px-3 py-1 text-[12px] font-medium text-ink-secondary transition hover:border-brand hover:text-brand"
+            >
+              {phrase}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-divider pt-4">
+          <Button type="button" variant="ghost" onClick={onCancel}>Отмена</Button>
+          <Button type="submit" variant="primary" leadingIcon={<CheckCircle2 className="h-4 w-4" aria-hidden="true" />}>Принять работу</Button>
+        </div>
+      </DecisionPanel>
     </form>
   );
 }
 
-function NeedsReworkForm({ timeZoneId, onSubmit }: { timeZoneId: string; onSubmit: (comment: string, reworkDueAtMs: number) => void }): JSX.Element {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm<NeedsReworkFormValues>({
+function NeedsReworkForm({
+  assignment,
+  timeZoneId,
+  onSubmit,
+  onCancel,
+}: {
+  assignment: LeadAssignmentRecord;
+  timeZoneId: string;
+  onSubmit: (comment: string, reworkDueAtMs: number) => void;
+  onCancel: () => void;
+}): JSX.Element {
+  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<NeedsReworkFormValues>({
     resolver: zodResolver(needsReworkSchema),
     defaultValues: { comment: '', reworkDueDate: '', reworkDueTime: '23:59' },
   });
 
-  const [dueDate, dueTime] = watch(['reworkDueDate', 'reworkDueTime']);
+  // Сервер не примет срок раньше первоначального дедлайна — раньше этой даты календарь не пускает.
+  const initialDueKey = dayKeyOf(assignment.initialDueAt, timeZoneId);
+  const minKey = initialDueKey > todayKey() ? initialDueKey : todayKey();
+
+  const [comment, dueDate, dueTime] = watch(['comment', 'reworkDueDate', 'reworkDueTime']);
   const resolvedMs = dueDate.length > 0 && dueTime.length > 0 ? localInputToUtcMs(dueDate, dueTime, timeZoneId) : null;
   const inPast = resolvedMs !== null && resolvedMs <= leadNow();
+  const beforeInitial = resolvedMs !== null && resolvedMs < assignment.initialDueAt;
 
   return (
     <form
       onSubmit={(event) => {
         void handleSubmit((values) => {
           const ms = localInputToUtcMs(values.reworkDueDate, values.reworkDueTime, timeZoneId);
-          if (ms === null || ms <= leadNow()) return;
-          onSubmit(values.comment, ms);
+          if (ms === null || ms <= leadNow() || ms < assignment.initialDueAt) return;
+          onSubmit(values.comment.trim(), ms);
         })(event);
       }}
-      className="space-y-3 rounded-control border border-warning-border bg-warning-soft p-4"
     >
-      <FormField label="Комментарий" htmlFor="rework-comment" required error={errors.comment?.message} hint="10–3000 символов — что нужно исправить">
-        <FormTextarea id="rework-comment" rows={3} invalid={errors.comment !== undefined} {...register('comment')} />
-      </FormField>
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Новый дедлайн" htmlFor="rework-date" required error={errors.reworkDueDate?.message}>
-          <FormInput id="rework-date" type="date" invalid={errors.reworkDueDate !== undefined} {...register('reworkDueDate')} />
+      <DecisionPanel>
+        <DecisionHeader icon={RotateCcw} tone="warning" title="Вернуть на доработку" subtitle="Ментор увидит ваш комментарий в приложении и в Telegram." />
+
+        <FormField label="Что нужно исправить" htmlFor="rework-comment" required error={errors.comment?.message}>
+          <FormTextarea
+            id="rework-comment"
+            rows={4}
+            invalid={errors.comment !== undefined}
+            placeholder="Опишите конкретно: что не так и как должно быть. Например: добавь разбор по каждому студенту ниже 80 баллов."
+            {...register('comment')}
+          />
+          <div className="mt-1 flex justify-between text-[11.5px] text-ink-muted">
+            <span>Минимум 10 символов</span>
+            <span className={`tabular-nums ${comment.length > COMMENT_MAX ? 'text-danger' : ''}`}>{comment.length} / {COMMENT_MAX}</span>
+          </div>
         </FormField>
-        <FormField label="Время" htmlFor="rework-time" required error={errors.reworkDueTime?.message}>
-          <FormInput id="rework-time" type="time" invalid={errors.reworkDueTime !== undefined} {...register('reworkDueTime')} />
-        </FormField>
-      </div>
-      {inPast ? <p className="text-[12px] text-danger">Новый дедлайн обязан быть в будущем</p> : null}
-      <div className="flex justify-end">
-        <Button type="submit" variant="primary">Вернуть на доработку</Button>
-      </div>
+
+        <div>
+          <SectionLabel>Новый срок</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+            <FormField label="Дата" htmlFor="rework-date" required error={errors.reworkDueDate?.message}>
+              <Controller
+                control={control}
+                name="reworkDueDate"
+                render={({ field }) => <DatePicker id="rework-date" value={field.value} onChange={field.onChange} min={minKey} invalid={errors.reworkDueDate !== undefined} />}
+              />
+            </FormField>
+            <FormField label="Время" htmlFor="rework-time" required error={errors.reworkDueTime?.message}>
+              <Controller
+                control={control}
+                name="reworkDueTime"
+                render={({ field }) => <TimePicker id="rework-time" value={field.value} onChange={field.onChange} invalid={errors.reworkDueTime !== undefined} />}
+              />
+            </FormField>
+          </div>
+          <p className="mt-1.5 text-[11.5px] text-ink-muted">
+            Не раньше первоначального дедлайна — {formatDayKeyRu(initialDueKey)}. Время по {timeZoneId}.
+          </p>
+          {inPast ? <p className="mt-1 text-[12px] text-danger">Новый срок должен быть в будущем</p> : null}
+          {!inPast && beforeInitial ? <p className="mt-1 text-[12px] text-danger">Новый срок не может быть раньше первоначального дедлайна</p> : null}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-divider pt-4">
+          <Button type="button" variant="ghost" onClick={onCancel}>Отмена</Button>
+          <Button type="submit" variant="primary" leadingIcon={<RotateCcw className="h-4 w-4" aria-hidden="true" />}>Вернуть на доработку</Button>
+        </div>
+      </DecisionPanel>
     </form>
+  );
+}
+
+/** Выбор решения: две карточки вместо двух одинаковых кнопок. */
+function DecisionChoice({ onApprove, onRework }: { onApprove: () => void; onRework: () => void }): JSX.Element {
+  const card = 'group flex items-start gap-3 rounded-card border border-line bg-surface p-4 text-left transition hover:-translate-y-px hover:shadow-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand';
+  return (
+    <div>
+      <SectionLabel>Ваше решение</SectionLabel>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <button type="button" onClick={onApprove} className={`${card} hover:border-success`}>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-success-soft text-success">
+            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-[13.5px] font-semibold text-ink">Принять</span>
+            <span className="mt-0.5 block text-[12px] text-ink-muted">Работа выполнена, задание закроется</span>
+          </span>
+        </button>
+        <button type="button" onClick={onRework} className={`${card} hover:border-warning`}>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-warning-soft text-warning">
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-[13.5px] font-semibold text-ink">На доработку</span>
+            <span className="mt-0.5 block text-[12px] text-ink-muted">Объясните, что исправить, и дайте новый срок</span>
+          </span>
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -108,10 +233,12 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
   const statusMeta = assignment !== undefined ? LEAD_STATUS_META[assignment.status] : null;
   const latest = assignment !== undefined && assignment.submissions.length > 0 ? assignment.submissions[assignment.submissions.length - 1] : undefined;
   const previous = assignment !== undefined ? assignment.submissions.slice(0, -1).reverse() : [];
+  const formatDate = (ms: number): string => formatCategoryDateTime(ms, scope.timeZoneId);
 
-  function handleOpenFile(file: SubmissionFile): void {
-    if (file.extension === 'pdf') setPreviewFile(file);
-    else setDetailsFile(file);
+  function handleOpenFile(file: LeadSubmissionFile, submittedAt: number): void {
+    const entry: SubmissionFile = { ...file, uploadedLabel: formatDate(submittedAt) };
+    if (file.extension === 'pdf') setPreviewFile(entry);
+    else setDetailsFile(entry);
   }
 
   return (
@@ -135,99 +262,62 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
           <EmptyState icon={<FileText className="h-5 w-5" aria-hidden="true" />} title="Решение недоступно" description="Оно не существует или не ожидает проверки." />
         ) : (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 rounded-control border border-line p-4 sm:grid-cols-4">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Ментор</p>
-                <p className="mt-0.5 text-[13px] font-medium text-ink">{mentorNameOf(assignment.mentorId)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Источник</p>
-                <p className="mt-0.5 text-[13px] font-medium text-ink">{sourceLabel(assignment.source)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">Дедлайн</p>
-                <p className="mt-0.5 text-[13px] font-medium text-ink">{formatCategoryDateTime(assignment.currentDueAt, scope.timeZoneId)}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-muted">В очереди с</p>
-                <p className="mt-0.5 text-[13px] font-medium text-ink">
-                  {latest !== undefined ? formatRelative(latest.submittedAt).label : '—'}
-                </p>
-              </div>
-            </div>
+            <MetaTiles
+              columns={4}
+              items={[
+                { icon: UserRound, label: 'Ментор', value: mentorNameOf(assignment.mentorId), tone: 'brand' },
+                { icon: Tag, label: 'Источник', value: sourceLabel(assignment.source) },
+                { icon: CalendarClock, label: 'Дедлайн', value: formatDate(assignment.currentDueAt) },
+                { icon: Hourglass, label: 'В очереди', value: latest !== undefined ? formatRelative(latest.submittedAt).label : '—' },
+              ]}
+            />
 
             {latest === undefined ? (
               <EmptyState icon={<FileText className="h-5 w-5" aria-hidden="true" />} title="Нет отправленного решения" description="Ментор ещё не загрузил файл по этой версии." />
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[13.5px] font-semibold text-ink">Текущая версия ({latest.versionNumber})</h3>
-                  {latest.isLate ? <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">Сдано с опозданием</span> : null}
-                </div>
-                {latest.comment !== null ? <p className="text-[13px] text-ink-secondary">{latest.comment}</p> : null}
-                <div className="space-y-2">
-                  {latest.files.map((file) => (
-                    <button
-                      key={file.id}
-                      type="button"
-                      onClick={() => { handleOpenFile({ ...file, uploadedLabel: formatCategoryDateTime(latest.submittedAt, scope.timeZoneId) }); }}
-                      className="flex w-full items-center gap-2.5 rounded-control-sm border border-line px-3 py-2.5 text-left transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{file.name}</span>
-                      <span className="shrink-0 text-[11.5px] text-ink-muted">{file.sizeLabel}</span>
-                    </button>
-                  ))}
-                </div>
+              <div>
+                <SectionLabel>Решение на проверке</SectionLabel>
+                <SubmissionVersionCard submission={latest} isCurrent commentLabel="Комментарий ментора" formatDate={formatDate} onOpenFile={handleOpenFile} />
               </div>
             )}
 
             {previous.length > 0 ? (
-              <details className="rounded-control border border-line p-4">
-                <summary className="cursor-pointer text-[13px] font-medium text-ink-secondary">Предыдущие попытки ({previous.length})</summary>
+              <details className="group rounded-card border border-line bg-surface-muted p-4">
+                <summary className="cursor-pointer list-none text-[13px] font-semibold text-ink-secondary transition hover:text-ink">
+                  Предыдущие версии ({previous.length})
+                </summary>
                 <div className="mt-3 space-y-3">
                   {previous.map((submission) => (
-                    <div key={submission.id} className="rounded-control-sm border border-divider p-3">
-                      <p className="text-[12.5px] font-medium text-ink">Версия {submission.versionNumber} · {formatCategoryDateTime(submission.submittedAt, scope.timeZoneId)}</p>
-                      {submission.review !== null ? (
-                        <p className={`mt-1 text-[12.5px] ${submission.review.decision === 'Approved' ? 'text-success' : 'text-warning'}`}>
-                          {submission.review.decision === 'Approved' ? 'Одобрено' : 'На доработку'}
-                          {submission.review.comment !== null ? `: ${submission.review.comment}` : ''}
-                        </p>
-                      ) : null}
-                    </div>
+                    <SubmissionVersionCard key={submission.id} submission={submission} isCurrent={false} commentLabel="Комментарий ментора" formatDate={formatDate} onOpenFile={handleOpenFile} />
                   ))}
                 </div>
               </details>
             ) : null}
 
             {assignment.status === 'Submitted' ? (
-              <div className="flex items-center justify-between rounded-control border border-line bg-surface-muted p-4">
-                <p className="text-[13px] text-ink-secondary">Решение в очереди — проверка ещё не начата.</p>
-                <Button variant="primary" onClick={() => { onStartReview(assignment); }}>Начать проверку</Button>
-              </div>
+              <Notice
+                tone="info"
+                icon={Hourglass}
+                title="Решение ждёт проверки"
+                action={<Button variant="primary" onClick={() => { onStartReview(assignment); }}>Начать проверку</Button>}
+              >
+                Начните проверку — ментор увидит, что работу смотрят.
+              </Notice>
             ) : null}
 
             {assignment.status === 'InReview' ? (
-              <div className="space-y-3">
-                {mode === 'none' ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary" leadingIcon={<CheckCircle2 className="h-4 w-4" aria-hidden="true" />} onClick={() => { setMode('approve'); }}>
-                      Одобрить
-                    </Button>
-                    <Button variant="secondary" leadingIcon={<Wrench className="h-4 w-4" aria-hidden="true" />} onClick={() => { setMode('rework'); }}>
-                      На доработку
-                    </Button>
-                  </div>
-                ) : null}
-                {mode === 'approve' ? <ApproveForm onSubmit={(comment) => { onApprove(assignment, comment); setMode('none'); }} /> : null}
-                {mode === 'rework' ? <NeedsReworkForm timeZoneId={scope.timeZoneId} onSubmit={(comment, dueAt) => { onNeedsRework(assignment, comment, dueAt); setMode('none'); }} /> : null}
-                {mode !== 'none' ? (
-                  <button type="button" onClick={() => { setMode('none'); }} className="text-[12.5px] font-medium text-ink-muted hover:text-ink">
-                    Отменить решение
-                  </button>
-                ) : null}
-              </div>
+              mode === 'none' ? (
+                <DecisionChoice onApprove={() => { setMode('approve'); }} onRework={() => { setMode('rework'); }} />
+              ) : mode === 'approve' ? (
+                <ApproveForm onSubmit={(comment) => { onApprove(assignment, comment); setMode('none'); }} onCancel={() => { setMode('none'); }} />
+              ) : (
+                <NeedsReworkForm
+                  assignment={assignment}
+                  timeZoneId={scope.timeZoneId}
+                  onSubmit={(comment, dueAt) => { onNeedsRework(assignment, comment, dueAt); setMode('none'); }}
+                  onCancel={() => { setMode('none'); }}
+                />
+              )
             ) : null}
           </div>
         )}

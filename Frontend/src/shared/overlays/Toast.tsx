@@ -50,10 +50,10 @@ export function Toast({ entry }: { entry: ToastEntry }): JSX.Element {
   }, []);
 
   const presenceClasses = entry.closing
-    ? 'duration-150 ease-in opacity-0 translate-x-2'
+    ? 'duration-150 ease-in opacity-0 -translate-y-2 scale-[0.98]'
     : entered
-      ? 'duration-[180ms] ease-out opacity-100 translate-x-0 translate-y-0'
-      : 'duration-0 opacity-0 translate-x-3 -translate-y-1';
+      ? 'duration-[220ms] ease-out opacity-100 translate-y-0 scale-100'
+      : 'duration-0 opacity-0 -translate-y-3 scale-[0.98]';
 
   return (
     <div
