@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { Drawer, UnsavedChangesDialog } from '../../../shared/overlays';
 import { Button } from '../../../shared/ui/Button';
+import { DatePicker } from '../../../shared/ui/DatePicker';
 import { FormBannerError, FormField, FormInput, FormTextarea } from '../../../shared/ui/FormField';
 import type { LeadTopicRecord } from '../../../mocks/ui-preview/leadTopics.preview';
 import { formatCategoryDate, leadNow } from '../scope/leadDateFormat';
@@ -34,7 +35,7 @@ export function TopicFormDrawer({ open, existing, onClose }: TopicFormDrawerProp
 
   const existingPlannedDateInput = existing !== undefined && existing.plannedDate !== null ? toDateInputValue(existing.plannedDate, scope.timeZoneId) : '';
 
-  const { register, handleSubmit, reset, watch, formState: { errors, isDirty } } = useForm<TopicFormValues>({
+  const { register, control, handleSubmit, reset, watch, formState: { errors, isDirty } } = useForm<TopicFormValues>({
     resolver: zodResolver(topicSchema),
     defaultValues: {
       dayNumber: existing?.dayNumber ?? 1,
@@ -108,7 +109,11 @@ export function TopicFormDrawer({ open, existing, onClose }: TopicFormDrawerProp
               <FormInput id="topic-day" type="number" min={1} invalid={errors.dayNumber !== undefined} {...register('dayNumber')} />
             </FormField>
             <FormField label="Плановая дата" htmlFor="topic-date" hint="Необязательно">
-              <FormInput id="topic-date" type="date" {...register('plannedDate')} />
+              <Controller
+                control={control}
+                name="plannedDate"
+                render={({ field }) => <DatePicker id="topic-date" value={field.value} onChange={field.onChange} clearable showPresets={false} />}
+              />
             </FormField>
           </div>
           {isPastDate ? <p className="text-[12px] text-warning">Дата в прошлом — это допустимо при переносе расписания.</p> : null}

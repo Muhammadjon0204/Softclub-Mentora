@@ -7,7 +7,10 @@ import { formatCategoryDate, leadNow, localInputToUtcMs } from '../lead/scope/le
 import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { useAllTopicAssignments, useScopedLeadTopics } from '../lead/scope/useScopedLeadSchedule';
+import { todayKey } from '../../lib/dayKeys';
+import { DatePicker } from '../../shared/ui/DatePicker';
 import { FormBannerError, FormField, FormInput, FormSelect, FormTextarea, fieldA11yProps } from '../../shared/ui/FormField';
+import { TimePicker } from '../../shared/ui/TimePicker';
 import { createAssignmentSchema, DEFAULT_DUE_TIME_LOCAL } from './createAssignment.schema';
 import type { CreateAssignmentFormValues } from './createAssignment.schema';
 
@@ -161,10 +164,20 @@ export function AssignmentForm({ formId, existing, bannerError, onDirtyChange, o
 
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Дедлайн" htmlFor="af-due-date" required error={errors.dueDate?.message}>
-          <FormInput id="af-due-date" type="date" invalid={errors.dueDate !== undefined} {...register('dueDate')} />
+          <Controller
+            control={control}
+            name="dueDate"
+            render={({ field }) => (
+              <DatePicker id="af-due-date" value={field.value} onChange={field.onChange} min={todayKey()} invalid={errors.dueDate !== undefined} />
+            )}
+          />
         </FormField>
         <FormField label="Время" htmlFor="af-due-time" required error={errors.dueTime?.message} hint={`По умолчанию ${DEFAULT_DUE_TIME_LOCAL}`}>
-          <FormInput id="af-due-time" type="time" invalid={errors.dueTime !== undefined} {...register('dueTime')} />
+          <Controller
+            control={control}
+            name="dueTime"
+            render={({ field }) => <TimePicker id="af-due-time" value={field.value} onChange={field.onChange} invalid={errors.dueTime !== undefined} />}
+          />
         </FormField>
       </div>
       {dueInPast ? <FormBannerError message="Дедлайн не может быть в прошлом" /> : null}

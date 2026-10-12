@@ -1,14 +1,19 @@
-import { CheckCircle2, FileText, Send, Wrench } from 'lucide-react';
+import { AlertTriangle, AlignLeft, CalendarClock, CalendarPlus, CheckCircle2, Eye, FileText, Flag, Hourglass, Send, UserRound, Wrench, XCircle } from 'lucide-react';
+import type { ComponentType } from 'react';
 import { useEffect, useState } from 'react';
 
 import { Drawer, useToast } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
+import { MetaTiles, Notice, QuoteBlock, SectionLabel, TextPanel } from '../../shared/ui/DetailBlocks';
+import type { BlockTone, MetaItem } from '../../shared/ui/DetailBlocks';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { FileDropzone } from '../../shared/ui/FileDropzone';
 import type { PendingFile } from '../../shared/ui/FileDropzone';
 import type { SubmissionFile } from '../admin-assignments/assignmentPresentation';
 import { FileDetailsModal } from '../admin-assignments/FileDetailsModal';
 import { FilePreviewModal } from '../admin-assignments/FilePreviewModal';
+import { SubmissionVersionCard } from '../assignment-details/SubmissionVersionCard';
+import type { LeadSubmissionFile } from '../../mocks/ui-preview/leadAssignments.preview';
 import {
   MENTOR_ASSIGNMENT_STATUS_LABEL,
   MENTOR_STATUS_META,
@@ -36,43 +41,31 @@ export interface MentorAssignmentDetailsDrawerProps {
   onClose: () => void;
 }
 
-function Field({ label, value }: { label: string; value: React.ReactNode }): JSX.Element {
-  return (
-    <div>
-      <p className="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">{label}</p>
-      <p className="mt-0.5 text-[13.5px] text-ink">{value}</p>
-    </div>
-  );
-}
-
 function OverviewTab({ assignment }: { assignment: MentorAssignmentRecord }): JSX.Element {
   const scope = useMentorScope();
+  const format = (ms: number): string => formatCategoryDateTime(ms, scope.timeZoneId);
+  const deadlineMoved = assignment.currentDueAt !== assignment.initialDueAt;
+
+  const items: MetaItem[] = [
+    /*
+      Phase 1E contract map, Open Question #3 (resolved): `AssignedById` is a raw, unmasked Guid a
+      Mentor cannot resolve to a name (`GET /users` is Lead/Admin-only). Same masking principle as
+      `EVT-004`'s `ActorLabel` for the assignment's own event history — a generic role label, never
+      an invented name.
+    */
+    { icon: UserRound, label: 'Назначил', value: assignment.assignedById !== null ? 'Руководитель направления' : '—', tone: 'brand' },
+    ...(assignment.assignedAt !== null ? [{ icon: CalendarPlus, label: 'Назначено', value: format(assignment.assignedAt) }] : []),
+    { icon: CalendarClock, label: deadlineMoved ? 'Текущий дедлайн' : 'Дедлайн', value: format(assignment.currentDueAt), tone: 'warning' as const },
+    ...(deadlineMoved ? [{ icon: Flag, label: 'Начальный дедлайн', value: format(assignment.initialDueAt) }] : []),
+    ...(assignment.approvedAt !== null ? [{ icon: CheckCircle2, label: 'Принято', value: format(assignment.approvedAt), tone: 'success' as const }] : []),
+  ];
+
   return (
     <div className="space-y-5">
-      <div>
-        <p className="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Описание</p>
-        <p className="mt-1 whitespace-pre-wrap text-[13.5px] leading-[20px] text-ink-secondary">
-          {assignment.description.length > 0 ? assignment.description : 'Без описания'}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        {/*
-          Phase 1E contract map, Open Question #3 (resolved): `AssignedById` is a raw, unmasked Guid a
-          Mentor cannot resolve to a name (`GET /users` is Lead/Admin-only). Same masking principle as
-          `EVT-004`'s `ActorLabel` for the assignment's own event history — a generic role label, never
-          an invented name.
-        */}
-        <Field label="Назначил" value={assignment.assignedById !== null ? 'Руководитель направления' : '—'} />
-        {assignment.assignedAt !== null ? <Field label="Назначено" value={formatCategoryDateTime(assignment.assignedAt, scope.timeZoneId)} /> : null}
-        <Field label="Начальный дедлайн" value={formatCategoryDateTime(assignment.initialDueAt, scope.timeZoneId)} />
-        <Field label="Текущий дедлайн" value={formatCategoryDateTime(assignment.currentDueAt, scope.timeZoneId)} />
-        {assignment.approvedAt !== null ? <Field label="Принято" value={formatCategoryDateTime(assignment.approvedAt, scope.timeZoneId)} /> : null}
-      </div>
+      <TextPanel icon={AlignLeft} title="Описание задания" text={assignment.description} emptyText="Руководитель не добавил описание" />
+      <MetaTiles items={items} />
       {assignment.status === 'Cancelled' && assignment.cancelReason !== null ? (
-        <div className="rounded-control-sm border border-danger-border bg-danger-soft px-3 py-2.5 text-[12.5px] text-danger">
-          <p className="font-medium">Причина отмены</p>
-          <p className="mt-0.5">{assignment.cancelReason}</p>
-        </div>
+        <Notice tone="danger" icon={XCircle} title="Задание отменено">{assignment.cancelReason}</Notice>
       ) : null}
     </div>
   );
@@ -139,10 +132,16 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
   }
 
   return (
-    <div className="space-y-3.5 rounded-control border border-line p-4">
-      <p className="text-[13px] font-semibold text-ink">
-        {assignment.submissions.length > 0 ? 'Загрузить исправленную версию' : 'Отправить решение'}
-      </p>
+    <div className="space-y-4 rounded-card border border-line bg-surface p-4 shadow-surface sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
+          <Send className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div>
+          <p className="text-[14px] font-semibold text-ink">{assignment.submissions.length > 0 ? 'Отправить исправленную версию' : 'Отправить решение'}</p>
+          <p className="mt-0.5 text-[12.5px] text-ink-muted">Файл, комментарий или и то, и другое — руководитель получит уведомление.</p>
+        </div>
+      </div>
       {isOverdueWarning ? (
         <p className="rounded-control-sm border border-warning-border bg-warning-soft px-3 py-2 text-[12.5px] text-warning">
           Дедлайн прошёл — решение будет отмечено как сданное с опозданием.
@@ -150,7 +149,7 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
       ) : null}
       <FileDropzone acceptExtensions={ACCEPT_EXTENSIONS} maxSizeBytes={MAX_FILE_SIZE_BYTES} files={pending} onFilesChange={setPending} disabled={isSubmitting} />
       <div>
-        <label htmlFor="submission-comment" className="mb-1 block text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">
+        <label htmlFor="submission-comment" className="mb-1.5 block text-[12.5px] font-medium text-ink-secondary">
           Комментарий к работе{readyFiles.length > 0 ? ' (необязательно)' : ''}
         </label>
         <textarea
@@ -160,11 +159,11 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
           onChange={(event) => { setComment(event.target.value); }}
           disabled={isSubmitting}
           placeholder="Например: позвонил родителям студентов и обсудил результаты, файл прикладывать не требуется"
-          className="w-full resize-none rounded-control-sm border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none transition placeholder:text-ink-disabled focus:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand disabled:opacity-60"
+          className="min-h-[88px] w-full resize-none rounded-control border border-line bg-surface px-3 py-2.5 text-[13px] leading-5 text-ink outline-none transition placeholder:text-ink-disabled focus:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
         />
         <p className="mt-1 text-[11.5px] text-ink-muted">Если задание не предполагает файл — достаточно комментария. Иначе можно приложить и то, и другое.</p>
       </div>
-      <div className="flex justify-end">
+      <div className="flex justify-end border-t border-divider pt-4">
         <Button variant="primary" leadingIcon={<Send className="h-4 w-4" aria-hidden="true" />} disabled={!canConfirm} isLoading={isSubmitting} onClick={() => { void handleSubmit(); }}>
           Отправить на проверку
         </Button>
@@ -173,93 +172,52 @@ function SubmissionForm({ assignment, onSubmitted }: { assignment: MentorAssignm
   );
 }
 
-function blockedSubmissionReason(assignment: MentorAssignmentRecord): string {
-  if (assignment.status === 'Submitted') return 'Решение отправлено и ожидает начала проверки руководителем.';
-  if (assignment.status === 'InReview') return 'Руководитель сейчас проверяет отправленное решение.';
-  if (assignment.status === 'Approved') return 'Задание принято руководителем.';
-  if (assignment.status === 'Cancelled') return 'Задание отменено.';
-  if (assignment.status === 'Overdue') return 'Приём работ по этой задаче закрыт. Обратитесь к тимлиду.';
-  return 'Загрузка решения сейчас недоступна.';
-}
+const BLOCKED_NOTICE: Partial<Record<MentorAssignmentRecord['status'], { tone: BlockTone; icon: ComponentType<{ className?: string }>; title: string; text: string }>> = {
+  Submitted: { tone: 'info', icon: Hourglass, title: 'Ожидает проверки', text: 'Решение отправлено. Руководитель скоро начнёт проверку — уведомление придёт в Telegram и на почту.' },
+  InReview: { tone: 'brand', icon: Eye, title: 'Идёт проверка', text: 'Руководитель сейчас смотрит ваше решение.' },
+  Approved: { tone: 'success', icon: CheckCircle2, title: 'Задание принято', text: 'Работа закрыта, больше ничего делать не нужно.' },
+  Cancelled: { tone: 'neutral', icon: XCircle, title: 'Задание отменено', text: 'Приём решений закрыт.' },
+  Overdue: { tone: 'danger', icon: AlertTriangle, title: 'Срок истёк', text: 'Приём работ по этой задаче закрыт. Обратитесь к тимлиду.' },
+};
 
-function SubmissionTab({ assignment, onOpenFile }: { assignment: MentorAssignmentRecord; onOpenFile: (file: SubmissionFile) => void }): JSX.Element {
+function SubmissionTab({ assignment, onOpenFile }: { assignment: MentorAssignmentRecord; onOpenFile: (file: LeadSubmissionFile, submittedAt: number) => void }): JSX.Element {
   const scope = useMentorScope();
   const caps = assignmentCapabilities(assignment);
   const latestReview = assignment.submissions.length > 0 ? assignment.submissions[assignment.submissions.length - 1].review : null;
+  const format = (ms: number): string => formatCategoryDateTime(ms, scope.timeZoneId);
+  const blocked = BLOCKED_NOTICE[assignment.status] ?? { tone: 'neutral' as const, icon: FileText, title: 'Отправка недоступна', text: 'Загрузка решения сейчас недоступна.' };
 
   return (
     <div className="space-y-5">
       {assignment.status === 'NeedsRework' && latestReview !== null ? (
-        <div className="space-y-1.5 rounded-control border border-warning-border bg-warning-soft p-4">
-          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-warning">
-            <Wrench className="h-4 w-4" aria-hidden="true" />
-            Требуется доработка
-          </p>
-          <p className="text-[13px] text-ink-secondary">{latestReview.comment}</p>
-          <p className="text-[11.5px] text-ink-muted">{latestReview.reviewerName} · {formatCategoryDateTime(latestReview.createdAt, scope.timeZoneId)}</p>
-        </div>
-      ) : null}
-
-      {assignment.status === 'Approved' && latestReview !== null ? (
-        <div className="space-y-1.5 rounded-control border border-success-border bg-success-soft p-4">
-          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-success">
-            <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-            Принято
-          </p>
-          {latestReview.comment !== null ? <p className="text-[13px] text-ink-secondary">{latestReview.comment}</p> : null}
-          <p className="text-[11.5px] text-ink-muted">{latestReview.reviewerName} · {formatCategoryDateTime(latestReview.createdAt, scope.timeZoneId)}</p>
+        <div className="space-y-3">
+          <Notice tone="warning" icon={Wrench} title="Требуется доработка">
+            Исправьте замечания и отправьте новую версию до {format(assignment.currentDueAt)}.
+          </Notice>
+          {latestReview.comment !== null ? (
+            <QuoteBlock tone="warning" label={`Комментарий · ${latestReview.reviewerName}`} text={latestReview.comment} meta={format(latestReview.createdAt)} />
+          ) : null}
         </div>
       ) : null}
 
       {caps.canSubmit ? (
         <SubmissionForm assignment={assignment} onSubmitted={() => {}} />
       ) : (
-        <div className="rounded-control border border-line bg-surface-muted px-4 py-3.5 text-[13px] text-ink-secondary">
-          {blockedSubmissionReason(assignment)}
-        </div>
+        <Notice tone={blocked.tone} icon={blocked.icon} title={blocked.title}>{blocked.text}</Notice>
       )}
 
+      {assignment.status === 'Approved' && latestReview !== null && latestReview.comment !== null ? (
+        <QuoteBlock tone="success" label={`Отзыв · ${latestReview.reviewerName}`} text={latestReview.comment} meta={format(latestReview.createdAt)} />
+      ) : null}
+
       <div>
-        <p className="mb-2.5 text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">
-          История версий {assignment.submissions.length > 0 ? `(${String(assignment.submissions.length)})` : ''}
-        </p>
+        <SectionLabel>История версий {assignment.submissions.length > 0 ? `· ${String(assignment.submissions.length)}` : ''}</SectionLabel>
         {assignment.submissions.length === 0 ? (
-          <EmptyState icon={<FileText className="h-5 w-5" aria-hidden="true" />} title="Решение ещё не отправлено" description="Загрузите файл выше, чтобы отправить его на проверку." />
+          <EmptyState icon={<FileText className="h-5 w-5" aria-hidden="true" />} title="Решение ещё не отправлено" description="Загрузите файл или напишите комментарий выше, чтобы отправить работу на проверку." />
         ) : (
           <div className="space-y-3">
             {[...assignment.submissions].reverse().map((submission, index) => (
-              <div key={submission.id} className="rounded-control border border-line p-3.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-semibold text-ink">
-                    Версия {submission.versionNumber}{index === 0 ? ' · текущая' : ''}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {submission.isLate ? <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-danger">С опозданием</span> : null}
-                    <span className="text-[12px] text-ink-muted">{formatCategoryDateTime(submission.submittedAt, scope.timeZoneId)}</span>
-                  </div>
-                </div>
-                {submission.comment !== null ? <p className="mt-2 text-[13px] text-ink-secondary">{submission.comment}</p> : null}
-                <div className="mt-2.5 space-y-1.5">
-                  {submission.files.map((file) => (
-                    <button
-                      key={file.id}
-                      type="button"
-                      onClick={() => { onOpenFile({ ...file, uploadedLabel: formatCategoryDateTime(submission.submittedAt, scope.timeZoneId) }); }}
-                      className="flex w-full items-center gap-2.5 rounded-control-sm border border-line px-3 py-2 text-left transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{file.name}</span>
-                      <span className="shrink-0 text-[11.5px] text-ink-muted">{file.sizeLabel}</span>
-                    </button>
-                  ))}
-                </div>
-                {submission.review !== null ? (
-                  <div className={`mt-2.5 rounded-control-sm px-3 py-2 text-[12.5px] ${submission.review.decision === 'Approved' ? 'border border-success-border bg-success-soft text-success' : 'border border-warning-border bg-warning-soft text-warning'}`}>
-                    <p className="font-medium">{submission.review.decision === 'Approved' ? 'Принято' : 'На доработку'} · {submission.review.reviewerName}</p>
-                    {submission.review.comment !== null ? <p className="mt-0.5">{submission.review.comment}</p> : null}
-                  </div>
-                ) : null}
-              </div>
+              <SubmissionVersionCard key={submission.id} submission={submission} isCurrent={index === 0} commentLabel="Ваш комментарий" formatDate={format} onOpenFile={onOpenFile} />
             ))}
           </div>
         )}
@@ -292,6 +250,7 @@ function HistoryTab({ assignment }: { assignment: MentorAssignmentRecord }): JSX
  * поставить себе Approved, отменить, переназначить или начать проверку.
  */
 export function MentorAssignmentDetailsDrawer({ assignment, assignmentId, onClose }: MentorAssignmentDetailsDrawerProps): JSX.Element {
+  const scope = useMentorScope();
   const [tab, setTab] = useState<Tab>('overview');
   const [previewFile, setPreviewFile] = useState<SubmissionFile | null>(null);
   const [detailsFile, setDetailsFile] = useState<SubmissionFile | null>(null);
@@ -304,7 +263,8 @@ export function MentorAssignmentDetailsDrawer({ assignment, assignmentId, onClos
   const open = assignmentId !== null;
   const statusMeta = assignment !== undefined ? MENTOR_STATUS_META[assignment.status] : null;
 
-  function handleOpenFile(file: SubmissionFile): void {
+  function handleOpenFile(raw: LeadSubmissionFile, submittedAt: number): void {
+    const file: SubmissionFile = { ...raw, uploadedLabel: formatCategoryDateTime(submittedAt, scope.timeZoneId) };
     if (file.extension === 'pdf') setPreviewFile(file);
     else setDetailsFile(file);
   }

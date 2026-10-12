@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
 import type { AssignmentDto } from '../../api/lead/assignments';
-import { MONTH_NAMES_GENITIVE_RU, WEEKDAY_SHORT_RU, countdownParts, dayKeyOf, formatTime, weekdayOf, zonedParts } from '../deadline-calendar/calendarMath';
+import { MONTH_NAMES_GENITIVE_RU, WEEKDAY_SHORT_RU, countdownParts, dayKeyOf, formatTime, weekdayOf, zonedParts } from '../../lib/calendarMath';
 import { useCalendarDeadlines } from '../deadline-calendar/useCalendarDeadlines';
 import { useNow } from '../deadline-calendar/useNow';
 import { useMentorScope } from '../mentor/scope/useMentorScope';

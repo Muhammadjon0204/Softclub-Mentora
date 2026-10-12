@@ -19,7 +19,7 @@ import {
   weekdayOf,
   zonedParts,
   type YearMonth,
-} from './calendarMath';
+} from '../../lib/calendarMath';
 import { TONE_CLASSES, TONE_LABEL, TONE_ORDER, type CalendarEvent } from './deadlineEvents';
 import { useCalendarDeadlines } from './useCalendarDeadlines';
 import { useNow } from './useNow';
