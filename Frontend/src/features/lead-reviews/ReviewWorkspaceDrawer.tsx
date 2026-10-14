@@ -262,8 +262,8 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
           <EmptyState icon={<FileText className="h-5 w-5" aria-hidden="true" />} title="Решение недоступно" description="Оно не существует или не ожидает проверки." />
         ) : (
           <div className="space-y-6">
+            {/* Две колонки: в окне шириной ~740px четыре плитки сжимают имя и дедлайн в столбик. */}
             <MetaTiles
-              columns={4}
               items={[
                 { icon: UserRound, label: 'Ментор', value: mentorNameOf(assignment.mentorId), tone: 'brand' },
                 { icon: Tag, label: 'Источник', value: sourceLabel(assignment.source) },
