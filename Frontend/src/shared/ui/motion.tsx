@@ -123,8 +123,3 @@ export function NavActivePill(): JSX.Element {
     />
   );
 }
-
-/** Фон выбранного таба/чипа фильтра. `layoutId` — свой у каждой группы табов на странице. */
-export function FilterActivePill({ layoutId = 'active-filter-pill', className = 'rounded-full bg-brand-soft' }: { layoutId?: string; className?: string }): JSX.Element {
-  return <motion.span layoutId={layoutId} aria-hidden="true" className={`absolute inset-0 -z-10 ${className}`} transition={SPRING_PILL} />;
-}

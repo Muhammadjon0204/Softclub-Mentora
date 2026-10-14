@@ -34,10 +34,21 @@ import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
-import { AnimatedNumber, FilterActivePill, StaggerContainer } from '../../shared/ui/motion';
+import { AnimatedNumber, StaggerContainer } from '../../shared/ui/motion';
 import { SPRING_PILL } from '../../shared/ui/motionTokens';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+/** Цвет счётчика и подчёркивания выбранного таба — по смыслу статуса. */
+const FILTER_TONE: Record<AssignmentFilter, { text: string; bar: string }> = {
+  all: { text: 'text-brand', bar: 'bg-brand' },
+  open: { text: 'text-brand', bar: 'bg-brand' },
+  review: { text: 'text-warning', bar: 'bg-warning' },
+  rework: { text: 'text-warning', bar: 'bg-warning' },
+  overdue: { text: 'text-danger', bar: 'bg-danger' },
+  approved: { text: 'text-success', bar: 'bg-success' },
+  cancelled: { text: 'text-ink-secondary', bar: 'bg-ink-secondary' },
+};
 const HINT_TONE = { muted: 'text-ink-muted', warning: 'text-warning', danger: 'text-danger' } as const;
 
 /** Все задания филиала (или организации) — только просмотр, без действий руководителя. */
@@ -121,38 +132,44 @@ export function AssignmentsPage(): JSX.Element {
       <PreviewPageHeader title="Задания" subtitle="Контроль выполнения задач и соблюдения сроков по филиалам" />
 
       <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <PreviewMetricCard icon={<ClipboardList />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" onClick={toggle('open')} active={filter === 'open'} />
-        <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint="Сданы, ждут руководителя" tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} />
-        <PreviewMetricCard icon={<TriangleAlert />} label="Просроченные" value={String(overdueCount)} hint={overdueCount > 0 ? 'Срок истёк без сдачи' : 'Просрочек нет'} tone={overdueCount > 0 ? 'danger' : 'default'} onClick={toggle('overdue')} active={filter === 'overdue'} />
-        <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" tone="success" onClick={toggle('approved')} active={filter === 'approved'} />
+        <PreviewMetricCard icon={<ClipboardList />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" onClick={toggle('open')} active={filter === 'open'} accent="brand" />
+        <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint="Сданы, ждут руководителя" tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} accent="warning" />
+        <PreviewMetricCard icon={<TriangleAlert />} label="Просроченные" value={String(overdueCount)} hint={overdueCount > 0 ? 'Срок истёк без сдачи' : 'Просрочек нет'} tone={overdueCount > 0 ? 'danger' : 'default'} onClick={toggle('overdue')} active={filter === 'overdue'} accent="danger" />
+        <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" tone="success" onClick={toggle('approved')} active={filter === 'approved'} accent="success" />
       </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-divider px-5 pb-3 pt-3.5 sm:px-6" role="tablist" aria-label="Фильтр по статусу">
-            {ASSIGNMENT_FILTERS.map((item) => {
+        {/* Строгая линия табов: разделители между пунктами, у выбранного — цветная черта снизу,
+            которая скользит к новому табу. Цвет — по смыслу статуса, как у карточек сверху. */}
+        <LayoutGroup id="assignments-status-tabs">
+          <div className="flex min-w-0 items-stretch overflow-x-auto border-b border-divider px-3 [scrollbar-width:none] sm:px-4" role="tablist" aria-label="Фильтр по статусу">
+            {ASSIGNMENT_FILTERS.map((item, index) => {
               const active = item.id === filter;
               const count = countFor(item.statuses);
+              const tone = FILTER_TONE[item.id];
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => { setFilter(item.id); setPage(1); }}
-                  className={`relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors ${
-                    active ? 'border-transparent text-brand-active' : 'border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink'
-                  }`}
-                >
-                  {active ? <FilterActivePill layoutId="assignments-status-pill" className="rounded-full bg-brand-soft ring-1 ring-brand" /> : null}
-                  {item.label}
-                  <AnimatedNumber
-                    value={count}
-                    className={`rounded-full px-1.5 text-[11px] tabular-nums transition-colors ${active ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}
-                  />
-                </button>
+                <div key={item.id} className="flex shrink-0 items-center">
+                  {index > 0 ? <span aria-hidden="true" className="h-4 w-px bg-line" /> : null}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => { setFilter(item.id); setPage(1); }}
+                    className={`relative flex h-12 items-center gap-2 px-4 text-[13px] transition-colors ${
+                      active ? 'font-semibold text-ink' : 'font-medium text-ink-muted hover:text-ink'
+                    }`}
+                  >
+                    {item.label}
+                    <AnimatedNumber value={count} className={`text-[12px] font-semibold tabular-nums transition-colors ${active ? tone.text : 'text-ink-disabled'}`} />
+                    {active ? (
+                      <motion.span layoutId="assignments-status-underline" aria-hidden="true" className={`absolute inset-x-3 -bottom-px h-[2px] ${tone.bar}`} transition={SPRING_PILL} />
+                    ) : null}
+                  </button>
+                </div>
               );
             })}
-        </div>
+          </div>
+        </LayoutGroup>
         <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по названию или ментору" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
           <PreviewSelect label="Направление" value={categoryFilter} onChange={(value) => { setCategoryFilter(value); setPage(1); }} options={categoryOptions} width="lg" />

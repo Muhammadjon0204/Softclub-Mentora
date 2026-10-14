@@ -29,7 +29,31 @@ interface PreviewMetricCardProps {
   onClick?: () => void;
   /** Подсветка, когда фильтр этой карточки включён. */
   active?: boolean;
+  /** Цвет свечения выбранной карточки; по умолчанию — из `tone` (обычная карточка — фирменный). */
+  accent?: MetricAccent;
 }
+
+export type MetricAccent = 'brand' | 'info' | 'warning' | 'danger' | 'success';
+
+/**
+ * Выбранная карточка не обводится рамкой, а мягко «светится» своим цветом сзади: оранжевый —
+ * ждут проверки, красный — просрочки, зелёный — одобрено, фирменный — всё остальное.
+ * Цвета — те же, что у токенов `--primary/--warning/...`, но с прозрачностью для тени.
+ */
+const GLOW: Record<MetricAccent, string> = {
+  brand: 'border-[rgba(91,92,226,0.32)] shadow-[0_12px_32px_-10px_rgba(91,92,226,0.55),0_0_0_4px_rgba(91,92,226,0.06)]',
+  info: 'border-[rgba(52,120,212,0.32)] shadow-[0_12px_32px_-10px_rgba(52,120,212,0.55),0_0_0_4px_rgba(52,120,212,0.06)]',
+  warning: 'border-[rgba(200,120,18,0.32)] shadow-[0_12px_32px_-10px_rgba(200,120,18,0.55),0_0_0_4px_rgba(200,120,18,0.07)]',
+  danger: 'border-[rgba(201,74,74,0.32)] shadow-[0_12px_32px_-10px_rgba(201,74,74,0.55),0_0_0_4px_rgba(201,74,74,0.06)]',
+  success: 'border-[rgba(22,138,91,0.32)] shadow-[0_12px_32px_-10px_rgba(22,138,91,0.55),0_0_0_4px_rgba(22,138,91,0.06)]',
+};
+
+const ACCENT_BY_TONE: Record<MetricTone, MetricAccent> = {
+  default: 'brand',
+  warning: 'warning',
+  danger: 'danger',
+  success: 'success',
+};
 
 const ICON_TONE: Record<MetricTone, string> = {
   default: 'text-ink-disabled',
@@ -75,12 +99,17 @@ export function PreviewMetricCard({
   to,
   onClick,
   active = false,
+  accent,
 }: PreviewMetricCardProps): JSX.Element {
   const interactive = to !== undefined || onClick !== undefined;
   const className = [
-    'group relative flex h-full min-w-0 flex-col rounded-card border bg-surface px-4 py-3.5 text-left shadow-surface transition-[border-color,box-shadow] duration-200 hover:shadow-surface-hover',
-    active ? 'border-brand ring-1 ring-brand' : tone === 'default' || tone === 'success' ? 'border-line' : ACCENT[tone],
-    interactive ? 'cursor-pointer no-underline hover:border-line-strong hover:shadow-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand' : '',
+    'group relative flex h-full min-w-0 flex-col rounded-card border bg-surface px-4 py-3.5 text-left transition-[border-color,box-shadow] duration-300',
+    active
+      ? GLOW[accent ?? ACCENT_BY_TONE[tone]]
+      : `shadow-surface hover:shadow-surface-hover ${tone === 'default' || tone === 'success' ? 'border-line' : ACCENT[tone]}`,
+    interactive
+      ? `cursor-pointer no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${active ? '' : 'hover:border-line-strong'}`
+      : '',
   ].join(' ');
 
   const body = (
