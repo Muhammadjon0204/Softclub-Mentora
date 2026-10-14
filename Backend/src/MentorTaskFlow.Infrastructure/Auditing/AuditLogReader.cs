@@ -87,7 +87,11 @@ public sealed class AuditLogReader(
         }
         else if (query.ExcludeSystemNoise)
         {
-            source = source.Where(log => !AuditActions.PageNoiseActions.Contains(log.Action));
+            // A plain array, not the IReadOnlySet itself: EF Core cannot translate
+            // IReadOnlySet<T>.Contains and threw on every browse request (500 on /admin/audit-log);
+            // an array becomes `action <> ALL (@noise)` in SQL.
+            var noise = AuditActions.PageNoiseActions.ToArray();
+            source = source.Where(log => !noise.Contains(log.Action));
         }
 
         if (query.ActorId is { } actorId)

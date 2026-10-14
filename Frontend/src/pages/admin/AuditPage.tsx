@@ -31,7 +31,7 @@ const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 function AuditResultBadge({ result }: { result: string }): JSX.Element {
   const isSuccess = result === 'Success';
-  return <Badge tone={isSuccess ? 'success' : 'danger'}>{isSuccess ? 'Успешно' : result}</Badge>;
+  return <Badge tone={isSuccess ? 'success' : 'danger'}>{isSuccess ? 'Успешно' : result === 'Failure' ? 'Отклонено' : result}</Badge>;
 }
 
 /** Реальный журнал административных и системных действий (`/admin/audit-log`) — не preview. */
@@ -52,7 +52,7 @@ export function AuditPage(): JSX.Element {
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Журнал аудита" subtitle="Реальные административные и системные действия" />
+      <PreviewPageHeader title="Журнал аудита" subtitle="Кто, что и когда изменил: действия администраторов, руководителей и системы" />
 
       <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <PreviewMetricCard icon={<ScrollText className="h-5 w-5" />} label="Событий" value={String(query.data?.totalCount ?? 0)} />
