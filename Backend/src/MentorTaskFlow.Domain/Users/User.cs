@@ -1,4 +1,5 @@
 using MentorTaskFlow.Domain.Common;
+using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Tenancy;
 
 namespace MentorTaskFlow.Domain.Users;
@@ -83,6 +84,17 @@ public sealed class User : AuditableEntity
     public DateTimeOffset? LockoutUntil { get; private set; }
 
     public DateTimeOffset? LastLoginAt { get; private set; }
+
+    // Personal notification settings: one switch per topic and channel (profile page). Everything is
+    // on by default, so a person who never opens the page gets exactly what they got before.
+    public bool NotifyAssignmentsEmail { get; private set; } = true;
+    public bool NotifyAssignmentsTelegram { get; private set; } = true;
+    public bool NotifyDeadlinesEmail { get; private set; } = true;
+    public bool NotifyDeadlinesTelegram { get; private set; } = true;
+    public bool NotifyReviewsEmail { get; private set; } = true;
+    public bool NotifyReviewsTelegram { get; private set; } = true;
+    public bool NotifySystemEmail { get; private set; } = true;
+    public bool NotifySystemTelegram { get; private set; } = true;
 
     private User()
     {
@@ -290,6 +302,42 @@ public sealed class User : AuditableEntity
     public void Activate(DateTimeOffset now)
     {
         IsActive = true;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Whether this person wants <paramref name="topic"/> on <paramref name="channel"/>.</summary>
+    public bool WantsNotification(NotificationTopic topic, NotificationChannel channel) =>
+        (topic, channel) switch
+        {
+            (NotificationTopic.Assignments, NotificationChannel.Email) => NotifyAssignmentsEmail,
+            (NotificationTopic.Assignments, NotificationChannel.Telegram) => NotifyAssignmentsTelegram,
+            (NotificationTopic.Deadlines, NotificationChannel.Email) => NotifyDeadlinesEmail,
+            (NotificationTopic.Deadlines, NotificationChannel.Telegram) => NotifyDeadlinesTelegram,
+            (NotificationTopic.Reviews, NotificationChannel.Email) => NotifyReviewsEmail,
+            (NotificationTopic.Reviews, NotificationChannel.Telegram) => NotifyReviewsTelegram,
+            (NotificationTopic.System, NotificationChannel.Email) => NotifySystemEmail,
+            (NotificationTopic.System, NotificationChannel.Telegram) => NotifySystemTelegram,
+            _ => true,
+        };
+
+    public void SetNotificationPreference(
+        NotificationTopic topic,
+        NotificationChannel channel,
+        bool enabled,
+        DateTimeOffset now)
+    {
+        switch (topic, channel)
+        {
+            case (NotificationTopic.Assignments, NotificationChannel.Email): NotifyAssignmentsEmail = enabled; break;
+            case (NotificationTopic.Assignments, NotificationChannel.Telegram): NotifyAssignmentsTelegram = enabled; break;
+            case (NotificationTopic.Deadlines, NotificationChannel.Email): NotifyDeadlinesEmail = enabled; break;
+            case (NotificationTopic.Deadlines, NotificationChannel.Telegram): NotifyDeadlinesTelegram = enabled; break;
+            case (NotificationTopic.Reviews, NotificationChannel.Email): NotifyReviewsEmail = enabled; break;
+            case (NotificationTopic.Reviews, NotificationChannel.Telegram): NotifyReviewsTelegram = enabled; break;
+            case (NotificationTopic.System, NotificationChannel.Email): NotifySystemEmail = enabled; break;
+            case (NotificationTopic.System, NotificationChannel.Telegram): NotifySystemTelegram = enabled; break;
+        }
+
         UpdatedAt = now;
     }
 

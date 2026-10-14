@@ -8,6 +8,7 @@ using MentorTaskFlow.Contracts.Tenancy;
 using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Common;
 using MentorTaskFlow.Domain.Identity;
+using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
@@ -165,6 +166,136 @@ public sealed class AuthService(
             ?? throw new UnauthorizedException();
 
         return await MapProfileAsync(user, cancellationToken);
+    }
+
+    public async Task<AuthUserDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var user = await LoadSelfAsync(userId, cancellationToken);
+
+        // Only the name: email is the login and changes through an admin, role and scope never
+        // through the person themselves. Not audited — like a password change, it is a personal
+        // setting, not an administrative action on someone else.
+        user.Rename(request.FullName ?? string.Empty, clock.UtcNow);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return await MapProfileAsync(user, cancellationToken);
+    }
+
+    public async Task<NotificationPreferencesDto> GetNotificationPreferencesAsync(Guid userId, CancellationToken cancellationToken) =>
+        ToPreferencesDto(await LoadSelfAsync(userId, cancellationToken));
+
+    public async Task<NotificationPreferencesDto> UpdateNotificationPreferencesAsync(
+        Guid userId,
+        NotificationPreferencesDto request,
+        CancellationToken cancellationToken)
+    {
+        var user = await LoadSelfAsync(userId, cancellationToken);
+        var now = clock.UtcNow;
+
+        foreach (var (topic, switches) in new[]
+                 {
+                     (NotificationTopic.Assignments, request.Assignments),
+                     (NotificationTopic.Deadlines, request.Deadlines),
+                     (NotificationTopic.Reviews, request.Reviews),
+                     (NotificationTopic.System, request.System),
+                 })
+        {
+            if (switches is null)
+            {
+                continue;
+            }
+
+            user.SetNotificationPreference(topic, NotificationChannel.Email, switches.Email, now);
+            user.SetNotificationPreference(topic, NotificationChannel.Telegram, switches.Telegram, now);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ToPreferencesDto(user);
+    }
+
+    public async Task<SessionsSummaryDto> GetSessionsAsync(Guid userId, string? currentRefreshToken, CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var currentFamily = await CurrentFamilyAsync(userId, currentRefreshToken, cancellationToken);
+
+        var otherFamilies = await dbContext.RefreshTokens
+            .AsNoTracking()
+            .Where(t => t.UserId == userId && t.RevokedAt == null && t.ExpiresAt > now && t.FamilyId != currentFamily)
+            .Select(t => t.FamilyId)
+            .Distinct()
+            .CountAsync(cancellationToken);
+
+        var lastLoginAt = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.LastLoginAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new SessionsSummaryDto(otherFamilies, lastLoginAt);
+    }
+
+    public async Task<RevokeOtherSessionsResponse> RevokeOtherSessionsAsync(
+        Guid userId,
+        string? currentRefreshToken,
+        string? ipAddress,
+        CancellationToken cancellationToken)
+    {
+        var now = clock.UtcNow;
+        var currentFamily = await CurrentFamilyAsync(userId, currentRefreshToken, cancellationToken);
+
+        // Every active refresh token outside the current family: those devices can no longer renew
+        // their access token and are signed out within its short lifetime. The current tab keeps its
+        // family, so the person is not thrown out of the page they clicked the button on.
+        var tokens = await dbContext.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null && t.FamilyId != currentFamily)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in tokens)
+        {
+            token.Revoke(RefreshTokenRevocationReason.Logout, ipAddress, now);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var families = tokens.Where(t => t.ExpiresAt > now).Select(t => t.FamilyId).Distinct().Count();
+        return new RevokeOtherSessionsResponse(families);
+    }
+
+    private async Task<User> LoadSelfAsync(Guid userId, CancellationToken cancellationToken) =>
+        await dbContext.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+        ?? throw new UnauthorizedException();
+
+    /// <summary>The family of the refresh cookie the request came with; <see cref="Guid.Empty"/> if none.</summary>
+    private async Task<Guid> CurrentFamilyAsync(Guid userId, string? currentRefreshToken, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(currentRefreshToken))
+        {
+            return Guid.Empty;
+        }
+
+        var hash = secureTokenService.HashToken(currentRefreshToken);
+
+        return await dbContext.RefreshTokens
+            .AsNoTracking()
+            .Where(t => t.UserId == userId && t.TokenHash == hash)
+            .Select(t => t.FamilyId)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static NotificationPreferencesDto ToPreferencesDto(User user)
+    {
+        ChannelSwitchesDto Of(NotificationTopic topic) => new(
+            user.WantsNotification(topic, NotificationChannel.Email),
+            user.WantsNotification(topic, NotificationChannel.Telegram));
+
+        return new NotificationPreferencesDto(
+            Of(NotificationTopic.Assignments),
+            Of(NotificationTopic.Deadlines),
+            Of(NotificationTopic.Reviews),
+            Of(NotificationTopic.System));
     }
 
     public async Task<AuthenticationResult> ChangePasswordAsync(

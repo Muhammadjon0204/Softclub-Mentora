@@ -6,6 +6,8 @@ import { profilePathForRole } from '../../auth/roleRedirect';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Popover } from '../../shared/ui/Popover';
 import { ProfileMenuItem } from './ProfileMenuItem';
+import { avatarColorClass } from '../../features/profile/profilePresentation';
+import { useAvatarColor } from '../../features/profile/useAvatarColor';
 
 function initialsOf(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -41,6 +43,7 @@ function scopeLabelOf(user: AuthUser): string {
  */
 export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
   const { logout } = useAuth();
+  const avatarClass = avatarColorClass(useAvatarColor(user.id));
   const { isAllBranches, selectedBranchId, availableBranches } = useBranchContext();
 
   const scopeLabel = scopeLabelOf(user);
@@ -67,7 +70,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
             isOpen ? 'border-brand/30 bg-brand-soft' : 'border-transparent hover:bg-surface-hover'
           }`}
         >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-semibold text-brand">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold transition-colors ${avatarClass}`}>
             {initialsOf(user.fullName)}
           </span>
           <span className="hidden min-w-0 flex-col items-start text-left sm:flex">
@@ -89,7 +92,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
         <div data-testid="profile-menu-panel" className="flex flex-col gap-2.5">
           {/* 5.1 — заголовок профиля. */}
           <div className="flex items-start gap-3 px-1 pt-0.5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[15px] font-semibold text-brand">
+            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${avatarClass}`}>
               {initialsOf(user.fullName)}
             </span>
             <div className="min-w-0 flex-1 pt-0.5">

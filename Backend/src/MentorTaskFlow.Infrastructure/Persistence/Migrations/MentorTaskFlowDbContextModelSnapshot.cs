@@ -1597,6 +1597,38 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("normalized_email");
 
+                    b.Property<bool>("NotifyAssignmentsEmail")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_assignments_email");
+
+                    b.Property<bool>("NotifyAssignmentsTelegram")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_assignments_telegram");
+
+                    b.Property<bool>("NotifyDeadlinesEmail")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_deadlines_email");
+
+                    b.Property<bool>("NotifyDeadlinesTelegram")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_deadlines_telegram");
+
+                    b.Property<bool>("NotifyReviewsEmail")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_reviews_email");
+
+                    b.Property<bool>("NotifyReviewsTelegram")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_reviews_telegram");
+
+                    b.Property<bool>("NotifySystemEmail")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_system_email");
+
+                    b.Property<bool>("NotifySystemTelegram")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_system_telegram");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
