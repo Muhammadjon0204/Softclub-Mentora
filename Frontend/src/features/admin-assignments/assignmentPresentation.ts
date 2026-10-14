@@ -1,4 +1,4 @@
-import type { PreviewAssignment } from '../../mocks/ui-preview/assignments.preview';
+import type { PreviewAssignment, PreviewAssignmentStatus } from '../../mocks/ui-preview/assignments.preview';
 import type { PreviewNotificationStatus } from '../../mocks/ui-preview/notifications.preview';
 
 export { branchDisplayName } from '../admin-preview/branchDirectory';
@@ -298,3 +298,13 @@ export function enrichAssignment(assignment: PreviewAssignment): PreviewAssignme
     notifications,
   };
 }
+
+/** Точка и цвет текста статуса в карточке задания (preview-модель). */
+export const ASSIGNMENT_STATUS_META: Record<PreviewAssignmentStatus, { dot: string; text: string }> = {
+  Assigned: { dot: 'bg-ink-disabled', text: 'text-ink-secondary' },
+  Submitted: { dot: 'bg-info', text: 'text-info' },
+  InReview: { dot: 'bg-brand', text: 'text-brand' },
+  NeedsRework: { dot: 'bg-warning', text: 'text-warning' },
+  Overdue: { dot: 'bg-danger', text: 'text-danger' },
+  Approved: { dot: 'bg-success', text: 'text-success' },
+};

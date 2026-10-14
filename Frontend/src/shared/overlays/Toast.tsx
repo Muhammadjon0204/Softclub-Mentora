@@ -3,7 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { IconButton } from '../ui/Button';
-import { useToastContext } from './ToastProvider';
+import { useToastContext } from './toastContext';
 import type { ToastEntry, ToastVariant } from './ToastProvider';
 
 const VARIANT_ICON: Record<ToastVariant, LucideIcon> = {

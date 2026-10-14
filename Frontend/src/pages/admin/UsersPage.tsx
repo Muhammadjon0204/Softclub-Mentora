@@ -26,6 +26,7 @@ import { ROLE_LABEL, STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import type { PreviewUserRole, PreviewUserStatus } from '../../mocks/ui-preview/users.preview';
 import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
+import { pluralizeRu } from '../../features/admin-assignments/assignmentPresentation';
 import { Button } from '../../shared/ui/Button';
 import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useToast } from '../../shared/overlays';
@@ -228,7 +229,12 @@ export function UsersPage(): JSX.Element {
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageRows = rows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const filtersActive = search.trim().length > 0 || role !== 'all' || branch !== 'all' || status !== 'all';
+  // По умолчанию показываются активные — это и есть «без фильтров», «Сбросить» тогда не нужен.
+  const filtersActive = search.trim().length > 0 || role !== 'all' || branch !== 'all' || status !== 'Active';
+  // Владелец организации не входит в «Всего пользователей» (это состав команды) — считаем строки
+  // так же, а владельца называем отдельно, чтобы цифры над таблицей и в карточке совпадали.
+  const ownerShown = rows.some((candidate) => candidate.role === 'OrgAdmin');
+  const teamRowsCount = rows.length - (ownerShown ? 1 : 0);
   const newUsersSeries = useMemo(() => buildNewUsersSeries(allUsers), [allUsers]);
   const newThisWeek = newUsersSeries[newUsersSeries.length - 1]?.value ?? 0;
 
@@ -284,7 +290,10 @@ export function UsersPage(): JSX.Element {
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>
-          <span className="basis-full text-[13px] font-medium text-ink-secondary">{rows.length} пользователей</span>
+          <span className="basis-full text-[13px] font-medium text-ink-secondary">
+            {teamRowsCount} {pluralizeRu(teamRowsCount, 'пользователь', 'пользователя', 'пользователей')}
+            {ownerShown ? <span className="font-normal text-ink-muted"> · и владелец организации</span> : null}
+          </span>
           <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} />
           {isOrgAdmin ? <PreviewSelect label="Филиал" value={branch} onChange={setBranch} options={branchOptions} width="lg" /> : null}
           <PreviewSelect label="Роль" value={role} onChange={setRole} options={ROLE_OPTIONS} width="md" />

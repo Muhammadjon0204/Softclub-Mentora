@@ -1,17 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { pushOverlay, removeOverlay, topmostOverlay, updateOverlayInPlace } from './overlayStack';
 import type { OverlayRegistration } from './overlayStack';
-
-interface OverlayContextValue {
-  stack: OverlayRegistration[];
-  register: (entry: OverlayRegistration) => void;
-  update: (entry: OverlayRegistration) => void;
-  unregister: (id: string) => void;
-}
-
-const OverlayContext = createContext<OverlayContextValue | null>(null);
+import { OverlayContext } from './overlayContext';
+import type { OverlayContextValue } from './overlayContext';
 
 /**
  * Единственный provider на всё приложение: держит стек открытых overlays и
@@ -57,10 +50,4 @@ export function OverlayProvider({ children }: { children: ReactNode }): JSX.Elem
   );
 
   return <OverlayContext.Provider value={value}>{children}</OverlayContext.Provider>;
-}
-
-export function useOverlayContext(): OverlayContextValue {
-  const ctx = useContext(OverlayContext);
-  if (ctx === null) throw new Error('useOverlayContext должен использоваться внутри <OverlayProvider>');
-  return ctx;
 }

@@ -104,7 +104,15 @@ export function ReportsPage(): JSX.Element {
   const error = dashboard.error ?? query.error;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:space-y-4">
+      {/* Шапка только для печати / «Сохранить как PDF»: что за отчёт, за какой период и когда выгружен. */}
+      <div className="hidden border-b border-line pb-3 print:block">
+        <p className="text-[18px] font-semibold text-ink">Mentora — отчёт по направлениям</p>
+        <p className="text-[12px] text-ink-muted">
+          Период: {periodLabel.toLowerCase()} · выгружен {new Date(now).toLocaleString('ru-RU', { hour12: false })}
+        </p>
+      </div>
+      <div className="print:hidden">
       <PreviewPageHeader
         title="Отчёты"
         subtitle="Сравнение направлений и филиалов: нагрузка, сроки и скорость проверки"
@@ -128,8 +136,9 @@ export function ReportsPage(): JSX.Element {
           </div>
         }
       />
+      </div>
 
-      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4 print:grid-cols-4">
         <PreviewMetricCard icon={<ClipboardList />} label="Заданий за период" value={String(totals.total)} hint={`${String(totals.active)} сейчас в работе`} />
         <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрено" value={String(totals.approved)} hint={totals.completionPct === null ? 'Нет заданий' : `${String(totals.completionPct)}% от назначенных`} tone="success" />
         <PreviewMetricCard

@@ -12,7 +12,7 @@ export function OfflineBanner(): JSX.Element | null {
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 top-0 z-50 flex items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow"
+      className="fixed inset-x-0 top-0 z-50 flex print:hidden items-center justify-center gap-2 bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow"
     >
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 3l18 18" strokeLinecap="round" />

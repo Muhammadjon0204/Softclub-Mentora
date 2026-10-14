@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { useToastContext } from './ToastProvider';
+import { useToastContext } from './toastContext';
 import type { ToastOptions } from './ToastProvider';
 
 export interface UseToastResult {

@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form';
 
 import { Drawer, UnsavedChangesDialog } from '../../../shared/overlays';
 import { Button } from '../../../shared/ui/Button';
-import { FormBannerError, FormField, FormInput, ReadOnlyField, fieldA11yProps } from '../../../shared/ui/FormField';
+import { FormBannerError, FormField, FormInput, ReadOnlyField } from '../../../shared/ui/FormField';
+import { fieldA11yProps } from '../../../shared/ui/fieldA11y';
 import { useLeadScope } from '../scope/useLeadScope';
 import { createMentorSchema } from './createMentor.schema';
 import type { CreateMentorFormValues } from './createMentor.schema';

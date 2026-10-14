@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode, RefObject } from 'react';
+import type { ReactNode } from 'react';
 
 import { computeFloatingPosition } from './floatingPosition';
 import type { FloatingPlacement } from './floatingPosition';
@@ -135,21 +135,4 @@ export function Tooltip({ content, children, placement = 'top', disabled = false
       ) : null}
     </span>
   );
-}
-
-/** Показывать tooltip только когда текст реально обрезан (`scrollWidth > clientWidth`). */
-export function useIsTruncated(ref: RefObject<HTMLElement>, deps: unknown[] = []): boolean {
-  const [isTruncated, setIsTruncated] = useState(false);
-
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (element === null) {
-      setIsTruncated(false);
-      return;
-    }
-    setIsTruncated(element.scrollWidth > element.clientWidth);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- пересчитываем по внешним deps вызывающего компонента
-  }, deps);
-
-  return isTruncated;
 }

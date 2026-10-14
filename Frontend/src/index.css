@@ -121,3 +121,16 @@
 @media (prefers-reduced-motion: reduce) {
   .table-stagger tbody tr { animation: none; }
 }
+
+/* Печать / «Сохранить как PDF» (Отчёты): только сводка и таблица — без меню, шапки, кнопок,
+   теней и анимаций; строки таблицы не разрываются между страницами. */
+@media print {
+  @page { margin: 12mm; }
+  html, body { background: #fff !important; }
+  * { box-shadow: none !important; animation: none !important; transition: none !important; }
+  button:not([aria-pressed]), [role="tablist"], [role="radiogroup"] { display: none !important; }
+  main { overflow: visible !important; }
+  table { font-size: 11px; }
+  tr, .rounded-card { break-inside: avoid; }
+  thead th { position: static !important; }
+}

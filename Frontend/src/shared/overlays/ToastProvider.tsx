@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { ToastContext } from './toastContext';
+import type { ToastContextValue } from './toastContext';
 import { ToastViewport } from './ToastViewport';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
@@ -29,13 +31,6 @@ export interface ToastEntry extends ToastOptions {
 
 const TOAST_EXIT_MS = 170;
 
-interface ToastContextValue {
-  toasts: ToastEntry[];
-  push: (variant: ToastVariant, message: string, options?: ToastOptions) => string;
-  dismiss: (id: string) => void;
-  pause: (id: string) => void;
-  resume: (id: string) => void;
-}
 
 const DEFAULT_DURATION: Record<ToastVariant, number> = {
   success: 4000,
@@ -45,8 +40,6 @@ const DEFAULT_DURATION: Record<ToastVariant, number> = {
 };
 
 const MAX_VISIBLE_TOASTS = 3;
-
-const ToastContext = createContext<ToastContextValue | null>(null);
 
 interface TimerState {
   timeoutId: number | null;
@@ -174,10 +167,4 @@ export function ToastProvider({ children }: { children: ReactNode }): JSX.Elemen
       <ToastViewport />
     </ToastContext.Provider>
   );
-}
-
-export function useToastContext(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (ctx === null) throw new Error('useToastContext должен использоваться внутри <ToastProvider>');
-  return ctx;
 }

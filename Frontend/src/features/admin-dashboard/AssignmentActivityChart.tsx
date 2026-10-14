@@ -88,8 +88,11 @@ function LineTooltipBridge({
   coordinate,
   onChange,
 }: TooltipContentProps & { onChange: (state: LineTooltipState) => void }): null {
+  // Числа, а не объект `coordinate`: Recharts пересоздаёт его на каждый рендер.
+  const x = coordinate?.x;
+  const y = coordinate?.y;
   useEffect(() => {
-    if (active !== true || coordinate === undefined || payload === undefined || payload.length === 0) {
+    if (active !== true || x === undefined || y === undefined || payload === undefined || payload.length === 0) {
       onChange({ active: false, anchor: null, content: null });
       return;
     }
@@ -99,10 +102,10 @@ function LineTooltipBridge({
     });
     onChange({
       active: true,
-      anchor: { x: coordinate.x, y: coordinate.y },
+      anchor: { x, y },
       content: { label: typeof label === 'string' ? label : String(label ?? ''), items },
     });
-  }, [active, coordinate?.x, coordinate?.y, label, payload, onChange]);
+  }, [active, x, y, label, payload, onChange]);
   return null;
 }
 
