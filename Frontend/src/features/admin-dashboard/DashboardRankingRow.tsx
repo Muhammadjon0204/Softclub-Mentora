@@ -2,6 +2,7 @@ import { ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AnimatedBar } from '../../shared/ui/motion';
 
 export interface DashboardRankingRowProps {
   rank: number;
@@ -138,10 +139,7 @@ export function DashboardRankingRow({
             role={progressLabel !== undefined ? 'img' : undefined}
             aria-label={progressLabel}
           >
-            <div
-              className="h-full rounded-full bg-brand transition-[width] duration-[180ms] motion-reduce:transition-none"
-              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-            />
+            <AnimatedBar percent={progress} className="rounded-full bg-brand" />
           </div>
         ) : null}
       </div>

@@ -7,6 +7,7 @@ import type { RoleDistribution } from '../../api/admin/dashboard';
 import { ChartTooltipPortal } from './ChartTooltipPortal';
 import type { FloatingTooltipPoint } from './floatingTooltipPosition';
 import { RoleChartTooltip } from './RoleChartTooltip';
+import { AnimatedNumber } from '../../shared/ui/motion';
 
 interface RoleDistributionChartProps {
   data: RoleDistribution;
@@ -100,7 +101,10 @@ export function RoleDistributionChart({ data }: RoleDistributionChartProps): JSX
               paddingAngle={2}
               stroke="var(--surface)"
               strokeWidth={2}
-              isAnimationActive={false}
+              animationDuration={600}
+              animationEasing="ease-out"
+              startAngle={90}
+              endAngle={-270}
               onMouseEnter={handlePieMove}
               onMouseMove={handlePieMove}
               onMouseLeave={clearActive}
@@ -117,7 +121,7 @@ export function RoleDistributionChart({ data }: RoleDistributionChartProps): JSX
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold tabular-nums text-ink">{total}</span>
+          <AnimatedNumber value={total} className="text-2xl font-bold tabular-nums text-ink" />
           <span className="text-[12px] text-ink-muted">всего</span>
         </div>
       </div>

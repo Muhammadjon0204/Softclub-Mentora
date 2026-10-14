@@ -1,4 +1,6 @@
 import { CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -6,6 +8,7 @@ import { Link } from 'react-router-dom';
 import type { AssignmentDto } from '../../api/lead/assignments';
 import { Tooltip } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
+import { EASE_OUT_EXPO } from '../../shared/ui/motionTokens';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import {
   MONTH_NAMES_GENITIVE_RU,
@@ -29,6 +32,13 @@ import { useNow } from './useNow';
 const UPCOMING_LIMIT = 6;
 const UPCOMING_WINDOW_MS = 120 * 86_400_000;
 const CHIPS_PER_CELL = 2;
+
+/** Месяц въезжает со стороны стрелки и уезжает в противоположную. */
+const MONTH_SLIDE: Variants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 28 }),
+  center: { opacity: 1, x: 0 },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -28 }),
+};
 
 export interface DeadlineCalendarProps {
   /** Различает кэш ролей и филиалов; см. `useCalendarDeadlines`. */
@@ -192,9 +202,17 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
             ))}
           </div>
 
-          <div
+          <div className="relative overflow-hidden">
+          <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+          <motion.div
             key={`${visible.year}-${visible.month}`}
-            className={`grid grid-cols-7 gap-1 sm:gap-1.5 ${direction > 0 ? 'motion-safe:animate-calendar-next' : 'motion-safe:animate-calendar-prev'}`}
+            custom={direction}
+            variants={MONTH_SLIDE}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.26, ease: EASE_OUT_EXPO }}
+            className="grid grid-cols-7 gap-1 sm:gap-1.5"
           >
             {cells.map((cell) => {
               const dayEvents = byDay.get(cell.key) ?? [];
@@ -266,6 +284,8 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
                 </button>
               );
             })}
+          </motion.div>
+          </AnimatePresence>
           </div>
         </div>
 

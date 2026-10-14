@@ -155,7 +155,7 @@ export function AssignmentActivityChart({ data }: AssignmentActivityChartProps):
             tickLine={false}
             width={28}
           />
-          <RechartsTooltip cursor={{ fill: 'var(--surface-hover)' }} content={(props) => <LineTooltipBridge {...props} onChange={handleTooltipChange} />} />
+          <RechartsTooltip cursor={{ fill: 'var(--primary-soft)', fillOpacity: 0.6 }} content={(props) => <LineTooltipBridge {...props} onChange={handleTooltipChange} />} />
           <Legend
             verticalAlign="top"
             height={28}
@@ -171,7 +171,8 @@ export function AssignmentActivityChart({ data }: AssignmentActivityChartProps):
               fill={series.color}
               radius={[3, 3, 0, 0]}
               maxBarSize={14}
-              isAnimationActive={false}
+              animationDuration={450}
+              animationEasing="ease-out"
             />
           ))}
         </BarChart>

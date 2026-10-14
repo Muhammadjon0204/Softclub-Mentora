@@ -119,8 +119,8 @@ export function Modal({
           }}
           className={`relative flex max-h-[calc(100dvh-24px)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface shadow-[0_4px_10px_rgba(16,24,40,0.05),0_24px_60px_rgba(20,28,58,0.14)] transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none ${
             visible
-              ? 'duration-[190ms] ease-out opacity-100 translate-y-0 scale-100'
-              : 'duration-150 ease-in opacity-0 translate-y-2 scale-[0.985]'
+              ? 'duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] opacity-100 translate-y-0 scale-100'
+              : 'duration-150 ease-in opacity-0 translate-y-2 scale-95'
           } ${MODAL_SIZE_CLASSES[size]} ${className}`}
         >
           <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-5 sm:px-6">

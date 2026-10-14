@@ -11,6 +11,7 @@ import { Badge } from '../../shared/ui/Badge';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 interface AuditEntry {
   id: string;
@@ -53,7 +54,7 @@ export function AuditPage(): JSX.Element {
     <div className="space-y-6">
       <PreviewPageHeader title="Журнал аудита" subtitle="Реальные административные и системные действия" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <PreviewMetricCard icon={<ScrollText className="h-5 w-5" />} label="Событий" value={String(query.data?.totalCount ?? 0)} />
         <PreviewMetricCard
           icon={<ShieldCheck className="h-5 w-5" />}
@@ -66,7 +67,7 @@ export function AuditPage(): JSX.Element {
           value={String(allItems.filter((item) => item.result !== 'Success').length)}
           tone="warning"
         />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
         <PreviewTable>

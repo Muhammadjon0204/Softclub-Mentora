@@ -1,10 +1,12 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutGroup } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../auth/useAuth';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { ADMIN_NAV_ITEMS } from './navConfig';
+import { NavActivePill } from '../../shared/ui/motion';
 
 interface AdminSidebarProps {
   collapsed: boolean;
@@ -79,6 +81,7 @@ export function AdminSidebar({
         ) : null}
       </div>
 
+      <LayoutGroup id={`nav-${variant}`}>
       <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
           {items.map((item) => {
@@ -115,16 +118,21 @@ export function AdminSidebar({
                 to={item.path}
                 onClick={onNavigate}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition ${isCollapsed ? 'justify-center px-0' : ''} ${
+                  `relative isolate flex items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : ''} ${
                     isActive
-                      ? 'bg-brand-soft text-brand'
+                      ? 'text-brand'
                       : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                   }`
                 }
                 end
               >
-                <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
-                {!isCollapsed ? <span className="whitespace-nowrap">{item.label}</span> : null}
+                {({ isActive }) => (
+                  <>
+                    {isActive ? <NavActivePill /> : null}
+                  <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
+                  {!isCollapsed ? <span className="whitespace-nowrap">{item.label}</span> : null}
+                  </>
+                )}
               </NavLink>
             );
 
@@ -134,6 +142,7 @@ export function AdminSidebar({
           })}
         </ul>
       </nav>
+      </LayoutGroup>
     </div>
   );
 }

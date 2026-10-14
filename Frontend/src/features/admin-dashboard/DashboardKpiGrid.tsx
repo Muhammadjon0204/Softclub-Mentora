@@ -3,13 +3,14 @@ import { ClipboardList, Clock3, UserCheck, Users } from 'lucide-react';
 import type { DashboardKpis } from '../../api/admin/dashboard';
 import { PreviewMetricCard } from '../admin-preview/PreviewMetricCard';
 import { deltaTone } from './dashboardFormatters';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 const VS_LAST_MONTH = 'к прошлому месяцу';
 
 /** Четыре KPI обзора. Карточки заданий ведут сразу к отфильтрованному списку. */
 export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element {
   return (
-    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       <PreviewMetricCard
         icon={<Users aria-hidden="true" />}
         label="Всего пользователей"
@@ -51,6 +52,6 @@ export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element
         tone={kpis.pendingReview > 0 ? 'warning' : 'default'}
         to="/admin/assignments?status=review"
       />
-    </div>
+    </StaggerContainer>
   );
 }

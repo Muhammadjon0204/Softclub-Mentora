@@ -18,7 +18,7 @@ import { Select } from '../../shared/select';
 export function PreviewTable({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div className="min-w-0 w-full overflow-x-auto">
-      <table className="w-full table-fixed border-collapse text-left">{children}</table>
+      <table className="table-stagger w-full table-fixed border-collapse text-left">{children}</table>
     </div>
   );
 }

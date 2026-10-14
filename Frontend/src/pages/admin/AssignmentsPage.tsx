@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, ClipboardList, Clock3, SearchX, TriangleAlert } from 'lucide-react';
+import { LayoutGroup, motion } from 'framer-motion';
+import { CheckCircle2, ClipboardList, Clock3, Columns3, Rows3, SearchX, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -9,6 +10,7 @@ import { listAssignments } from '../../api/lead/assignments';
 import type { AssignmentDto } from '../../api/lead/assignments';
 import { useAuth } from '../../auth/useAuth';
 import { AdminAssignmentDrawer } from '../../features/admin-assignments/AdminAssignmentDrawer';
+import { AdminAssignmentsKanban } from '../../features/admin-assignments/AdminAssignmentsKanban';
 import {
   ACTIVE_STATUSES,
   ASSIGNMENT_FILTERS,
@@ -32,6 +34,8 @@ import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
+import { AnimatedNumber, FilterActivePill, StaggerContainer } from '../../shared/ui/motion';
+import { SPRING_PILL } from '../../shared/ui/motionTokens';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 const HINT_TONE = { muted: 'text-ink-muted', warning: 'text-warning', danger: 'text-danger' } as const;
@@ -54,6 +58,15 @@ export function AssignmentsPage(): JSX.Element {
       const params = new URLSearchParams(prev);
       if (next === 'all') params.delete('status');
       else params.set('status', next);
+      return params;
+    }, { replace: true });
+  };
+  const view = searchParams.get('view') === 'board' ? 'board' : 'table';
+  const setView = (next: 'table' | 'board'): void => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === 'table') params.delete('view');
+      else params.set('view', next);
       return params;
     }, { replace: true });
   };
@@ -107,12 +120,12 @@ export function AssignmentsPage(): JSX.Element {
     <div className="space-y-6">
       <PreviewPageHeader title="Задания" subtitle="Контроль выполнения задач и соблюдения сроков по филиалам" />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<ClipboardList />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" onClick={toggle('open')} active={filter === 'open'} />
         <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint="Сданы, ждут руководителя" tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} />
         <PreviewMetricCard icon={<TriangleAlert />} label="Просроченные" value={String(overdueCount)} hint={overdueCount > 0 ? 'Срок истёк без сдачи' : 'Просрочек нет'} tone={overdueCount > 0 ? 'danger' : 'default'} onClick={toggle('overdue')} active={filter === 'overdue'} />
         <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" tone="success" onClick={toggle('approved')} active={filter === 'approved'} />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-divider px-5 pb-3 pt-3.5 sm:px-6" role="tablist" aria-label="Фильтр по статусу">
@@ -126,12 +139,16 @@ export function AssignmentsPage(): JSX.Element {
                   role="tab"
                   aria-selected={active}
                   onClick={() => { setFilter(item.id); setPage(1); }}
-                  className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition ${
-                    active ? 'border-brand bg-brand-soft text-brand-active' : 'border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink'
+                  className={`relative isolate inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-medium transition-colors ${
+                    active ? 'border-transparent text-brand-active' : 'border-line bg-surface text-ink-secondary hover:border-line-strong hover:text-ink'
                   }`}
                 >
+                  {active ? <FilterActivePill layoutId="assignments-status-pill" className="rounded-full bg-brand-soft ring-1 ring-brand" /> : null}
                   {item.label}
-                  <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${active ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}>{count}</span>
+                  <AnimatedNumber
+                    value={count}
+                    className={`rounded-full px-1.5 text-[11px] tabular-nums transition-colors ${active ? 'bg-brand text-white' : 'bg-surface-muted text-ink-muted'}`}
+                  />
                 </button>
               );
             })}
@@ -143,8 +160,35 @@ export function AssignmentsPage(): JSX.Element {
             <PreviewSelect label="Филиал" value={branchFilter} onChange={(value) => { setBranchFilter(value); setPage(1); }} options={branchOptions} width="lg" />
           ) : null}
           <PreviewResetButton disabled={!filtersActive} onClick={resetFilters} />
+          <LayoutGroup id="assignments-view">
+            <div role="radiogroup" aria-label="Вид" className="ml-auto flex h-10 shrink-0 items-center rounded-control border border-line bg-surface p-1">
+              {([['table', 'Таблица', Rows3], ['board', 'Канбан', Columns3]] as const).map(([id, label, Icon]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={view === id}
+                  onClick={() => { setView(id); }}
+                  className={`relative isolate inline-flex h-full items-center gap-1.5 rounded-control-sm px-3 text-[12.5px] font-medium transition-colors ${view === id ? 'text-brand-active' : 'text-ink-secondary hover:text-ink'}`}
+                >
+                  {view === id ? <motion.span layoutId="assignments-view-pill" aria-hidden="true" className="absolute inset-0 -z-10 rounded-control-sm bg-brand-soft" transition={SPRING_PILL} /> : null}
+                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </LayoutGroup>
         </PreviewToolbar>
 
+        {view === 'board' && !query.isPending && query.error === null ? (
+          <AdminAssignmentsKanban
+            items={filtered}
+            mentorOf={mentorOf}
+            categoryOf={(item) => categoryName.get(item.categoryId)}
+            selectedId={openId}
+            onOpen={setOpenId}
+          />
+        ) : (
         <PreviewTable>
           <PreviewTableHead>
             <PreviewTh className={showBranch ? 'w-[30%]' : 'w-[40%]'}>Задание</PreviewTh>
@@ -220,8 +264,9 @@ export function AssignmentsPage(): JSX.Element {
             )}
           </tbody>
         </PreviewTable>
+        )}
 
-        {filtered.length > 0 ? (
+        {filtered.length > 0 && view === 'table' ? (
           <PreviewPagination
             page={currentPage}
             totalPages={totalPages}
