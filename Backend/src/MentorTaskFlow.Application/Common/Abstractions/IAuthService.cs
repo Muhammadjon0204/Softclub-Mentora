@@ -46,6 +46,29 @@ public interface IAuthService
     /// <summary>The authoritative profile — same shape as the login response (<c>AUTH-037</c>).</summary>
     Task<AuthUserDto> GetProfileAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>Renames the signed-in person (<c>PATCH /auth/me</c>).</summary>
+    Task<AuthUserDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request, CancellationToken cancellationToken);
+
+    Task<NotificationPreferencesDto> GetNotificationPreferencesAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task<NotificationPreferencesDto> UpdateNotificationPreferencesAsync(
+        Guid userId,
+        NotificationPreferencesDto request,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Other signed-in devices: active refresh-token families other than the one behind
+    /// <paramref name="currentRefreshToken"/>.
+    /// </summary>
+    Task<SessionsSummaryDto> GetSessionsAsync(Guid userId, string? currentRefreshToken, CancellationToken cancellationToken);
+
+    /// <summary>Signs every other device out, keeping the session the request came from.</summary>
+    Task<RevokeOtherSessionsResponse> RevokeOtherSessionsAsync(
+        Guid userId,
+        string? currentRefreshToken,
+        string? ipAddress,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Changes one's own password.
     /// </summary>

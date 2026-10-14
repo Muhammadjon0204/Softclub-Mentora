@@ -16,6 +16,8 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   changePassword: (payload: ChangePasswordRequest) => Promise<void>;
+  /** Подменяет профиль после того, как человек сам его изменил (например, имя на странице профиля). */
+  updateUser: (next: AuthUser) => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

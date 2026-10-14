@@ -92,6 +92,76 @@ public sealed class AuthController(
         return Ok(await authService.GetProfileAsync(user.UserId, cancellationToken));
     }
 
+    /// <summary><c>PATCH /auth/me</c> — the person renames themselves; nothing else is editable here.</summary>
+    [HttpPatch("me")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<AuthUserDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AuthUserDto>> UpdateMeAsync(UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        NoStore();
+        return Ok(await authService.UpdateProfileAsync(user.UserId, request, cancellationToken));
+    }
+
+    /// <summary><c>GET /auth/me/notification-preferences</c> — the profile page's switches.</summary>
+    [HttpGet("me/notification-preferences")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<NotificationPreferencesDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<NotificationPreferencesDto>> GetNotificationPreferencesAsync(CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        NoStore();
+        return Ok(await authService.GetNotificationPreferencesAsync(user.UserId, cancellationToken));
+    }
+
+    /// <summary><c>PUT /auth/me/notification-preferences</c>.</summary>
+    [HttpPut("me/notification-preferences")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<NotificationPreferencesDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<NotificationPreferencesDto>> UpdateNotificationPreferencesAsync(
+        NotificationPreferencesDto request,
+        CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        return Ok(await authService.UpdateNotificationPreferencesAsync(user.UserId, request, cancellationToken));
+    }
+
+    /// <summary>
+    /// <c>GET /auth/sessions</c> — how many other devices are signed in. The refresh cookie (path
+    /// <c>/api/v1/auth</c>) tells the current session apart.
+    /// </summary>
+    [HttpGet("sessions")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<SessionsSummaryDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<SessionsSummaryDto>> GetSessionsAsync(CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        NoStore();
+        var refreshToken = Request.Cookies[AuthCookieManager.RefreshTokenCookieName];
+        return Ok(await authService.GetSessionsAsync(user.UserId, refreshToken, cancellationToken));
+    }
+
+    /// <summary><c>POST /auth/sessions/revoke-others</c> — signs every other device out.</summary>
+    [HttpPost("sessions/revoke-others")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<RevokeOtherSessionsResponse>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<RevokeOtherSessionsResponse>> RevokeOtherSessionsAsync(CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        var refreshToken = Request.Cookies[AuthCookieManager.RefreshTokenCookieName];
+        return Ok(await authService.RevokeOtherSessionsAsync(user.UserId, refreshToken, RemoteIp, cancellationToken));
+    }
+
     /// <summary><c>POST /auth/change-password</c> — requires the current password (<c>AUTH-014</c>).</summary>
     [HttpPost("change-password")]
     [Authorize(Policy = MtfPolicies.Authenticated)]

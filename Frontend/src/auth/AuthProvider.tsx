@@ -147,6 +147,14 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     [],
   );
 
+  const updateUser = useCallback(
+    (next: AuthUser): void => {
+      queryClient.setQueryData(AUTH_ME_QUERY_KEY, next);
+      setUser(next);
+    },
+    [queryClient],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -157,8 +165,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       logout,
       refreshSession,
       changePassword,
+      updateUser,
     }),
-    [status, accessToken, user, login, logout, refreshSession, changePassword],
+    [status, accessToken, user, login, logout, refreshSession, changePassword, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

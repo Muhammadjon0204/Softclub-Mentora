@@ -50,10 +50,21 @@ public sealed class OutboxWriter(
         var now = clock.UtcNow;
         var payload = await NotificationPayloadEnricher.EnrichAsync(dbContext, entry, now, cancellationToken);
 
-        var telegramBound = policy is not ChannelPolicy.EmailOnly
-                            && await HasTelegramAsync(entry.RecipientUserId, cancellationToken);
+        var recipient = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == entry.RecipientUserId, cancellationToken);
 
-        foreach (var channel in ResolveChannels(policy, telegramBound, entry.EventType))
+        var telegramBound = policy is not ChannelPolicy.EmailOnly && recipient?.TelegramChatId is not null;
+
+        var channels = ResolveChannels(policy, telegramBound, entry.EventType).ToList();
+
+        if (recipient is not null && NotificationTopics.For(entry.EventType) is { } topic)
+        {
+            channels = ApplyPreferences(channels, policy, topic, recipient);
+        }
+
+        foreach (var channel in channels)
         {
             var key = DeduplicationKey.Build(
                 organizationId,
@@ -159,9 +170,32 @@ public sealed class OutboxWriter(
         }
     }
 
-    private Task<bool> HasTelegramAsync(Guid userId, CancellationToken cancellationToken) =>
-        dbContext.Users
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .AnyAsync(u => u.Id == userId && u.TelegramChatId != null, cancellationToken);
+    /// <summary>
+    /// Drops the channels the recipient switched off on their profile page.
+    /// </summary>
+    /// <remarks>
+    /// <c>TelegramPreferred</c> keeps its promise of reaching the person: if they turned the Telegram
+    /// copy off but still want email, the message goes by mail instead of vanishing. Switching both
+    /// off is an explicit choice and is honoured. Events without a topic never reach this method —
+    /// see <see cref="NotificationTopics.For"/>.
+    /// </remarks>
+    private static List<NotificationChannel> ApplyPreferences(
+        List<NotificationChannel> channels,
+        ChannelPolicy policy,
+        NotificationTopic topic,
+        Domain.Users.User recipient)
+    {
+        var kept = channels.Where(channel => recipient.WantsNotification(topic, channel)).ToList();
+
+        if (policy is ChannelPolicy.TelegramPreferred
+            && channels.Contains(NotificationChannel.Telegram)
+            && !kept.Contains(NotificationChannel.Telegram)
+            && !kept.Contains(NotificationChannel.Email)
+            && recipient.WantsNotification(topic, NotificationChannel.Email))
+        {
+            kept.Add(NotificationChannel.Email);
+        }
+
+        return kept;
+    }
 }
