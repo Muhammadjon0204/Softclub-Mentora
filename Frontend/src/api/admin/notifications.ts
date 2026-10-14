@@ -52,3 +52,9 @@ export async function listNotifications(query: NotificationListQuery = {}): Prom
   });
   return data;
 }
+
+/** POST /admin/notifications/{id}/retry — только из `DeadLetter`; счётчик попыток начинается заново. */
+export async function retryNotification(id: string): Promise<NotificationDto> {
+  const { data } = await apiClient.post<NotificationDto>(`/api/v1/admin/notifications/${id}/retry`);
+  return data;
+}

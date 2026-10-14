@@ -11,7 +11,8 @@ interface BestBranchCardProps {
   insight: BestBranchInsight;
 }
 
-const SCORE_TOOLTIP = 'Preview-индекс: завершение, соблюдение сроков и одобрение с первой попытки. Не официальный продуктовый KPI.';
+const SCORE_TOOLTIP =
+  'Оценка за период из 100: 40% — доля одобренных заданий, 35% — доля сданных в срок, 25% — доля принятых с первой попытки (пока одобренных нет, этот вес делится между первыми двумя). Отменённые и черновики не учитываются.';
 
 /**
  * «Лучший филиал» (все филиалы) vs «Результат филиала» (выбран один филиал /
@@ -68,9 +69,9 @@ export function BestBranchCard({ insight }: BestBranchCardProps): JSX.Element {
 
       <div className="mt-2.5">
         <Tooltip content={SCORE_TOOLTIP}>
-          <span className="inline-flex items-center gap-1 text-[11px] text-ink-muted">
-            <HelpCircle className="h-3 w-3" aria-hidden="true" />
-            Индекс эффективности — preview-показатель
+          <span tabIndex={0} className="inline-flex cursor-help items-center gap-1 rounded text-[11.5px] text-ink-muted hover:text-ink-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
+            <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+            Как считается оценка
           </span>
         </Tooltip>
       </div>

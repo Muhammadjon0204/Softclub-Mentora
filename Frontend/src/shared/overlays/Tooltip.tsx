@@ -13,6 +13,8 @@ export interface TooltipProps {
   placement?: FloatingPlacement;
   /** Не показывать вовсе — например, когда текст не обрезан и подсказка не нужна. */
   disabled?: boolean;
+  /** Классы обёртки-триггера (по умолчанию `inline-flex`) — например, `flex w-full min-w-0` для обрезаемых плашек. */
+  wrapperClassName?: string;
 }
 
 const OPEN_DELAY_MS = 350;
@@ -26,7 +28,7 @@ const OFFSET = 8;
  * none, hover+focus, задержка открытия/закрытия (раздел 19 промпта). Не путать
  * с `ChartTooltipPortal` — у графиков своя специализированная mouse-driven логика.
  */
-export function Tooltip({ content, children, placement = 'top', disabled = false }: TooltipProps): JSX.Element {
+export function Tooltip({ content, children, placement = 'top', disabled = false, wrapperClassName = 'inline-flex' }: TooltipProps): JSX.Element {
   const [open, setOpen] = useState(false);
   const openTimeoutRef = useRef<number | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
@@ -101,7 +103,7 @@ export function Tooltip({ content, children, placement = 'top', disabled = false
   return (
     <span
       ref={wrapperRef}
-      className="relative inline-flex"
+      className={`relative ${wrapperClassName}`}
       onMouseEnter={scheduleOpen}
       onMouseLeave={scheduleClose}
       onFocus={scheduleOpen}

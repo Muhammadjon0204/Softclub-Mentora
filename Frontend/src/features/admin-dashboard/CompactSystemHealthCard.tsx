@@ -3,16 +3,18 @@ import { Link } from 'react-router-dom';
 import type { ServiceHealthDto } from '../../api/admin/dashboard';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { DashboardCardFooterLink } from './DashboardCardFooterLink';
-import { relativeTimeLabel } from './dashboardFormatters';
+import { isNotConfigured, relativeTimeLabel } from './dashboardFormatters';
 import { InsightCard } from './InsightCard';
 
 interface CompactSystemHealthCardProps {
   services: ServiceHealthDto[];
 }
 
+const NOT_CONFIGURED_META = { dot: 'bg-ink-disabled', text: 'text-ink-muted', label: 'Не настроен' };
+
 const STATUS_META: Record<ServiceHealthDto['status'], { dot: string; text: string; label: string }> = {
   Operational: { dot: 'bg-success', text: 'text-success', label: 'Работает' },
-  Degraded: { dot: 'bg-warning', text: 'text-warning', label: 'Деградация' },
+  Degraded: { dot: 'bg-warning', text: 'text-warning', label: 'Ограничено' },
   Unavailable: { dot: 'bg-danger', text: 'text-danger', label: 'Недоступен' },
 };
 
@@ -23,7 +25,7 @@ const STATUS_META: Record<ServiceHealthDto['status'], { dot: string; text: strin
  * карточками ряда (раздел 19 полироли).
  */
 export function CompactSystemHealthCard({ services }: CompactSystemHealthCardProps): JSX.Element {
-  const allOperational = services.every((s) => s.status === 'Operational');
+  const allOperational = services.every((s) => s.status === 'Operational' || isNotConfigured(s));
 
   return (
     <InsightCard
@@ -33,7 +35,7 @@ export function CompactSystemHealthCard({ services }: CompactSystemHealthCardPro
     >
       <ul className="flex h-full flex-col justify-start">
         {services.map((service, index) => {
-          const meta = STATUS_META[service.status];
+          const meta = isNotConfigured(service) ? NOT_CONFIGURED_META : STATUS_META[service.status];
           const tooltip = `Проверено: ${relativeTimeLabel(service.lastCheckedAt)} · Задержка: ${service.latencyMs} мс`;
           return (
             <li key={service.id} className={index === services.length - 1 ? '' : 'border-b border-divider'}>

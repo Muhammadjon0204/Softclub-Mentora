@@ -82,7 +82,9 @@ export function PreviewSelect({ label, value, onChange, options, width = 'md', c
   );
 }
 
-export function PreviewResetButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }): JSX.Element {
+/** Появляется только когда есть что сбрасывать (`disabled` = фильтры не выбраны). */
+export function PreviewResetButton({ onClick, disabled = false }: { onClick: () => void; disabled?: boolean }): JSX.Element | null {
+  if (disabled) return null;
   return (
     <button
       type="button"

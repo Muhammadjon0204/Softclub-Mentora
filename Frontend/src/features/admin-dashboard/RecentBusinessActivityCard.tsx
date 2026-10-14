@@ -26,7 +26,7 @@ export function RecentBusinessActivityCard({ auditEntries, assignmentEntries }: 
     <Card padded={false} className="flex h-full flex-col">
       <div className="border-b border-divider px-4 py-3.5">
         <h3 className="text-[14px] font-semibold leading-5 text-ink">Последняя активность</h3>
-        <p className="mt-0.5 text-[12px] text-ink-muted">Последние действия и события платформы</p>
+        <p className="mt-0.5 text-[12px] text-ink-muted">Рабочие действия: задания, люди, филиалы</p>
       </div>
 
       <div className="flex-1">

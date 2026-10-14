@@ -1,6 +1,5 @@
-import { Plus, ShieldCheck, UserCheck, Users as UsersIcon } from 'lucide-react';
+import { GraduationCap, Plus, ShieldCheck, UserCheck, Users as UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis } from 'recharts';
 import { useSearchParams } from 'react-router-dom';
 
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
@@ -270,37 +269,17 @@ export function UsersPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Всего" value={String(summary.total)} />
-        <PreviewMetricCard icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />} label="Администраторы" value={String(summary.admins)} />
-        <div className="h-full" title="Руководители направлений">
-          <PreviewMetricCard icon={<UserCheck className="h-5 w-5" aria-hidden="true" />} label="Руководители" value={String(summary.leads)} />
-        </div>
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Менторы" value={String(summary.mentors)} />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <PreviewMetricCard
+          icon={<UsersIcon />}
+          label="Всего пользователей"
+          value={String(summary.total)}
+          hint={<span className={newThisWeek > 0 ? 'font-medium text-success' : undefined}>+{newThisWeek} за неделю</span>}
+        />
+        <PreviewMetricCard icon={<ShieldCheck />} label="Администраторы" value={String(summary.admins)} onClick={() => { setRole(role === 'BranchAdmin' ? 'all' : 'BranchAdmin'); }} active={role === 'BranchAdmin'} />
+        <PreviewMetricCard icon={<UserCheck />} label="Руководители" value={String(summary.leads)} onClick={() => { setRole(role === 'Lead' ? 'all' : 'Lead'); }} active={role === 'Lead'} />
+        <PreviewMetricCard icon={<GraduationCap />} label="Менторы" value={String(summary.mentors)} onClick={() => { setRole(role === 'Mentor' ? 'all' : 'Mentor'); }} active={role === 'Mentor'} />
       </div>
-
-      <Card padded={false} className="min-w-0">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider px-5 py-3 sm:px-6">
-          <div>
-            <h2 className="text-[14px] font-semibold leading-5 text-ink">Новые пользователи</h2>
-            <p className="text-[12px] leading-4 text-ink-muted">За последние 30 дней</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[18px] font-bold leading-6 text-ink tabular-nums">+{newThisWeek}</p>
-            <p className="text-[11px] leading-4 text-ink-muted">на этой неделе</p>
-          </div>
-        </div>
-        <div className="px-2 pb-3 pt-2 sm:px-3" style={{ height: 116 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={newUsersSeries} margin={{ top: 6, right: 12, bottom: 0, left: 4 }}>
-              <CartesianGrid vertical={false} stroke="var(--divider)" />
-              <XAxis dataKey="label" tick={{ fill: 'var(--text-secondary)', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <RechartsTooltip contentStyle={{ borderRadius: 10, border: '1px solid var(--border)', boxShadow: '0 4px 10px rgba(16,24,40,0.08)', fontSize: 12 }} />
-              <Area type="monotone" dataKey="value" stroke="var(--primary)" strokeWidth={2} fill="var(--primary)" fillOpacity={0.05} dot={false} activeDot={{ r: 3 }} isAnimationActive={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>

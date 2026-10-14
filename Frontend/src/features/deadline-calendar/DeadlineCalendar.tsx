@@ -1,8 +1,10 @@
 import { CalendarCheck2, CalendarClock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 import type { AssignmentDto } from '../../api/lead/assignments';
+import { Tooltip } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import {
@@ -35,6 +37,10 @@ export interface DeadlineCalendarProps {
   toEvent: (dto: AssignmentDto) => CalendarEvent;
   /** Подсказка для пустого «Ближайшие», своя у каждой роли. */
   emptyUpcomingHint: string;
+  /** Какие события показывать (фильтры над календарём); по умолчанию — все. */
+  filter?: (event: CalendarEvent) => boolean;
+  /** Панель фильтров над сеткой. */
+  toolbar?: ReactNode;
 }
 
 function pluralDeadlines(count: number): string {
@@ -66,7 +72,7 @@ function dayHeading(key: string): { weekday: string; date: string } {
  * Пустой месяц — всё тот же аккуратный календарь: сетка, сегодняшний день, спокойные
  * подсказки в боковых панелях вместо заглушки во весь экран.
  */
-export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingHint }: DeadlineCalendarProps): JSX.Element {
+export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingHint, filter, toolbar }: DeadlineCalendarProps): JSX.Element {
   const now = useNow(60_000);
   const todayKey = dayKeyOf(now, timeZoneId);
 
@@ -85,7 +91,7 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
   const hourStart = Math.floor(now / 3_600_000) * 3_600_000;
   const upcomingQuery = useCalendarDeadlines(scopeKey, hourStart, hourStart + UPCOMING_WINDOW_MS, { maxItems: 24 });
 
-  const events = useMemo(() => month.items.map(toEvent), [month.items, toEvent]);
+  const events = useMemo(() => month.items.map(toEvent).filter((event) => filter?.(event) ?? true), [month.items, toEvent, filter]);
 
   const byDay = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
@@ -99,8 +105,12 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
   }, [events, timeZoneId]);
 
   const upcoming = useMemo(
-    () => upcomingQuery.items.map(toEvent).filter((event) => event.tone !== 'done' && event.dueAtMs >= now).slice(0, UPCOMING_LIMIT),
-    [upcomingQuery.items, toEvent, now],
+    () =>
+      upcomingQuery.items
+        .map(toEvent)
+        .filter((event) => event.tone !== 'done' && event.dueAtMs >= now && (filter?.(event) ?? true))
+        .slice(0, UPCOMING_LIMIT),
+    [upcomingQuery.items, toEvent, now, filter],
   );
 
   const cells = useMemo(() => monthGrid(visible.year, visible.month), [visible]);
@@ -165,6 +175,8 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
           </div>
         </div>
 
+        {toolbar !== undefined ? <div className="flex flex-wrap items-center gap-2 border-b border-divider px-5 py-3 sm:px-6">{toolbar}</div> : null}
+
         {month.error ? (
           <div className="border-b border-divider p-5">
             <ErrorState error={month.error} title="Не удалось загрузить дедлайны" />
@@ -205,14 +217,23 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
                       ? 'border-brand bg-brand-soft shadow-surface'
                       : isToday
                         ? 'border-brand-soft-hover bg-surface'
-                        : 'border-transparent hover:border-line hover:bg-surface-muted',
-                    cell.inMonth ? '' : 'opacity-40',
+                        : cell.inMonth
+                          ? 'border-transparent hover:border-line hover:bg-surface-muted'
+                          : 'border-transparent bg-surface-muted hover:border-line',
                   ].join(' ')}
                 >
                   <span
                     className={[
                       'grid h-7 w-7 place-items-center rounded-full text-[13px] tabular-nums transition',
-                      isToday ? 'bg-brand font-semibold text-white shadow-[0_4px_12px_-4px_var(--primary)]' : isSelected ? 'font-semibold text-brand-active' : isWeekend ? 'text-ink-disabled group-hover:text-ink' : 'text-ink-secondary group-hover:text-ink',
+                      isToday
+                        ? 'bg-brand font-semibold text-white shadow-[0_4px_12px_-4px_var(--primary)]'
+                        : isSelected
+                          ? 'font-semibold text-brand-active'
+                          : !cell.inMonth
+                            ? 'text-ink-disabled opacity-60'
+                            : isWeekend
+                              ? 'text-ink-muted group-hover:text-ink'
+                              : 'text-ink-secondary group-hover:text-ink',
                     ].join(' ')}
                   >
                     {cell.day}
@@ -226,16 +247,17 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
                           <span key={event.id} className={`h-1.5 w-1.5 rounded-full ${TONE_CLASSES[event.tone].dot}`} />
                         ))}
                       </span>
-                      <span className="hidden min-w-0 flex-col gap-1 sm:flex" aria-hidden="true">
+                      <span className={`hidden min-w-0 flex-col gap-1 sm:flex ${cell.inMonth ? '' : 'opacity-60'}`}>
                         {dayEvents.slice(0, CHIPS_PER_CELL).map((event) => (
-                          <span
-                            key={event.id}
-                            className={`flex min-w-0 items-stretch gap-1.5 rounded-md py-[3px] pl-1 pr-1.5 text-[11px] font-medium leading-4 transition ${TONE_CLASSES[event.tone].chip} ${TONE_CLASSES[event.tone].text}`}
-                          >
-                            <span className={`w-[3px] shrink-0 rounded-full ${TONE_CLASSES[event.tone].dot}`} />
-                            {event.person !== null ? <span className="shrink-0 font-semibold opacity-70">{initialsOf(event.person)}</span> : null}
-                            <span className="truncate">{event.title}</span>
-                          </span>
+                          <Tooltip key={event.id} content={<EventPreview event={event} timeZoneId={timeZoneId} />} wrapperClassName="flex w-full min-w-0">
+                            <span
+                              className={`flex w-full min-w-0 items-stretch gap-1.5 rounded-md py-[3px] pl-1 pr-1.5 text-[11px] font-medium leading-4 transition ${TONE_CLASSES[event.tone].chip} ${TONE_CLASSES[event.tone].text}`}
+                            >
+                              <span className={`w-[3px] shrink-0 rounded-full ${TONE_CLASSES[event.tone].dot}`} aria-hidden="true" />
+                              {event.person !== null ? <span className="shrink-0 font-semibold opacity-70" aria-hidden="true">{initialsOf(event.person)}</span> : null}
+                              <span className="truncate">{event.title}</span>
+                            </span>
+                          </Tooltip>
                         ))}
                         {extra > 0 ? <span className="px-1.5 text-[11px] font-medium text-ink-muted">ещё {extra}</span> : null}
                       </span>
@@ -299,6 +321,21 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
         </Card>
       </div>
     </div>
+  );
+}
+
+/** Содержимое всплывающей подсказки над плашкой: полное название, кто, где и точное время. */
+function EventPreview({ event, timeZoneId }: { event: CalendarEvent; timeZoneId: string }): JSX.Element {
+  const { month, day } = zonedParts(event.dueAtMs, timeZoneId);
+  return (
+    <span className="block min-w-[180px] text-left">
+      <span className="block text-[12.5px] font-semibold leading-4">{event.title}</span>
+      {event.person !== null ? <span className="mt-1 block text-white/80">{event.person}</span> : null}
+      {event.context !== null ? <span className="block text-white/70">{event.context}</span> : null}
+      <span className="mt-1 block text-white/80">
+        Дедлайн: {day} {MONTH_NAMES_GENITIVE_RU[month - 1]}, {formatTime(event.dueAtMs, timeZoneId)} · {TONE_LABEL[event.tone]}
+      </span>
+    </span>
   );
 }
 
