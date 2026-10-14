@@ -38,7 +38,7 @@ const DRAWER_SIZE_CLASSES: Record<DrawerSize, string> = {
   xl: 'sm:w-[min(740px,calc(100vw-24px))]',
 };
 
-const EXIT_MS = 180;
+const EXIT_MS = 200;
 
 /**
  * Единый правосторонний Drawer для создания/редактирования/просмотра деталей.
@@ -99,7 +99,7 @@ export function Drawer({
         <div
           role="presentation"
           onClick={handleBackdropClick}
-          className={`absolute inset-0 bg-[rgba(15,23,42,0.36)] backdrop-blur-[1.5px] transition-opacity motion-reduce:transition-none ${
+          className={`absolute inset-0 bg-[rgba(15,23,42,0.24)] backdrop-blur-[2px] transition-opacity duration-300 motion-reduce:transition-none ${
             visible ? 'duration-[170ms] ease-out opacity-100' : 'duration-150 ease-in opacity-0'
           }`}
         />
@@ -115,8 +115,8 @@ export function Drawer({
           }}
           className={`absolute inset-y-0 right-0 flex h-[100dvh] w-screen flex-col border-l border-line bg-surface shadow-[0_4px_10px_rgba(16,24,40,0.05),0_24px_60px_rgba(20,28,58,0.14)] transition-[opacity,transform] motion-reduce:transition-none motion-reduce:transform-none sm:rounded-l-[18px] ${
             visible
-              ? 'duration-[220ms] ease-out opacity-100 translate-x-0'
-              : 'duration-[180ms] ease-in opacity-[0.98] translate-x-5'
+              ? 'duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] opacity-100 translate-x-0'
+              : 'duration-[200ms] ease-in opacity-100 translate-x-full'
           } ${DRAWER_SIZE_CLASSES[size]} ${className}`}
         >
           <DrawerHeader

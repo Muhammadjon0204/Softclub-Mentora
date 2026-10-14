@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { PageTransition } from '../shared/ui/motion';
 
 import { OfflineBanner } from '../components/OfflineBanner';
 import { AdminSidebar } from '../components/admin/AdminSidebar';
@@ -18,6 +19,7 @@ registerBranchHeaderInterceptor();
  * компонентов.
  */
 export function AdminLayout(): JSX.Element {
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -60,7 +62,9 @@ export function AdminLayout(): JSX.Element {
           </div>
           <main className="flex-1 overflow-y-auto print:overflow-visible">
             <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-              <Outlet />
+              <PageTransition key={location.pathname}>
+                <Outlet />
+              </PageTransition>
             </div>
           </main>
         </div>

@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Tags, TriangleAlert, UserCheck, Users as UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -28,6 +29,9 @@ import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Tooltip } from '../../shared/ui/Tooltip';
+import { StaggerContainer } from '../../shared/ui/motion';
+import { AnimatedBar } from '../../shared/ui/motion';
+import { SPRING_ITEM, STAGGER_LIMIT } from '../../shared/ui/motionTokens';
 
 const LEAD_OPTIONS = [
   { value: 'all', label: 'Все руководители' },
@@ -113,7 +117,7 @@ export function CategoriesPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<Tags />} label="Всего направлений" value={String(scopedCategories.length)} />
         <PreviewMetricCard icon={<UserCheck />} label="С руководителем" value={String(withLead)} />
         <PreviewMetricCard icon={<UsersIcon />} label="Менторы" value={String(totalMentors)} />
@@ -126,7 +130,7 @@ export function CategoriesPage(): JSX.Element {
           onClick={needsAttention > 0 ? () => { setLeadFilter(leadFilter === 'unassigned' ? 'all' : 'unassigned'); } : undefined}
           active={leadFilter === 'unassigned'}
         />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false}>
         <PreviewToolbar>
@@ -159,13 +163,19 @@ export function CategoriesPage(): JSX.Element {
           </div>
         ) : (
         <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-2">
-          {cards.map((category) => {
+          <AnimatePresence mode="popLayout" initial={false}>
+          {cards.map((category, cardIndex) => {
             const isUnassigned = category.leadName === null;
             const s = stats.byCategory.get(category.id);
             const efficiency = s?.completionPct ?? null;
             return (
-              <div
+              <motion.div
                 key={category.id}
+                layout
+                initial={{ opacity: 0, y: 14, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.94 }}
+                transition={{ ...SPRING_ITEM, delay: cardIndex < STAGGER_LIMIT ? cardIndex * 0.045 : 0 }}
                 ref={(node) => {
                   if (node) cardRefs.current.set(category.id, node);
                   else cardRefs.current.delete(category.id);
@@ -251,12 +261,13 @@ export function CategoriesPage(): JSX.Element {
                     )}
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${String(efficiency ?? 0)}%` }} />
+                    <AnimatedBar percent={efficiency ?? 0} className="rounded-full bg-brand" />
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
+          </AnimatePresence>
         </div>
         )}
       </Card>

@@ -19,6 +19,7 @@ import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -153,7 +154,7 @@ export function NotificationsPage(): JSX.Element {
     <div className="space-y-6">
       <PreviewPageHeader title="Уведомления" subtitle="Кому и что отправлено в Telegram и на почту, и дошло ли" />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<Bell />} label="Всего" value={String(query.data?.totalCount ?? 0)} />
         <PreviewMetricCard icon={<Clock3 />} label="В очереди" value={String(countOf('Pending'))} onClick={toggleStatus('Pending')} active={status === 'Pending'} />
         <PreviewMetricCard icon={<CheckCircle2 />} label="Отправлены" value={String(countOf('Sent'))} tone="success" onClick={toggleStatus('Sent')} active={status === 'Sent'} />
@@ -166,7 +167,7 @@ export function NotificationsPage(): JSX.Element {
           onClick={toggleStatus('DeadLetter')}
           active={status === 'DeadLetter'}
         />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>

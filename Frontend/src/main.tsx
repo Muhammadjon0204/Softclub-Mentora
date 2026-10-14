@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'framer-motion';
 
 import { AuthProvider } from './auth/AuthProvider';
 import { RealtimeSync } from './realtime/RealtimeSync';
@@ -32,11 +33,14 @@ createRoot(container).render(
       <BrowserRouter>
         <AuthProvider>
           <RealtimeSync />
-          <OverlayProvider>
-            <ToastProvider>
-              <AppRouter />
-            </ToastProvider>
-          </OverlayProvider>
+          {/* reducedMotion="user": при prefers-reduced-motion движение гасится, остаётся только opacity. */}
+          <MotionConfig reducedMotion="user">
+            <OverlayProvider>
+              <ToastProvider>
+                <AppRouter />
+              </ToastProvider>
+            </OverlayProvider>
+          </MotionConfig>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>

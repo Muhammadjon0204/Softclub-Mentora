@@ -31,6 +31,7 @@ import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useToast } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 const ROLE_OPTIONS = [
   { value: 'all', label: 'Все роли' },
@@ -269,7 +270,7 @@ export function UsersPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard
           icon={<UsersIcon />}
           label="Всего пользователей"
@@ -279,7 +280,7 @@ export function UsersPage(): JSX.Element {
         <PreviewMetricCard icon={<ShieldCheck />} label="Администраторы" value={String(summary.admins)} onClick={() => { setRole(role === 'BranchAdmin' ? 'all' : 'BranchAdmin'); }} active={role === 'BranchAdmin'} />
         <PreviewMetricCard icon={<UserCheck />} label="Руководители" value={String(summary.leads)} onClick={() => { setRole(role === 'Lead' ? 'all' : 'Lead'); }} active={role === 'Lead'} />
         <PreviewMetricCard icon={<GraduationCap />} label="Менторы" value={String(summary.mentors)} onClick={() => { setRole(role === 'Mentor' ? 'all' : 'Mentor'); }} active={role === 'Mentor'} />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
         <PreviewToolbar>

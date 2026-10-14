@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ROLE_LABEL } from '../../mocks/ui-preview/users.preview';
 import { branchDisplayName, emptyOrValue, NOTIFICATION_LANGUAGE_LABEL, ROLE_ICON, ROLE_TONE, STATUS_META } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
+import { UserWorkStats } from './UserWorkStats';
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 
 function initialsOf(fullName: string): string {
@@ -77,6 +78,8 @@ export function UserOverviewSection({ user }: { user: PreviewUserDetails }): JSX
           <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
       </div>
+
+      <UserWorkStats user={user} />
 
       <dl className="divide-y divide-divider px-0.5">
         {rows.map((row) => (

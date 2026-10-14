@@ -27,6 +27,8 @@ import { StatusDot } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
+import { AnimatedBar } from '../../shared/ui/motion';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Все статусы' },
@@ -52,7 +54,7 @@ function HealthValue({ value, hasWork }: { value: number; hasWork: boolean }): J
     <div>
       <span className={`text-[13.5px] font-semibold tabular-nums ${tone.text}`}>{value}%</span>
       <div className="mt-1 h-[3px] w-9 overflow-hidden rounded-full bg-surface-muted">
-        <div className={`h-full rounded-full ${tone.bar}`} style={{ width: `${value}%` }} />
+        <AnimatedBar percent={value} className={`rounded-full ${tone.bar}`} />
       </div>
     </div>
   );
@@ -204,7 +206,7 @@ export function BranchesPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<Building2 />} label="Всего филиалов" value={String(scopedBranches.length)} />
         <PreviewMetricCard icon={<Power />} label="Активные" value={String(activeCount)} />
         <PreviewMetricCard icon={<Tags />} label="Направления" value={String(totalCategories)} />
@@ -217,7 +219,7 @@ export function BranchesPage(): JSX.Element {
           onClick={withoutAdmin > 0 ? () => { setOnlyWithoutAdmin((prev) => !prev); setStatus('all'); } : undefined}
           active={onlyWithoutAdmin}
         />
-      </div>
+      </StaggerContainer>
 
       <div className={`grid grid-cols-1 items-start gap-4 ${isOrgAdmin ? 'min-[1600px]:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
         <Card padded={false} className="min-w-0">
@@ -352,7 +354,7 @@ export function BranchesPage(): JSX.Element {
                       </span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-muted">
-                      <div className="h-full rounded-full bg-brand" style={{ width: `${entry.pct}%` }} />
+                      <AnimatedBar percent={entry.pct} className="rounded-full bg-brand" />
                     </div>
                   </div>
                 </li>

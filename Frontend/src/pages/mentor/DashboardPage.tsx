@@ -7,6 +7,7 @@ import { AttentionRequiredCard } from '../../features/mentor-dashboard/Attention
 import { RecentActivityCard } from '../../features/mentor-dashboard/RecentActivityCard';
 import { useMentorDashboard } from '../../features/mentor-dashboard/useMentorDashboard';
 import { useMentorScope } from '../../features/mentor/scope/useMentorScope';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 function currentHourInTimeZone(timeZoneId: string): number {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: timeZoneId, hour: 'numeric', hour12: false }).formatToParts(new Date());
@@ -44,13 +45,13 @@ export function DashboardPage(): JSX.Element {
     <div className="space-y-5">
       <PreviewPageHeader title="Обзор" subtitle={`${greeting} — вот что происходит с вашими заданиями.`} />
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+      <StaggerContainer className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
         <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные задания" value={String(kpis.activeAssignments)} />
         <PreviewMetricCard icon={<ClipboardCheck className="h-5 w-5" aria-hidden="true" />} label="На проверке" value={String(kpis.awaitingReview)} />
         <PreviewMetricCard icon={<Wrench className="h-5 w-5" aria-hidden="true" />} label="На доработке" value={String(kpis.rework)} tone={kpis.rework > 0 ? 'warning' : 'default'} />
         <PreviewMetricCard icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />} label="Просрочено" value={String(kpis.overdue)} tone={kpis.overdue > 0 ? 'warning' : 'default'} />
         <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Принято за 30 дней" value={String(kpis.approvedPeriod)} />
-      </div>
+      </StaggerContainer>
 
       {/* Десктоп: слева лента событий на всю высоту, справа «Требует внимания» и под ним трекер.
           Телефон: трекер → лента → «Требует внимания». Порядок задают order-* на одной сетке,

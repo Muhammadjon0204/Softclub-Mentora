@@ -1,10 +1,12 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutGroup } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 
 import { BrandLogo } from '../../shared/branding/BrandLogo';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { useMentorNavBadges } from './useMentorNavBadges';
 import { MENTOR_NAV_ITEMS } from './navConfig';
+import { NavActivePill } from '../../shared/ui/motion';
 
 interface MentorSidebarProps {
   collapsed: boolean;
@@ -60,6 +62,7 @@ export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop'
         ) : null}
       </div>
 
+      <LayoutGroup id={`nav-${variant}`}>
       <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
           {MENTOR_NAV_ITEMS.map((item) => {
@@ -71,28 +74,33 @@ export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop'
                 to={item.path}
                 onClick={onNavigate}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition ${isCollapsed ? 'justify-center px-0' : ''} ${
-                    isActive ? 'bg-brand-soft text-brand' : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
+                  `relative isolate flex items-center gap-3 rounded-control px-3 py-2.5 text-sm font-medium transition-colors ${isCollapsed ? 'justify-center px-0' : ''} ${
+                    isActive ? 'text-brand' : 'text-ink-secondary hover:bg-surface-hover hover:text-ink'
                   }`
                 }
                 end
               >
-                <span className="relative flex shrink-0 items-center">
-                  <Icon className="h-[19px] w-[19px]" aria-hidden="true" />
-                  {isCollapsed && badgeCount > 0 ? (
-                    <span aria-hidden="true" className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-brand" />
-                  ) : null}
-                </span>
-                {!isCollapsed ? (
-                  <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    {badgeCount > 0 ? (
-                      <span className="shrink-0 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums text-brand">
-                        {badgeCount}
-                      </span>
+                {({ isActive }) => (
+                  <>
+                    {isActive ? <NavActivePill /> : null}
+                  <span className="relative flex shrink-0 items-center">
+                    <Icon className="h-[19px] w-[19px]" aria-hidden="true" />
+                    {isCollapsed && badgeCount > 0 ? (
+                      <span aria-hidden="true" className="absolute -right-1 -top-1 h-1.5 w-1.5 rounded-full bg-brand" />
                     ) : null}
                   </span>
-                ) : null}
+                  {!isCollapsed ? (
+                    <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                      <span className="whitespace-nowrap">{item.label}</span>
+                      {badgeCount > 0 ? (
+                        <span className="shrink-0 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums text-brand">
+                          {badgeCount}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                  </>
+                )}
               </NavLink>
             );
 
@@ -100,6 +108,7 @@ export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop'
           })}
         </ul>
       </nav>
+      </LayoutGroup>
     </div>
   );
 }

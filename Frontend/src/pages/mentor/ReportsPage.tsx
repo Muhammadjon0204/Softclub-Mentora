@@ -10,6 +10,7 @@ import type { ReportsFilters } from '../../features/mentor-reports/useMentorRepo
 import { useMentorScope } from '../../features/mentor/scope/useMentorScope';
 import { Card } from '../../shared/ui/Card';
 import { FormCheckbox } from '../../shared/ui/FormField';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 const PERIOD_OPTIONS = [
   { value: '7', label: '7 дней' },
@@ -54,12 +55,12 @@ export function ReportsPage(): JSX.Element {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Назначено за период" value={String(report.totalAssignments)} />
         <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Принято" value={String(report.approvedAssignments)} />
         <PreviewMetricCard icon={<Sparkles className="h-5 w-5" aria-hidden="true" />} label="С первой попытки" value={formatPercent(report.firstPassApprovalRate)} />
         <PreviewMetricCard icon={<TrendingUp className="h-5 w-5" aria-hidden="true" />} label="Доля просрочек" value={formatPercent(report.overdueRate)} tone={report.overdueRate !== null && report.overdueRate > 0 ? 'warning' : 'default'} />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false}>
         <div className="border-b border-divider px-5 py-4 sm:px-6">

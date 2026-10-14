@@ -18,6 +18,8 @@ import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
+import { StaggerContainer } from '../../shared/ui/motion';
+import { AnimatedBar } from '../../shared/ui/motion';
 
 const PERIOD_DAYS: Record<DashboardPeriod, number | null> = { all: null, '1m': 30, '3m': 90, '6m': 182, '1y': 365 };
 
@@ -127,7 +129,7 @@ export function ReportsPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<ClipboardList />} label="Заданий за период" value={String(totals.total)} hint={`${String(totals.active)} сейчас в работе`} />
         <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрено" value={String(totals.approved)} hint={totals.completionPct === null ? 'Нет заданий' : `${String(totals.completionPct)}% от назначенных`} tone="success" />
         <PreviewMetricCard
@@ -145,7 +147,7 @@ export function ReportsPage(): JSX.Element {
           tone={totals.overdue > 0 ? 'danger' : 'default'}
           to={totals.overdue > 0 ? '/admin/assignments?status=overdue' : undefined}
         />
-      </div>
+      </StaggerContainer>
 
       <Card padded={false} className="min-w-0">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider px-5 py-4 sm:px-6">
@@ -193,7 +195,7 @@ export function ReportsPage(): JSX.Element {
                       <span className="flex items-center gap-2">
                         <span className="w-9 shrink-0 tabular-nums text-ink">{row.stats.onTimePct}%</span>
                         <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-muted">
-                          <span className={`block h-full rounded-full ${row.stats.onTimePct >= 80 ? 'bg-success' : row.stats.onTimePct >= 50 ? 'bg-warning' : 'bg-danger'}`} style={{ width: `${String(row.stats.onTimePct)}%` }} />
+                          <AnimatedBar percent={row.stats.onTimePct} className={`rounded-full ${row.stats.onTimePct >= 80 ? 'bg-success' : row.stats.onTimePct >= 50 ? 'bg-warning' : 'bg-danger'}`} />
                         </span>
                       </span>
                     )}

@@ -6,6 +6,7 @@ import { Tooltip } from '../../shared/ui/Tooltip';
 import { DashboardCardFooterLink } from './DashboardCardFooterLink';
 import { formatBranchDisplayName } from './dashboardFormatters';
 import { InsightCard } from './InsightCard';
+import { AnimatedBar } from '../../shared/ui/motion';
 
 interface BestBranchCardProps {
   insight: BestBranchInsight;
@@ -57,7 +58,7 @@ export function BestBranchCard({ insight }: BestBranchCardProps): JSX.Element {
         </div>
 
         <div className="h-1 w-full overflow-hidden rounded-full bg-surface-muted">
-          <div className="h-full rounded-full bg-brand transition-[width] duration-[180ms] motion-reduce:transition-none" style={{ width: `${insight.performanceScore}%` }} />
+          <AnimatedBar percent={insight.performanceScore} className="rounded-full bg-brand" />
         </div>
       </Link>
 

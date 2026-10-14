@@ -8,6 +8,7 @@ import { TeamSummaryCard } from '../../features/lead-dashboard/TeamSummaryCard';
 import { useLeadDashboard } from '../../features/lead-dashboard/useLeadDashboard';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { ChartCard } from '../../shared/ui/ChartCard';
+import { StaggerContainer } from '../../shared/ui/motion';
 
 /**
  * `/lead/dashboard` (ТЗ 2.2, раздел 24.4) — operational-обзор направления:
@@ -26,13 +27,13 @@ export function DashboardPage(): JSX.Element {
         subtitle={`${scope.categoryName} · ${scope.branchDisplayName} — состояние заданий и команды за последние 30 дней`}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <StaggerContainer className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} label="Активные задания" value={String(kpis.active)} />
         <PreviewMetricCard icon={<Clock3 className="h-5 w-5" aria-hidden="true" />} label="Ожидают проверки" value={String(kpis.awaitingReview)} />
         <PreviewMetricCard icon={<Wrench className="h-5 w-5" aria-hidden="true" />} label="На доработке" value={String(kpis.rework)} />
         <PreviewMetricCard icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />} label="Просрочено" value={String(kpis.overdue)} tone="warning" />
         <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" aria-hidden="true" />} label="Одобрено за период" value={String(kpis.approvedPeriod)} />
-      </div>
+      </StaggerContainer>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
         <PriorityQueueCard items={priorityItems} />
