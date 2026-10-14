@@ -23,12 +23,12 @@ export function AdminLayout(): JSX.Element {
 
   return (
     <BranchProvider>
-      <div className="flex h-screen min-w-[360px] overflow-hidden bg-app">
+      <div className="flex h-screen min-w-[360px] overflow-hidden bg-app print:block print:h-auto print:overflow-visible print:bg-white">
         <OfflineBanner />
 
         {/* Desktop sidebar. */}
         <aside
-          className={`hidden shrink-0 border-r border-line transition-[width] duration-200 lg:block ${collapsed ? 'w-[76px]' : 'w-[280px]'}`}
+          className={`hidden shrink-0 border-r border-line transition-[width] duration-200 lg:block print:!hidden ${collapsed ? 'w-[76px]' : 'w-[280px]'}`}
         >
           <AdminSidebar collapsed={collapsed} onToggleCollapse={() => { setCollapsed((v) => !v); }} />
         </aside>
@@ -54,8 +54,11 @@ export function AdminLayout(): JSX.Element {
         ) : null}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <AdminTopbar onOpenMobileSidebar={() => { setMobileOpen(true); }} />
-          <main className="flex-1 overflow-y-auto">
+          {/* Печать (экспорт отчёта в PDF) — только содержимое страницы, без меню и шапки. */}
+          <div className="print:hidden">
+            <AdminTopbar onOpenMobileSidebar={() => { setMobileOpen(true); }} />
+          </div>
+          <main className="flex-1 overflow-y-auto print:overflow-visible">
             <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
               <Outlet />
             </div>

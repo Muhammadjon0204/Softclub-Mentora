@@ -125,9 +125,11 @@ export function useCategoriesQuery(): UseCategoriesQueryResult {
   const resolveBranchName = (branchId: string): string | null => branchNameById.get(branchId) ?? null;
 
   const users = usersQuery.data?.items ?? [];
-  const categories = (categoriesQuery.data?.items ?? []).map((dto) =>
-    toCategoryDetails(dto, resolveLeadInfo(dto.id, users), resolveBranchName),
-  );
+  // Тот же ключ кэша делит `useUsersQuery`, который грузит направления без `isActive` — поэтому
+  // фильтр повторяем здесь, иначе в список попадали бы и деактивированные.
+  const categories = (categoriesQuery.data?.items ?? [])
+    .filter((dto) => dto.isActive)
+    .map((dto) => toCategoryDetails(dto, resolveLeadInfo(dto.id, users), resolveBranchName));
 
   return {
     categories,

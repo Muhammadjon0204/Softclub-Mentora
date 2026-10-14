@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -19,11 +19,11 @@ interface AssignmentActivityChartProps {
   data: ActivityPoint[];
 }
 
-/** Просрочено — приглушённый amber, не ярко-красный (раздел 8 промпта). */
+/** Счётчики по дням дискретные (0, 1, 2…) — столбцы читаются точнее сглаженной линии. */
 const SERIES = [
   { key: 'approved', name: 'Одобрено', color: 'var(--success)' },
   { key: 'submitted', name: 'Отправлено', color: 'var(--primary)' },
-  { key: 'overdue', name: 'Просрочено', color: 'var(--warning)' },
+  { key: 'overdue', name: 'Просрочено', color: 'var(--danger)' },
 ] as const;
 
 interface LineTooltipItem {
@@ -106,7 +106,7 @@ function LineTooltipBridge({
   return null;
 }
 
-/** Тонкая горизонтальная сетка, без вертикальных линий, dot только на hover. */
+/** Сгруппированные столбцы по дням, тонкая горизонтальная сетка. */
 export function AssignmentActivityChart({ data }: AssignmentActivityChartProps): JSX.Element {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [state, setState] = useState<LineTooltipState>({ active: false, anchor: null, content: null });
@@ -140,7 +140,7 @@ export function AssignmentActivityChart({ data }: AssignmentActivityChartProps):
   return (
     <div ref={wrapperRef} className="relative">
       <ResponsiveContainer width="100%" height={230}>
-        <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+        <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }} barCategoryGap="28%" barGap={2}>
           <CartesianGrid stroke="var(--divider)" vertical={false} />
           <XAxis
             dataKey="dateLabel"
@@ -155,7 +155,7 @@ export function AssignmentActivityChart({ data }: AssignmentActivityChartProps):
             tickLine={false}
             width={28}
           />
-          <RechartsTooltip content={(props) => <LineTooltipBridge {...props} onChange={handleTooltipChange} />} />
+          <RechartsTooltip cursor={{ fill: 'var(--surface-hover)' }} content={(props) => <LineTooltipBridge {...props} onChange={handleTooltipChange} />} />
           <Legend
             verticalAlign="top"
             height={28}
@@ -164,19 +164,17 @@ export function AssignmentActivityChart({ data }: AssignmentActivityChartProps):
             wrapperStyle={{ fontSize: 12.5, color: 'var(--text-secondary)' }}
           />
           {SERIES.map((series) => (
-            <Line
+            <Bar
               key={series.key}
-              type="monotone"
               dataKey={series.key}
               name={series.name}
-              stroke={series.color}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
+              fill={series.color}
+              radius={[3, 3, 0, 0]}
+              maxBarSize={14}
               isAnimationActive={false}
             />
           ))}
-        </LineChart>
+        </BarChart>
       </ResponsiveContainer>
 
       <ChartTooltipPortal visible={state.active} anchor={viewportAnchor} strategy="cursor" onDismiss={handleDismiss}>

@@ -14,6 +14,8 @@ export interface CalendarEvent {
   dueAtMs: number;
   tone: DeadlineTone;
   href: string;
+  /** Для фильтра по направлению (Admin). */
+  categoryId?: string;
 }
 
 export type DeadlineTone = 'active' | 'review' | 'rework' | 'overdue' | 'done';

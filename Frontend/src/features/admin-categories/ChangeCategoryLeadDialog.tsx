@@ -115,7 +115,7 @@ export function ChangeCategoryLeadDialog({ category, open, onOpenChange, isSubmi
           ) : null}
 
           <ul className="space-y-1.5 text-[12px] leading-[17px] text-ink-secondary">
-            <li>· Новый руководитель получит роль Lead этого направления</li>
+            <li>· Новый руководитель станет руководителем этого направления</li>
             <li>· Активные сессии обоих пользователей будут завершены</li>
             <li>· Исторические записи сохраняются</li>
           </ul>

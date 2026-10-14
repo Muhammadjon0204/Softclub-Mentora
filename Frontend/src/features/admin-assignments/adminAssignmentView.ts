@@ -17,9 +17,9 @@ export const ASSIGNMENT_STATUS_LABEL: Record<string, string> = {
 export const ASSIGNMENT_STATUS_TONE: Record<string, BadgeTone> = {
   Draft: 'neutral',
   Suggested: 'info',
-  Assigned: 'neutral',
+  Assigned: 'brand',
   Submitted: 'info',
-  InReview: 'brand',
+  InReview: 'info',
   NeedsRework: 'warning',
   Overdue: 'danger',
   Approved: 'success',
@@ -29,11 +29,11 @@ export const ASSIGNMENT_STATUS_TONE: Record<string, BadgeTone> = {
 export const ACTIVE_STATUSES = ['Assigned', 'Submitted', 'InReview', 'NeedsRework', 'Overdue'];
 export const AWAITING_REVIEW_STATUSES = ['Submitted', 'InReview'];
 
-export type AssignmentFilter = 'all' | 'active' | 'review' | 'rework' | 'overdue' | 'approved' | 'cancelled';
+export type AssignmentFilter = 'all' | 'open' | 'review' | 'rework' | 'overdue' | 'approved' | 'cancelled';
 
 export const ASSIGNMENT_FILTERS: { id: AssignmentFilter; label: string; statuses: string[] | null }[] = [
   { id: 'all', label: 'Все', statuses: null },
-  { id: 'active', label: 'В работе', statuses: ['Assigned'] },
+  { id: 'open', label: 'Активные', statuses: ACTIVE_STATUSES },
   { id: 'review', label: 'На проверке', statuses: AWAITING_REVIEW_STATUSES },
   { id: 'rework', label: 'На доработке', statuses: ['NeedsRework'] },
   { id: 'overdue', label: 'Просрочены', statuses: ['Overdue'] },
@@ -80,4 +80,8 @@ export function formatShortDateTimeRu(iso: string): { date: string; time: string
     date: value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', ''),
     time: value.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false }),
   };
+}
+
+export function parseAssignmentFilter(value: string | null): AssignmentFilter {
+  return ASSIGNMENT_FILTERS.some((f) => f.id === value) ? (value as AssignmentFilter) : 'all';
 }

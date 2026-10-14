@@ -1,4 +1,4 @@
-import { Building2, Plus, Power, Users as UsersIcon } from 'lucide-react';
+import { Building2, Plus, Power, ShieldAlert, Tags, UserPlus } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -16,6 +16,9 @@ import { ChangeBranchAdminDialog } from '../../features/admin-branches/ChangeBra
 import { DeactivateBranchDialog } from '../../features/admin-branches/DeactivateBranchDialog';
 import { useBranchActions } from '../../features/admin-branches/useBranchActions';
 import { useUsersQuery } from '../../features/admin-users/useUsersQuery';
+import { ACTIVE_STATUSES } from '../../features/admin-assignments/adminAssignmentView';
+import { useAssignmentStats } from '../../features/admin-assignments/useAssignmentStats';
+import { useCategoriesQuery } from '../../features/admin-categories/useCategoriesQuery';
 import type { PreviewBranchDetails } from '../../features/admin-branches/branchPresentation';
 import { useBranchesQuery } from '../../features/admin-branches/useBranchesQuery';
 import { useAuth } from '../../auth/useAuth';
@@ -41,7 +44,9 @@ function formatStreet(address: string): string {
   return address.replace(/^г\.\s*[^,]+,\s*/, '');
 }
 
-function HealthValue({ value }: { value: number }): JSX.Element {
+/** Без активных заданий процент ничего не значит — серое «Нет данных», а не красные 0%. */
+function HealthValue({ value, hasWork }: { value: number; hasWork: boolean }): JSX.Element {
+  if (!hasWork) return <span className="text-[12.5px] text-ink-disabled">Нет данных</span>;
   const tone = healthToneClasses(value);
   return (
     <div>
@@ -88,13 +93,25 @@ export function BranchesPage(): JSX.Element {
     return map;
   }, [usersQuery.users]);
 
+  // `BranchDto` не несёт счётчиков — считаем их здесь из пользователей, направлений и заданий.
+  const { categories } = useCategoriesQuery();
+  const { items: assignments } = useAssignmentStats();
   const allBranches = useMemo(
     () =>
       branchesQuery.branches.map((branch) => {
         const admin = branchAdminByBranchId.get(branch.id);
-        return admin === undefined ? branch : { ...branch, adminUserId: admin.id, adminName: admin.fullName };
+        const active = assignments.filter((a) => a.branchId === branch.id && ACTIVE_STATUSES.includes(a.status));
+        const overdue = active.filter((a) => a.status === 'Overdue').length;
+        const counted = {
+          ...branch,
+          categoriesCount: categories.filter((c) => c.branchId === branch.id).length,
+          mentorsCount: usersQuery.users.filter((u) => u.role === 'Mentor' && u.status !== 'Deactivated' && u.branchId === branch.id).length,
+          activeAssignments: active.length,
+          healthPct: active.length === 0 ? 0 : Math.round(((active.length - overdue) / active.length) * 100),
+        };
+        return admin === undefined ? counted : { ...counted, adminUserId: admin.id, adminName: admin.fullName };
       }),
-    [branchesQuery.branches, branchAdminByBranchId],
+    [branchesQuery.branches, branchAdminByBranchId, categories, assignments, usersQuery.users],
   );
   // `PreviewBranch.name` — городское display-имя ("Худжанд"), а `authUser.branch.name` —
   // институциональное («Филиал Худжанд», см. branchDirectory.ts) — сравнивать нужно по `id`.
@@ -105,6 +122,7 @@ export function BranchesPage(): JSX.Element {
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('active');
+  const [onlyWithoutAdmin, setOnlyWithoutAdmin] = useState(false);
   const [formDrawer, setFormDrawer] = useState<BranchFormDrawerState | null>(null);
   const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
 
@@ -135,11 +153,12 @@ export function BranchesPage(): JSX.Element {
       if (query.length > 0 && !candidate.name.toLowerCase().includes(query) && !candidate.code.toLowerCase().includes(query)) return false;
       if (status === 'active' && !candidate.isActive) return false;
       if (status === 'inactive' && candidate.isActive) return false;
+      if (onlyWithoutAdmin && candidate.adminUserId !== null) return false;
       return true;
     });
-  }, [scopedBranches, search, status]);
+  }, [scopedBranches, search, status, onlyWithoutAdmin]);
 
-  const filtersActive = search.trim().length > 0 || status !== 'all';
+  const filtersActive = search.trim().length > 0 || status !== 'active' || onlyWithoutAdmin;
 
   const totalCategories = scopedBranches.reduce((sum, b) => sum + b.categoriesCount, 0);
   const activeCount = scopedBranches.filter((b) => b.isActive).length;
@@ -147,15 +166,17 @@ export function BranchesPage(): JSX.Element {
 
   const userDistribution = useMemo(() => {
     const counts = new Map<string, number>();
+    const nameById = new Map(allBranches.map((branch) => [branch.id, branch.name]));
     usersQuery.users.forEach((user) => {
-      if (user.status === 'Deactivated' || user.branchName.length === 0) return;
-      counts.set(user.branchName, (counts.get(user.branchName) ?? 0) + 1);
+      if (user.status === 'Deactivated') return;
+      const label = user.branchId === null || user.role === 'OrgAdmin' ? 'Без филиала (Администрация)' : (nameById.get(user.branchId) ?? (user.branchName.length > 1 ? user.branchName : 'Не привязан'));
+      counts.set(label, (counts.get(label) ?? 0) + 1);
     });
     const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
     return [...counts.entries()]
       .sort(([, left], [, right]) => right - left)
       .map(([label, count]) => ({ label, count, pct: total === 0 ? 0 : Math.round((count / total) * 100) }));
-  }, [usersQuery.users]);
+  }, [usersQuery.users, allBranches]);
   const distributionTotal = userDistribution.reduce((sum, entry) => sum + entry.count, 0);
 
   const actions = useBranchActions();
@@ -183,11 +204,19 @@ export function BranchesPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label="Всего филиалов" value={String(scopedBranches.length)} />
-        <PreviewMetricCard icon={<Power className="h-5 w-5" aria-hidden="true" />} label="Активные" value={String(activeCount)} />
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Категории" value={String(totalCategories)} />
-        <PreviewMetricCard icon={<Building2 className="h-5 w-5" aria-hidden="true" />} label="Без администратора" value={String(withoutAdmin)} tone={withoutAdmin > 0 ? 'warning' : 'default'} />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <PreviewMetricCard icon={<Building2 />} label="Всего филиалов" value={String(scopedBranches.length)} />
+        <PreviewMetricCard icon={<Power />} label="Активные" value={String(activeCount)} />
+        <PreviewMetricCard icon={<Tags />} label="Направления" value={String(totalCategories)} />
+        <PreviewMetricCard
+          icon={<ShieldAlert />}
+          label="Без администратора"
+          value={String(withoutAdmin)}
+          hint={withoutAdmin > 0 ? (onlyWithoutAdmin ? 'Показаны только они' : 'Нажмите, чтобы показать') : 'У всех есть администратор'}
+          tone={withoutAdmin > 0 ? 'warning' : 'default'}
+          onClick={withoutAdmin > 0 ? () => { setOnlyWithoutAdmin((prev) => !prev); setStatus('all'); } : undefined}
+          active={onlyWithoutAdmin}
+        />
       </div>
 
       <div className={`grid grid-cols-1 items-start gap-4 ${isOrgAdmin ? 'min-[1600px]:grid-cols-[minmax(0,1fr)_320px]' : ''}`}>
@@ -195,18 +224,18 @@ export function BranchesPage(): JSX.Element {
           <PreviewToolbar>
             <PreviewSearchInput placeholder="Поиск по названию или коду…" value={search} onChange={setSearch} />
             <PreviewSelect label="Статус" value={status} onChange={setStatus} options={STATUS_OPTIONS} width="sm" />
-            <PreviewResetButton disabled={!filtersActive} onClick={() => { setSearch(''); setStatus('active'); }} />
+            <PreviewResetButton disabled={!filtersActive} onClick={() => { setSearch(''); setStatus('active'); setOnlyWithoutAdmin(false); }} />
           </PreviewToolbar>
 
           <PreviewTable>
             <PreviewTableHead>
               <PreviewTh>Филиал</PreviewTh>
-              <PreviewTh className="w-[160px]">Администратор</PreviewTh>
-              <PreviewTh className="w-20">Категории</PreviewTh>
+              <PreviewTh className="w-[180px]">Администратор</PreviewTh>
+              <PreviewTh className="w-[92px]">Направления</PreviewTh>
               <PreviewTh className="w-20">Менторы</PreviewTh>
               <PreviewTh className="w-[105px]">Активные задания</PreviewTh>
               <PreviewTh className="w-[100px]">Статус</PreviewTh>
-              <PreviewTh className="w-20">Здоровье</PreviewTh>
+              <PreviewTh className="w-[92px]">Здоровье</PreviewTh>
               <PreviewActionTh />
             </PreviewTableHead>
             <tbody>
@@ -251,12 +280,21 @@ export function BranchesPage(): JSX.Element {
                     </div>
                   </PreviewTd>
                   <PreviewTd>
-                    {branchRow.adminName ?? (
+                    {branchRow.adminName ?? (isOrgAdmin ? (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); setActionDialog({ type: 'assignAdmin', branch: branchRow }); }}
+                        className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-warning-border bg-warning-soft px-2.5 text-[12px] font-medium text-warning transition hover:border-warning focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                        Назначить админа
+                      </button>
+                    ) : (
                       <span className="inline-flex items-center gap-1.5 text-[13px] text-warning">
                         <StatusDot tone="warning" />
                         Не назначен
                       </span>
-                    )}
+                    ))}
                   </PreviewTd>
                   <PreviewTd className="tabular-nums">{branchRow.categoriesCount}</PreviewTd>
                   <PreviewTd className="tabular-nums">{branchRow.mentorsCount}</PreviewTd>
@@ -268,7 +306,7 @@ export function BranchesPage(): JSX.Element {
                     </span>
                   </PreviewTd>
                   <PreviewTd className="whitespace-nowrap">
-                    <HealthValue value={branchRow.healthPct} />
+                    <HealthValue value={branchRow.healthPct} hasWork={branchRow.activeAssignments > 0} />
                   </PreviewTd>
                   <PreviewActionCell
                     onClick={(event) => { event.stopPropagation(); }}

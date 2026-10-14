@@ -1,8 +1,10 @@
 import type {
   AuditLogEntryDto,
+  ServiceHealthDto,
   RecentAssignmentActivityDto,
   RecentAssignmentActivityStatus,
 } from '../../api/admin/dashboard';
+import { auditActionLabel } from '../admin-preview/auditPresentation';
 import type { DeltaTone, SemanticTone } from './dashboard.types';
 
 /**
@@ -29,23 +31,6 @@ export function deltaTone(deltaPct: number, moreIsBetter: boolean): DeltaTone {
   if (deltaPct === 0) return 'neutral';
   const isUp = deltaPct > 0;
   return isUp === moreIsBetter ? 'positive' : 'negative';
-}
-
-/**
- * Синтетические, но стабильные спарклайны вокруг текущего значения — без
- * Math.random. Каждая KPI-карточка получает свою форму тренда, а не один и
- * тот же паттерн, растянутый под разный масштаб.
- */
-const SPARKLINE_SHAPES = {
-  rising: [0.78, 0.83, 0.89, 0.94, 0.98, 1.02, 1.08],
-  wave: [0.92, 0.86, 0.8, 0.88, 0.97, 1.03, 1.06],
-  spike: [0.85, 0.95, 1.08, 1.15, 1.05, 0.96, 1.02],
-  falling: [1.1, 1.04, 0.99, 0.94, 0.9, 0.86, 0.83],
-} as const;
-
-export function sparklineFor(value: number, shape: keyof typeof SPARKLINE_SHAPES): number[] {
-  const base = Math.max(1, value);
-  return SPARKLINE_SHAPES[shape].map((factor) => Math.round(base * factor));
 }
 
 const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat('ru-RU', { numeric: 'auto' });
@@ -193,10 +178,31 @@ const AUDIT_ACTION_MAP: Partial<Record<string, { message: string; tone: Semantic
   'audit.read': { message: 'просмотрел(а) журнал аудита', tone: 'neutral' },
 };
 
+/**
+ * Входы, токены, проверки доступа, служебная очистка — технические события. Им место на
+ * «Состоянии системы» и в журнале аудита, а в ленте обзора — только рабочие действия людей.
+ */
+const TECHNICAL_PREFIXES = ['auth.', 'security.', 'retention.', 'storage.', 'audit.', 'ai.', 'bootstrap.'];
+const TECHNICAL_ACTIONS = new Set([
+  'token_reuse_detected',
+  'login_success',
+  'login_denied',
+  'account_locked',
+  'logout',
+  'password_changed',
+  'user_sessions_revoked',
+  'notification.dispatch',
+]);
+
+export function isTechnicalAuditAction(action: string): boolean {
+  return TECHNICAL_ACTIONS.has(action) || TECHNICAL_PREFIXES.some((prefix) => action.startsWith(prefix));
+}
+
 function formatAuditActivity(entry: AuditLogEntryDto): FormattedActivityEntry | null {
+  if (isTechnicalAuditAction(entry.action)) return null;
   const mapped = AUDIT_ACTION_MAP[entry.action];
   if (mapped === null) return null;
-  const fallback = mapped ?? { message: entry.action, tone: 'neutral' as const };
+  const fallback = mapped ?? { message: auditActionLabel(entry.action).toLowerCase(), tone: 'neutral' as const };
 
   return {
     id: entry.id,
@@ -233,4 +239,9 @@ export function buildRecentActivityFeed(
     .filter((entry): entry is FormattedActivityEntry => entry !== null)
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
     .slice(0, limit);
+}
+
+/** Необязательный сервис, который просто не подключён, — не авария. */
+export function isNotConfigured(service: ServiceHealthDto): boolean {
+  return service.status === 'Degraded' && /не настроен/i.test(service.message);
 }

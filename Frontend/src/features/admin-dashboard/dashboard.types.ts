@@ -1,19 +1,5 @@
-import type { ReactNode } from 'react';
-
 /** Семантика delta-badge на KPI-карточке: направление роста ≠ «хорошо/плохо» само по себе. */
 export type DeltaTone = 'positive' | 'negative' | 'neutral';
-
-export interface KpiCardSpec {
-  key: string;
-  icon: ReactNode;
-  label: string;
-  value: string;
-  deltaPct: number;
-  deltaTone: DeltaTone;
-  tooltip: string;
-  sparkline: number[];
-  sparklineColor: string;
-}
 
 /** Единая палитра тонов для dot+text статусов и лент активности по всему Dashboard. */
 export type SemanticTone = 'neutral' | 'success' | 'info' | 'warning' | 'danger';

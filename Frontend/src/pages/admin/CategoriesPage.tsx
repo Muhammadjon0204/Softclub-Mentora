@@ -15,20 +15,24 @@ import type { CategoryFormDrawerState } from '../../features/admin-categories/Ca
 import { ChangeCategoryLeadDialog } from '../../features/admin-categories/ChangeCategoryLeadDialog';
 import { DeactivateCategoryDialog } from '../../features/admin-categories/DeactivateCategoryDialog';
 import { useCategoryActions } from '../../features/admin-categories/useCategoryActions';
-import { CATEGORY_COLOR_TILE, healthTone } from '../../features/admin-categories/categoryPresentation';
+import { CATEGORY_COLOR_TILE } from '../../features/admin-categories/categoryPresentation';
+import { pluralizeRu } from '../../features/admin-assignments/assignmentPresentation';
+import { useAssignmentStats } from '../../features/admin-assignments/useAssignmentStats';
 import type { PreviewCategoryDetails } from '../../features/admin-categories/categoryPresentation';
 import { useCategoriesQuery } from '../../features/admin-categories/useCategoriesQuery';
 import { useAuth } from '../../auth/useAuth';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
+import { Avatar } from '../../shared/ui/Avatar';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
+import { Tooltip } from '../../shared/ui/Tooltip';
 
 const LEAD_OPTIONS = [
-  { value: 'all', label: 'Lead: все' },
-  { value: 'assigned', label: 'Lead назначен' },
-  { value: 'unassigned', label: 'Lead не назначен' },
+  { value: 'all', label: 'Все руководители' },
+  { value: 'assigned', label: 'С руководителем' },
+  { value: 'unassigned', label: 'Без руководителя' },
 ];
 
 type ActionDialogState =
@@ -90,6 +94,7 @@ export function CategoriesPage(): JSX.Element {
     });
   }, [scopedCategories, search, branch, leadFilter]);
 
+  const stats = useAssignmentStats();
   const withLead = scopedCategories.filter((c) => c.leadName !== null).length;
   const totalMentors = scopedCategories.reduce((sum, c) => sum + c.mentorsCount, 0);
   const needsAttention = scopedCategories.filter((c) => c.leadName === null).length;
@@ -100,7 +105,7 @@ export function CategoriesPage(): JSX.Element {
     <div className="space-y-6">
       <PreviewPageHeader
         title="Категории"
-        subtitle="Учебные направления и их команды"
+        subtitle="Учебные направления, их руководители и команды менторов"
         action={
           <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
             Создать категорию
@@ -108,15 +113,18 @@ export function CategoriesPage(): JSX.Element {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<Tags className="h-5 w-5" aria-hidden="true" />} label="Всего категорий" value={String(scopedCategories.length)} />
-        <PreviewMetricCard icon={<UserCheck className="h-5 w-5" aria-hidden="true" />} label="С активным Lead" value={String(withLead)} />
-        <PreviewMetricCard icon={<UsersIcon className="h-5 w-5" aria-hidden="true" />} label="Менторы" value={String(totalMentors)} />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <PreviewMetricCard icon={<Tags />} label="Всего направлений" value={String(scopedCategories.length)} />
+        <PreviewMetricCard icon={<UserCheck />} label="С руководителем" value={String(withLead)} />
+        <PreviewMetricCard icon={<UsersIcon />} label="Менторы" value={String(totalMentors)} />
         <PreviewMetricCard
-          icon={<TriangleAlert className="h-5 w-5" aria-hidden="true" />}
-          label="Требуют внимания"
+          icon={<TriangleAlert />}
+          label="Без руководителя"
           value={String(needsAttention)}
+          hint={needsAttention > 0 ? 'Нажмите, чтобы показать' : 'У всех есть руководитель'}
           tone={needsAttention > 0 ? 'warning' : 'default'}
+          onClick={needsAttention > 0 ? () => { setLeadFilter(leadFilter === 'unassigned' ? 'all' : 'unassigned'); } : undefined}
+          active={leadFilter === 'unassigned'}
         />
       </div>
 
@@ -132,8 +140,9 @@ export function CategoriesPage(): JSX.Element {
               width="lg"
             />
           ) : null}
-          <PreviewSelect label="Lead" value={leadFilter} onChange={setLeadFilter} options={LEAD_OPTIONS} width="md" />
+          <PreviewSelect label="Руководитель" value={leadFilter} onChange={setLeadFilter} options={LEAD_OPTIONS} width="md" />
           <PreviewResetButton
+            disabled={search.trim() === '' && branch === 'all' && leadFilter === 'all'}
             onClick={() => {
               setSearch('');
               setBranch('all');
@@ -152,6 +161,8 @@ export function CategoriesPage(): JSX.Element {
         <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 lg:grid-cols-2">
           {cards.map((category) => {
             const isUnassigned = category.leadName === null;
+            const s = stats.byCategory.get(category.id);
+            const efficiency = s?.completionPct ?? null;
             return (
               <div
                 key={category.id}
@@ -169,14 +180,14 @@ export function CategoriesPage(): JSX.Element {
                     openCategoryDetails(category.id);
                   }
                 }}
-                className={`cursor-pointer rounded-panel border p-5 outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
-                  category.id === categoryId ? 'border-brand ring-1 ring-brand' : isUnassigned ? 'border-warning-border bg-warning-soft/40' : 'border-line bg-surface hover:bg-surface-hover'
+                className={`cursor-pointer rounded-card border p-4 outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+                  category.id === categoryId ? 'border-brand ring-1 ring-brand' : isUnassigned ? 'border-warning-border bg-surface hover:bg-surface-hover' : 'border-line bg-surface hover:bg-surface-hover'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-control ${CATEGORY_COLOR_TILE[category.colorToken]}`}>
-                      <Tags className="h-5 w-5" aria-hidden="true" />
+                    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-control ${CATEGORY_COLOR_TILE[category.colorToken]}`}>
+                      <Tags className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
                       <p className="font-semibold text-ink">{category.name}</p>
@@ -198,33 +209,49 @@ export function CategoriesPage(): JSX.Element {
                   </div>
                 </div>
 
-                <div className="mt-3.5 flex items-center justify-between text-[13px]">
-                  <span className="text-ink-muted">Lead</span>
-                  {isUnassigned ? <Badge tone="warning">Lead не назначен</Badge> : <span className="font-medium text-ink">{category.leadName}</span>}
+                <div className="mt-3 flex items-center justify-between gap-3 text-[13px]">
+                  <span className="text-ink-muted">Руководитель</span>
+                  {isUnassigned ? (
+                    <Badge tone="warning">Не назначен</Badge>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (category.leadUserId !== null) navigate(`/admin/users?userId=${category.leadUserId}`);
+                      }}
+                      className="inline-flex min-w-0 items-center gap-2 rounded-full py-0.5 pl-0.5 pr-2 font-medium text-ink transition hover:bg-brand-soft hover:text-brand-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                    >
+                      <Avatar name={category.leadName ?? ''} size="xs" />
+                      <span className="truncate">{category.leadName}</span>
+                    </button>
+                  )}
                 </div>
 
-                <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                    <p className="text-[15px] font-semibold tabular-nums text-ink">{category.mentorsCount}</p>
-                    <p className="text-[11px] text-ink-muted">Менторы</p>
-                  </div>
-                  <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                    <p className="text-[15px] font-semibold tabular-nums text-ink">{category.activeAssignments}</p>
-                    <p className="text-[11px] text-ink-muted">Активные</p>
-                  </div>
-                  <div className="rounded-control-sm bg-surface-muted px-2 py-1.5">
-                    <p className="text-[15px] font-semibold tabular-nums text-ink">{category.pendingReview}</p>
-                    <p className="text-[11px] text-ink-muted">На проверке</p>
-                  </div>
-                </div>
+                <dl className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-divider pt-3 text-[12.5px] text-ink-secondary">
+                  <div><dt className="sr-only">Менторы</dt><dd><span className="font-semibold tabular-nums text-ink">{category.mentorsCount}</span> {pluralizeRu(category.mentorsCount, 'ментор', 'ментора', 'менторов')}</dd></div>
+                  <div><dt className="sr-only">В работе</dt><dd><span className="font-semibold tabular-nums text-ink">{s?.active ?? 0}</span> в работе</dd></div>
+                  <div><dt className="sr-only">На проверке</dt><dd><span className={`font-semibold tabular-nums ${(s?.inReview ?? 0) > 0 ? 'text-warning' : 'text-ink'}`}>{s?.inReview ?? 0}</span> на проверке</dd></div>
+                  {(s?.overdue ?? 0) > 0 ? (
+                    <div><dt className="sr-only">Просрочено</dt><dd><span className="font-semibold tabular-nums text-danger">{s?.overdue}</span> просрочено</dd></div>
+                  ) : null}
+                </dl>
 
-                <div className="mt-3.5">
+                <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between text-[12px]">
-                    <span className="text-ink-muted">Здоровье</span>
-                    <Badge tone={healthTone(category.healthPct)}>{category.healthPct}%</Badge>
+                    <Tooltip content="Доля одобренных среди всех назначенных заданий направления (без черновиков и отменённых).">
+                      <span className="cursor-help text-ink-muted">Эффективность</span>
+                    </Tooltip>
+                    {efficiency === null ? (
+                      <span className="text-ink-disabled">— нет заданий</span>
+                    ) : (
+                      <span className="font-semibold tabular-nums text-ink">
+                        {efficiency}% <span className="font-normal text-ink-muted">· {s?.approved} из {(s?.total ?? 0) - (s?.cancelled ?? 0)}</span>
+                      </span>
+                    )}
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-                    <div className={`h-full rounded-full ${CATEGORY_COLOR_TILE[category.colorToken].includes('brand') ? 'bg-brand' : 'bg-info'}`} style={{ width: `${category.healthPct}%` }} />
+                    <div className="h-full rounded-full bg-brand" style={{ width: `${String(efficiency ?? 0)}%` }} />
                   </div>
                 </div>
               </div>

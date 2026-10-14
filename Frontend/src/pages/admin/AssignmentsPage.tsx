@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, ClipboardList, Clock3, SearchX, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { listCategories } from '../../api/admin/categories';
 import { listUsers } from '../../api/admin/users';
@@ -16,12 +17,13 @@ import {
   AWAITING_REVIEW_STATUSES,
   deadlineHint,
   formatShortDateTimeRu,
+  parseAssignmentFilter,
 } from '../../features/admin-assignments/adminAssignmentView';
 import type { AssignmentFilter } from '../../features/admin-assignments/adminAssignmentView';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewPagination, PreviewTable, PreviewTableHead, PreviewTd, PreviewTh, PreviewTr } from '../../features/admin-preview/PreviewTable';
-import { PreviewSearchInput, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
+import { PreviewResetButton, PreviewSearchInput, PreviewSelect, PreviewToolbar } from '../../features/admin-preview/PreviewToolbar';
 import { branchScopedKey } from '../../features/branch-context/queryKeys';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Avatar } from '../../shared/ui/Avatar';
@@ -45,8 +47,19 @@ export function AssignmentsPage(): JSX.Element {
   const usersQuery = useQuery({ queryKey: ['admin-users', 'list', organizationId], queryFn: () => listUsers({ page: 1, pageSize: 100 }) });
   const categoriesQuery = useQuery({ queryKey: scopeKey('admin-categories', 'list'), queryFn: () => listCategories({ page: 1, pageSize: 100 }) });
 
-  const [filter, setFilter] = useState<AssignmentFilter>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = parseAssignmentFilter(searchParams.get('status'));
+  const setFilter = (next: AssignmentFilter): void => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === 'all') params.delete('status');
+      else params.set('status', next);
+      return params;
+    }, { replace: true });
+  };
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -56,6 +69,18 @@ export function AssignmentsPage(): JSX.Element {
   const categoryName = useMemo(() => new Map((categoriesQuery.data?.items ?? []).map((c) => [c.id, c.name])), [categoriesQuery.data]);
   const mentorOf = (item: AssignmentDto): string => userName.get(item.assignedToId) ?? 'Ментор';
   const showBranch = assignments.some((item) => item.branch !== null && item.branch !== undefined);
+  const categoryOptions = useMemo(() => {
+    const ids = [...new Set(assignments.map((item) => item.categoryId))];
+    const named = ids.map((id) => ({ value: id, label: categoryName.get(id) ?? 'Направление' })).sort((a, b) => a.label.localeCompare(b.label, 'ru'));
+    return [{ value: 'all', label: 'Все направления' }, ...named];
+  }, [assignments, categoryName]);
+  const branchOptions = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const item of assignments) if (item.branch) byId.set(item.branch.id, item.branch.name);
+    return [{ value: 'all', label: 'Все филиалы' }, ...[...byId].map(([value, label]) => ({ value, label }))];
+  }, [assignments]);
+  const filtersActive = search.trim() !== '' || categoryFilter !== 'all' || branchFilter !== 'all' || filter !== 'all';
+  const resetFilters = (): void => { setSearch(''); setCategoryFilter('all'); setBranchFilter('all'); setFilter('all'); setPage(1); };
 
   const countFor = (statuses: string[] | null): number => (statuses === null ? assignments.length : assignments.filter((item) => statuses.includes(item.status)).length);
   const activeFilter = ASSIGNMENT_FILTERS.find((f) => f.id === filter) ?? ASSIGNMENT_FILTERS[0];
@@ -63,6 +88,8 @@ export function AssignmentsPage(): JSX.Element {
   const filtered = assignments.filter(
     (item) =>
       (activeFilter.statuses === null || activeFilter.statuses.includes(item.status)) &&
+      (categoryFilter === 'all' || item.categoryId === categoryFilter) &&
+      (branchFilter === 'all' || item.branch?.id === branchFilter) &&
       (needle === '' || item.title.toLowerCase().includes(needle) || mentorOf(item).toLowerCase().includes(needle)),
   );
 
@@ -72,21 +99,23 @@ export function AssignmentsPage(): JSX.Element {
   const opened = assignments.find((item) => item.id === openId) ?? null;
   const now = Date.now();
   const columns = showBranch ? 5 : 4;
+  const toggle = (next: AssignmentFilter) => (): void => { setFilter(filter === next ? 'all' : next); setPage(1); };
+  const overdueCount = countFor(['Overdue']);
+  const reviewCount = countFor(AWAITING_REVIEW_STATUSES);
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Задания" subtitle="Все задания менторов: статусы, сроки и история" />
+      <PreviewPageHeader title="Задания" subtitle="Контроль выполнения задач и соблюдения сроков по филиалам" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PreviewMetricCard icon={<ClipboardList className="h-5 w-5" />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" />
-        <PreviewMetricCard icon={<Clock3 className="h-5 w-5" />} label="Ожидают проверки" value={String(countFor(AWAITING_REVIEW_STATUSES))} hint="Сданы, ждут руководителя" />
-        <PreviewMetricCard icon={<TriangleAlert className="h-5 w-5" />} label="Просроченные" value={String(countFor(['Overdue']))} hint="Срок истёк без сдачи" tone="warning" />
-        <PreviewMetricCard icon={<CheckCircle2 className="h-5 w-5" />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <PreviewMetricCard icon={<ClipboardList />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" onClick={toggle('open')} active={filter === 'open'} />
+        <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint="Сданы, ждут руководителя" tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} />
+        <PreviewMetricCard icon={<TriangleAlert />} label="Просроченные" value={String(overdueCount)} hint={overdueCount > 0 ? 'Срок истёк без сдачи' : 'Просрочек нет'} tone={overdueCount > 0 ? 'danger' : 'default'} onClick={toggle('overdue')} active={filter === 'overdue'} />
+        <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" tone="success" onClick={toggle('approved')} active={filter === 'approved'} />
       </div>
 
       <Card padded={false} className="min-w-0">
-        <PreviewToolbar>
-          <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5" role="tablist" aria-label="Фильтр по статусу">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 border-b border-divider px-5 pb-3 pt-3.5 sm:px-6" role="tablist" aria-label="Фильтр по статусу">
             {ASSIGNMENT_FILTERS.map((item) => {
               const active = item.id === filter;
               const count = countFor(item.statuses);
@@ -106,14 +135,20 @@ export function AssignmentsPage(): JSX.Element {
                 </button>
               );
             })}
-          </div>
+        </div>
+        <PreviewToolbar>
           <PreviewSearchInput placeholder="Поиск по названию или ментору" value={search} onChange={(value) => { setSearch(value); setPage(1); }} />
+          <PreviewSelect label="Направление" value={categoryFilter} onChange={(value) => { setCategoryFilter(value); setPage(1); }} options={categoryOptions} width="lg" />
+          {branchOptions.length > 2 ? (
+            <PreviewSelect label="Филиал" value={branchFilter} onChange={(value) => { setBranchFilter(value); setPage(1); }} options={branchOptions} width="lg" />
+          ) : null}
+          <PreviewResetButton disabled={!filtersActive} onClick={resetFilters} />
         </PreviewToolbar>
 
         <PreviewTable>
           <PreviewTableHead>
             <PreviewTh className={showBranch ? 'w-[30%]' : 'w-[40%]'}>Задание</PreviewTh>
-            <PreviewTh className={showBranch ? 'w-[22%]' : 'w-[24%]'}>Ментор</PreviewTh>
+            <PreviewTh className={showBranch ? 'w-[22%]' : 'w-[24%]'}>Исполнитель / Направление</PreviewTh>
             <PreviewTh className="w-[14%]">Статус</PreviewTh>
             {showBranch ? <PreviewTh className="w-[16%]">Филиал</PreviewTh> : null}
             <PreviewTh className="w-[18%]">Дедлайн</PreviewTh>
@@ -152,15 +187,16 @@ export function AssignmentsPage(): JSX.Element {
                     <PreviewTd className="py-2.5">
                       <button type="button" onClick={(event) => { event.stopPropagation(); setOpenId(item.id); }} className="block w-full min-w-0 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
                         <span className="block truncate text-[13.5px] font-medium text-ink" title={item.title}>{item.title}</span>
-                        <span className="block truncate text-[12px] text-ink-muted">
-                          {[category, item.source === 'Auto' ? 'Из расписания' : null].filter(Boolean).join(' · ') || 'Индивидуальное'}
-                        </span>
+                        <span className="block truncate text-[12px] text-ink-muted">{item.source === 'Auto' ? 'Из расписания' : 'Индивидуальное'}</span>
                       </button>
                     </PreviewTd>
                     <PreviewTd>
                       <span className="flex min-w-0 items-center gap-2.5">
                         <Avatar name={mentorOf(item)} size="sm" />
-                        <span className="truncate text-[13px] text-ink">{mentorOf(item)}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] text-ink">{mentorOf(item)}</span>
+                          <span className="block truncate text-[12px] text-ink-muted">{category ?? 'Направление'}</span>
+                        </span>
                       </span>
                     </PreviewTd>
                     <PreviewTd>
@@ -169,7 +205,9 @@ export function AssignmentsPage(): JSX.Element {
                         {ASSIGNMENT_STATUS_LABEL[item.status] ?? item.status}
                       </Badge>
                     </PreviewTd>
-                    {showBranch ? <PreviewTd className="truncate">{item.branch?.name ?? '—'}</PreviewTd> : null}
+                    {showBranch ? (
+                      <PreviewTd className="truncate">{item.branch?.name ?? <span className="text-ink-disabled">Не привязан</span>}</PreviewTd>
+                    ) : null}
                     <PreviewTd className="py-2.5">
                       <span className="block whitespace-nowrap text-[13px] tabular-nums text-ink">
                         {due.date} <span className="text-ink-muted">{due.time}</span>

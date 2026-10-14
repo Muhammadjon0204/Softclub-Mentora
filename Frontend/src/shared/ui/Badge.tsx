@@ -67,8 +67,8 @@ export function ActiveStatusBadge({ isActive }: { isActive: boolean }): JSX.Elem
 }
 
 const HEALTH_LABEL: Record<ServiceStatus, string> = {
-  Operational: 'Работает',
-  Degraded: 'Деградация',
+  Operational: 'Работает штатно',
+  Degraded: 'Ограничено',
   Unavailable: 'Недоступен',
 };
 
