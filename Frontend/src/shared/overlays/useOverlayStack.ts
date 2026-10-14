@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { useOverlayContext } from './OverlayProvider';
+import { useOverlayContext } from './overlayContext';
 import type { OverlayType } from './overlayStack';
 
 let overlayIdCounter = 0;

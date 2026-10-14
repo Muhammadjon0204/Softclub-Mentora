@@ -54,6 +54,13 @@ export default tseslint.config(
     },
   },
   {
+    // Единственный модуль UI-предпочтений (выбранный филиал): не auth-данные, см. комментарий в файле.
+    files: ['src/lib/preferenceStorage.ts'],
+    rules: {
+      'no-restricted-properties': 'off',
+    },
+  },
+  {
     // Тестам storage нужен — именно чтобы доказать, что там пусто.
     // Fast refresh к тестовым модулям неприменим.
     files: ['src/test/**/*.{ts,tsx}', 'src/**/*.test.{ts,tsx}'],

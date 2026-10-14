@@ -1,20 +1,11 @@
 import { History } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { ASSIGNMENT_STATUS_LABEL, type PreviewAssignmentStatus } from '../../mocks/ui-preview/assignments.preview';
+import { ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/assignments.preview';
 import { Button } from '../../shared/ui/Button';
 import { Tooltip } from '../../shared/overlays';
-import { branchDisplayName, formatDeadlineInline } from './assignmentPresentation';
+import { ASSIGNMENT_STATUS_META, branchDisplayName, formatDeadlineInline } from './assignmentPresentation';
 import type { PreviewAssignmentDetails } from './assignmentPresentation';
-
-export const ASSIGNMENT_STATUS_META: Record<PreviewAssignmentStatus, { dot: string; text: string }> = {
-  Assigned: { dot: 'bg-ink-disabled', text: 'text-ink-secondary' },
-  Submitted: { dot: 'bg-info', text: 'text-info' },
-  InReview: { dot: 'bg-brand', text: 'text-brand' },
-  NeedsRework: { dot: 'bg-warning', text: 'text-warning' },
-  Overdue: { dot: 'bg-danger', text: 'text-danger' },
-  Approved: { dot: 'bg-success', text: 'text-success' },
-};
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (

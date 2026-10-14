@@ -30,12 +30,14 @@ export { Popover, MenuItem } from './Popover';
 export type { PopoverProps, PopoverTriggerRenderProps } from './Popover';
 export { ActionMenu } from './ActionMenu';
 export type { ActionMenuItem, ActionMenuProps } from './ActionMenu';
-export { Tooltip, useIsTruncated } from './Tooltip';
+export { Tooltip } from './Tooltip';
+export { useIsTruncated } from './useIsTruncated';
 export type { TooltipProps } from './Tooltip';
 export type { FloatingAlign, FloatingPlacement } from './floatingPosition';
 
 // Toast.
-export { ToastProvider, useToastContext } from './ToastProvider';
+export { ToastProvider } from './ToastProvider';
+export { useToastContext } from './toastContext';
 export type { ToastEntry, ToastOptions, ToastVariant, ToastAction } from './ToastProvider';
 export { ToastViewport } from './ToastViewport';
 export { Toast } from './Toast';

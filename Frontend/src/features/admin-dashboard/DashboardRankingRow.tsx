@@ -133,15 +133,6 @@ export function DashboardRankingRow({
         {subtitle !== undefined ? (
           <TruncatableText text={subtitle} className="mt-px truncate text-[11.5px] leading-4 text-ink-muted" />
         ) : null}
-        {progress !== undefined ? (
-          <div
-            className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-surface-muted"
-            role={progressLabel !== undefined ? 'img' : undefined}
-            aria-label={progressLabel}
-          >
-            <AnimatedBar percent={progress} className="rounded-full bg-brand" />
-          </div>
-        ) : null}
       </div>
 
       <div className="flex items-center justify-self-end gap-1.5">
@@ -153,6 +144,17 @@ export function DashboardRankingRow({
         className="h-[15px] w-[15px] shrink-0 -translate-x-0.5 text-ink-muted opacity-0 transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100 motion-reduce:transition-none motion-reduce:group-hover:translate-x-0"
         aria-hidden="true"
       />
+
+      {/* Дорожка — от названия до правого края строки: «100%» справа должно совпадать с полной полосой. */}
+      {progress !== undefined ? (
+        <div
+          className="col-start-3 col-end-6 -mt-1 h-[3px] overflow-hidden rounded-full bg-surface-muted"
+          role={progressLabel !== undefined ? 'img' : undefined}
+          aria-label={progressLabel}
+        >
+          <AnimatedBar percent={progress} className="rounded-full bg-brand" />
+        </div>
+      ) : null}
     </Link>
   );
 }

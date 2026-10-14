@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { listBranches } from '../../api/admin/branches';
 import { useAuth } from '../../auth/useAuth';
+import { readPreference, writePreference } from '../../lib/preferenceStorage';
 import { BranchContext, type BranchContextValue } from './branchContextDefinition';
 import { BRANCH_SCOPED_TAG } from './queryKeys';
 import { setBranchScopeState } from './branchScopeStore';
@@ -18,25 +19,11 @@ const BRANCH_STORAGE_KEY_PREFIX = 'mentora.branchContext.selectedBranchId.';
 // backend всё равно проверяет scope на каждый запрос), с ключом per-user,
 // чтобы вход другим аккаунтом не унаследовал чужой выбор.
 function readStoredBranchId(userId: string | undefined): string | null {
-  if (!userId) return null;
-  try {
-    return window.localStorage.getItem(BRANCH_STORAGE_KEY_PREFIX + userId);
-  } catch {
-    return null;
-  }
+  return userId ? readPreference(BRANCH_STORAGE_KEY_PREFIX + userId) : null;
 }
 
 function writeStoredBranchId(userId: string | undefined, branchId: string | null): void {
-  if (!userId) return;
-  try {
-    if (branchId === null) {
-      window.localStorage.removeItem(BRANCH_STORAGE_KEY_PREFIX + userId);
-    } else {
-      window.localStorage.setItem(BRANCH_STORAGE_KEY_PREFIX + userId, branchId);
-    }
-  } catch {
-    // localStorage недоступен (приватный режим и т.п.) — просто не персистим.
-  }
+  if (userId) writePreference(BRANCH_STORAGE_KEY_PREFIX + userId, branchId);
 }
 
 /**
@@ -60,6 +47,8 @@ export function BranchProvider({ children }: BranchProviderProps): JSX.Element {
     enabled: isOrgAdmin,
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: branchesData, isLoading: isLoadingBranches, error: branchesError, refetch: refetchBranchesQuery } = branchesQuery;
 
   // Смена пользователя (повторный вход другим аккаунтом, включая первичную
   // загрузку user из /auth/session) обязана восстановить выбор именно этого
@@ -119,11 +108,11 @@ export function BranchProvider({ children }: BranchProviderProps): JSX.Element {
       selectedBranchId: isOrgAdmin ? selectedBranchId : (user?.branch?.id ?? null),
       isAllBranches: isOrgAdmin && selectedBranchId === null,
       canOverrideBranch: isOrgAdmin,
-      availableBranches: branchesQuery.data ?? [],
-      isLoadingBranches: branchesQuery.isLoading,
-      branchesError: branchesQuery.error,
+      availableBranches: branchesData ?? [],
+      isLoadingBranches,
+      branchesError,
       refetchBranches: () => {
-        void branchesQuery.refetch();
+        void refetchBranchesQuery();
       },
       fixedBranch: isOrgAdmin ? null : (user?.branch ?? null),
       setSelectedBranch,
@@ -133,10 +122,10 @@ export function BranchProvider({ children }: BranchProviderProps): JSX.Element {
       isOrgAdmin,
       selectedBranchId,
       user?.branch,
-      branchesQuery.data,
-      branchesQuery.isLoading,
-      branchesQuery.error,
-      branchesQuery.refetch,
+      branchesData,
+      isLoadingBranches,
+      branchesError,
+      refetchBranchesQuery,
       setSelectedBranch,
       clearBranchContext,
     ],

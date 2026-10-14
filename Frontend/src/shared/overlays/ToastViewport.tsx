@@ -1,6 +1,6 @@
 import { OverlayPortal } from './OverlayPortal';
 import { Toast } from './Toast';
-import { useToastContext } from './ToastProvider';
+import { useToastContext } from './toastContext';
 import { OVERLAY_Z_INDEX } from './overlayZIndex';
 
 /**
@@ -18,7 +18,7 @@ export function ToastViewport(): JSX.Element | null {
     <OverlayPortal>
       <div
         style={{ zIndex: OVERLAY_Z_INDEX.toast }}
-        className="pointer-events-none fixed left-1/2 top-3 flex w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 flex-col items-stretch gap-2 sm:top-5"
+        className="pointer-events-none fixed left-1/2 print:hidden top-3 flex w-[calc(100%-24px)] max-w-[420px] -translate-x-1/2 flex-col items-stretch gap-2 sm:top-5"
       >
         {toasts.map((entry) => (
           <Toast key={entry.id} entry={entry} />
