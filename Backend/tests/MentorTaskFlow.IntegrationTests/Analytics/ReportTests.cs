@@ -429,11 +429,8 @@ public sealed class ReportTests(PostgresFixture postgres) : IAsyncLifetime
                 Guid.CreateVersion7(),
                 assignment,
                 version,
-                $"submissions/key-{assignment.Id:N}-{version}.pdf",
-                "работа.pdf",
-                FileExtension.Pdf,
-                1024,
-                new string((char)('a' + version), 64),
+                new SubmittedFile($"submissions/key-{assignment.Id:N}-{version}.pdf", "работа.pdf", FileExtension.Pdf, 1024, new string((char)('a' + version), 64)),
+                comment: null,
                 lateFirstVersion && version == 1,
                 mentorId,
                 submittedAt);

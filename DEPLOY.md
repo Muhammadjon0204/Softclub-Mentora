@@ -334,19 +334,57 @@ docker compose --env-file .env.web -f docker-compose.web.yml up -d --build
 docker compose --env-file .env.api -f docker-compose.api.yml up -d --build mentora-migrator
 ```
 
-### Сборка на сервере или в CI
+### Автоматический деплой (CI/CD)
 
-Команды выше собирают образы прямо на VPS. `dotnet publish` из SDK-образа плюс `npm ci`
-занимают больше двух гигабайт памяти на машине, которая обслуживает ещё полтора десятка
-контейнеров.
+Ручные команды выше нужны только в аварийном случае. Обычный путь — merge в `main`:
 
-`.github/workflows/deploy.yml` собирает образы в GitHub Actions, публикует в Docker Hub,
-а на сервере делает только `pull` + `up -d`. Он не активируется, пока в
-Settings → Variables не появится `DEPLOY_ENABLED=true`. Нужны:
+1. **CI** (`.github/workflows/ci.yml`) собирает бэкенд и фронт и гоняет unit-, архитектурные
+   и интеграционные тесты.
+2. Если CI зелёный, **deploy** (`.github/workflows/deploy.yml`) собирает образы в GitHub
+   Actions (не на VPS — там на это не хватает памяти), пушит их в Docker Hub с тегами
+   `latest` и sha коммита, по SSH делает на сервере `git pull`, `pull` образов этого коммита
+   и `up -d`. Мигратор применяет миграции до старта API.
+3. Деплой ждёт, пока API станет `healthy`, и проверяет фронт. Если API не поднялся —
+   API и worker автоматически возвращаются на образ, работавший до деплоя, а job краснеет.
 
-- переменные: `DEPLOY_ENABLED`, `VITE_API_BASE_URL`
-- секреты: `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `SERVER_IP_ADDRESS`,
-  `SERVER_USERNAME`, `SSH_KEY`, `SERVER_SSH_PORT`, `SERVER_PROJECT_FOLDER`
+Откат вручную: Actions → deploy → Run workflow → `image_tag` = полный sha рабочего коммита.
+
+#### Однократная настройка
+
+**На сервере** (один раз):
+
+```bash
+# отдельный ключ только для деплоя
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/mentora_deploy -C "github-actions-deploy"
+cat ~/.ssh/mentora_deploy.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/mentora_deploy        # это значение секрета SSH_KEY, целиком
+
+# чтобы git pull не трогал заполненные .env (см. раздел 2)
+cd <папка проекта>
+git update-index --skip-worktree .env.api .env.web
+```
+
+**В GitHub:** Settings → Secrets and variables → Actions.
+
+Secrets:
+
+| Имя | Значение |
+|---|---|
+| `DOCKERHUB_USERNAME` | логин Docker Hub (`muhammadjon0204`) |
+| `DOCKERHUB_TOKEN` | hub.docker.com → Account settings → Personal access tokens, права Read & Write |
+| `SERVER_IP_ADDRESS` | IP сервера |
+| `SERVER_USERNAME` | пользователь SSH |
+| `SSH_KEY` | приватный ключ `~/.ssh/mentora_deploy` целиком |
+| `SERVER_SSH_PORT` | порт SSH (если пусто — 22) |
+| `SERVER_PROJECT_FOLDER` | полный путь к папке проекта на сервере |
+
+Variables:
+
+| Имя | Значение |
+|---|---|
+| `DEPLOY_ENABLED` | `true` (без неё образы собираются, но сервер не трогается) |
+| `VITE_API_BASE_URL` | `https://tmsapi.softclub.tj` — без `/api/v1` |
+| `PUBLIC_WEB_URL` | `https://tms.softclub.tj` (необязательно — проверка сайта снаружи) |
 
 ---
 

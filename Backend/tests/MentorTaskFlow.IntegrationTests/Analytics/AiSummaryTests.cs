@@ -627,9 +627,14 @@ public sealed class AiSummaryTests(PostgresFixture postgres) : IAsyncLifetime
             var submittedAt = AssignedAt.AddHours(2 * version);
 
             var submission = Submission.Record(
-                Guid.CreateVersion7(), assignment, version,
-                $"submissions/key-{assignment.Id:N}-{version}.pdf", "работа.pdf",
-                FileExtension.Pdf, 1024, new string((char)('a' + version), 64), false, mentorId, submittedAt);
+                Guid.CreateVersion7(),
+                assignment,
+                version,
+                new SubmittedFile($"submissions/key-{assignment.Id:N}-{version}.pdf", "работа.pdf", FileExtension.Pdf, 1024, new string((char)('a' + version), 64)),
+                comment: null,
+                false,
+                mentorId,
+                submittedAt);
 
             context.Submissions.Add(submission);
 

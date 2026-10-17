@@ -180,7 +180,9 @@ public sealed class AuditScopeTests
         AuditActions.OrganizationLevelActions.ShouldContain(AuditActions.AuditRead);
         AuditActions.OrganizationLevelActions.ShouldContain(AuditActions.AiSummaryGenerate);
 
-        NotificationEventTypes.OrganizationLevelEvents.Count.ShouldBe(4);
+        // The four of TEN-042 and DEPLOY-031, plus the two password-reset deliveries, whose recipient
+        // may be an Organization Admin with no branch.
+        NotificationEventTypes.OrganizationLevelEvents.Count.ShouldBe(6);
     }
 
     /// <summary>

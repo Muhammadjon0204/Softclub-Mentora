@@ -370,9 +370,14 @@ public sealed class BranchIsolationTests(PostgresFixture fixture) : IAsyncLifeti
         var submittedAt = Seeded.AddHours(2);
 
         var submission = Submission.Record(
-            Guid.CreateVersion7(), assignment, 1,
-            $"submissions/{assignment.Id:N}-1.pdf", "работа.pdf",
-            FileExtension.Pdf, 1024, new string('a', 64), false, mentorId, submittedAt);
+            Guid.CreateVersion7(),
+            assignment,
+            1,
+            new SubmittedFile($"submissions/{assignment.Id:N}-1.pdf", "работа.pdf", FileExtension.Pdf, 1024, new string('a', 64)),
+            comment: null,
+            false,
+            mentorId,
+            submittedAt);
 
         context.Submissions.Add(submission);
         assignment.Submit(isFirstVersion: true, submittedAt);

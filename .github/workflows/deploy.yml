@@ -1,49 +1,91 @@
-# Сборка образов и деплой на сервер.
+# Автоматический деплой: CI зелёный на main → образы → сервер → проверка здоровья.
 #
-# Образы собираются здесь, а не на сервере: `dotnet publish` из SDK-образа плюс
-# `npm ci` съедают на VPS больше двух гигабайт и минуты времени, и всё это на
-# машине, которая в этот момент обслуживает остальные проекты.
+# Как это работает:
+#   1. Push в main запускает CI (ci.yml). Деплой ждёт его и стартует ТОЛЬКО если CI
+#      прошёл: красная сборка или упавший тест на сервер не попадают.
+#   2. Образы API и фронта собираются здесь (не на сервере — там на это не хватает
+#      памяти) и публикуются в Docker Hub с двумя тегами: latest и sha коммита.
+#   3. На сервере: git pull (ради compose-файлов), pull образов именно этого коммита,
+#      up -d. Мигратор применяет новые миграции до старта API.
+#   4. Проверка здоровья API и фронта. Если API не поднялся — автоматический откат
+#      на тег, который работал до деплоя, и job помечается красным.
 #
-# Секреты репозитория:
+# Откат вручную: Actions → deploy → Run workflow → image_tag = sha нужного коммита
+# (полный sha из истории). Сборка при этом пропускается, берутся готовые образы.
+#
+# Секреты репозитория (Settings → Secrets and variables → Actions → Secrets):
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
-#   SERVER_IP_ADDRESS, SERVER_USERNAME, SSH_KEY, SERVER_SSH_PORT
-#   SERVER_PROJECT_FOLDER
+#   SERVER_IP_ADDRESS, SERVER_USERNAME, SSH_KEY, SERVER_SSH_PORT, SERVER_PROJECT_FOLDER
 #
-# Job deploy не запускается, пока в переменных репозитория (Settings → Variables)
-# не появится DEPLOY_ENABLED=true. До этого workflow только собирает и публикует
-# образы, ничего не трогая на сервере.
+# Переменные (там же → Variables):
+#   DEPLOY_ENABLED=true          без неё job deploy пропускается, образы только собираются
+#   VITE_API_BASE_URL            адрес API без /api/v1, например https://tmsapi.softclub.tj
+#   PUBLIC_WEB_URL (необяз.)     например https://tms.softclub.tj — проверка снаружи
 
 name: deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Откат: sha коммита, чьи образы развернуть (пусто — собрать текущий main)"
+        required: false
+        default: ""
+
+# Два деплоя одновременно перезаписали бы друг другу контейнеры. Новый ждёт старый,
+# а не отменяет его: прерванный посреди миграций деплой хуже очереди.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   build:
     name: build ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    # Только зелёный CI по push в main (не по PR), либо ручной запуск без тега отката.
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push')
+      || (github.event_name == 'workflow_dispatch' && inputs.image_tag == '')
 
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - name: api
             context: ./Backend
             image: mentora-api
             build_args: ""
-          # Адрес API вшивается в бандл на этапе сборки, поэтому образ фронта
-          # привязан к домену и значение обязано прийти сюда. Задаётся
-          # переменной репозитория VITE_API_BASE_URL (Settings → Variables),
-          # например https://api.mentora.example.com/api/v1
+          # Адрес API вшивается в бандл на этапе сборки, поэтому значение обязано прийти
+          # сюда — из переменной репозитория VITE_API_BASE_URL.
           - name: web
             context: ./Frontend
             image: mentora-web
             build_args: VITE_API_BASE_URL=${{ vars.VITE_API_BASE_URL }}
 
     steps:
+      # Ровно тот коммит, который проверил CI, а не то, что успело попасть в main позже.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check repository settings
+        run: |
+          missing=""
+          [ -n "${{ secrets.DOCKERHUB_USERNAME }}" ] || missing="$missing DOCKERHUB_USERNAME"
+          [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ] || missing="$missing DOCKERHUB_TOKEN"
+          if [ "${{ matrix.name }}" = "web" ] && [ -z "${{ vars.VITE_API_BASE_URL }}" ]; then
+            missing="$missing VITE_API_BASE_URL(variable)"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::error::Не заданы в Settings → Secrets and variables → Actions:$missing"
+            exit 1
+          fi
 
       - uses: docker/setup-buildx-action@v3
 
@@ -52,8 +94,8 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Два тега: latest — то, что тянет сервер, и sha — чтобы был откат к
-      # конкретному коммиту без пересборки.
+      # Два тега: latest — то, что тянет ручной `docker compose up`, и sha — то, что
+      # разворачивает этот workflow и на что можно откатиться без пересборки.
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -62,50 +104,123 @@ jobs:
           build-args: ${{ matrix.build_args }}
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:latest
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image }}:${{ github.event.workflow_run.head_sha || github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
     name: deploy to server
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: build
-    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    # Деплой и после пропущенной сборки — это ручной откат на готовый тег.
+    if: >-
+      always()
+      && vars.DEPLOY_ENABLED == 'true'
+      && (needs.build.result == 'success'
+        || (needs.build.result == 'skipped' && github.event_name == 'workflow_dispatch' && inputs.image_tag != ''))
+    environment: production
+
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
 
     steps:
-      # git pull нужен ради самого docker-compose.api.yml и скрипта инициализации
-      # ролей, который монтируется с диска. .env лежит только на сервере и в git
-      # не отслеживается, поэтому pull его не трогает.
+      - name: Check repository settings
+        run: |
+          missing=""
+          [ -n "${{ secrets.SERVER_IP_ADDRESS }}" ] || missing="$missing SERVER_IP_ADDRESS"
+          [ -n "${{ secrets.SERVER_USERNAME }}" ] || missing="$missing SERVER_USERNAME"
+          [ -n "${{ secrets.SSH_KEY }}" ] || missing="$missing SSH_KEY"
+          [ -n "${{ secrets.SERVER_PROJECT_FOLDER }}" ] || missing="$missing SERVER_PROJECT_FOLDER"
+          if [ -n "$missing" ]; then
+            echo "::error::Не заданы секреты:$missing"
+            exit 1
+          fi
+
+      # git pull нужен ради compose-файлов и скрипта ролей БД. .env.api и .env.web на
+      # сервере помечены skip-worktree (см. DEPLOY.md), поэтому pull их не трогает.
       #
-      # `up -d` без --build: образы уже собраны выше. Мигратор пересоздаётся сам,
-      # когда меняется образ API, и остальные ждут его через
-      # service_completed_successfully. `down` не делаем — он давал бы простой
-      # на всё время pull и старта.
-      - name: Pull images and restart
+      # IMAGE_TAG из окружения перекрывает значение из .env-файлов: разворачивается
+      # ровно проверенный коммит, а не «какой-то latest».
+      - name: Deploy and verify
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP_ADDRESS }}
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SERVER_SSH_PORT }}
+          port: ${{ secrets.SERVER_SSH_PORT || 22 }}
+          command_timeout: 20m
+          envs: IMAGE_TAG
           script: |
-            set -e
+            set -eu
             cd ${{ secrets.SERVER_PROJECT_FOLDER }}
+
+            API="docker compose --env-file .env.api -f docker-compose.api.yml"
+            WEB="docker compose --env-file .env.web -f docker-compose.web.yml"
+            api_container=$(grep -E '^API_CONTAINER_NAME=' .env.api | cut -d= -f2)
+            web_port=$(grep -E '^WEB_EXTERNAL_PORT=' .env.web | cut -d= -f2)
+
+            # Образ, который работает сейчас, получает локальный тег rollback — до pull, пока
+            # latest ещё указывает на него. На него и откатываемся при неудаче.
+            previous=$(docker inspect -f '{{.Image}}' "$api_container" 2>/dev/null || true)
+            api_repo=$(docker inspect -f '{{.Config.Image}}' "$api_container" 2>/dev/null | sed 's/:[^:/]*$//' || true)
+            if [ -n "$previous" ] && [ -n "$api_repo" ]; then
+              docker tag "$previous" "$api_repo:rollback"
+            fi
+            echo "Разворачиваю: $IMAGE_TAG"
+
             git pull --ff-only
 
-            # Анонимный docker pull упирается в rate-limit Docker Hub на подсетях
-            # хостингов вроде Hetzner даже для чисто публичных образов (minio/minio,
-            # postgres) — ошибка при этом звучит как «repository does not exist».
-            # Логинимся тем же аккаунтом, которым job build выше пушит образы, это
-            # снимает лимит для всех pull ниже, включая публичные.
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+            # Логин снимает rate-limit Docker Hub для анонимных pull с подсетей хостингов.
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-            docker compose --env-file .env.api -f docker-compose.api.yml pull
-            docker compose --env-file .env.api -f docker-compose.api.yml up -d --no-build
+            export IMAGE_TAG
+            $API pull mentora-migrator mentora-api mentora-worker
+            $WEB pull mentora-web
 
-            docker compose --env-file .env.web -f docker-compose.web.yml pull
-            docker compose --env-file .env.web -f docker-compose.web.yml up -d --no-build
+            wait_healthy() {
+              for i in $(seq 1 36); do
+                status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$api_container" 2>/dev/null || echo missing)
+                [ "$status" = "healthy" ] && return 0
+                sleep 5
+              done
+              echo "API не стал healthy за 3 минуты (последний статус: $status)"
+              docker logs --tail 80 "$api_container" || true
+              return 1
+            }
 
-            docker compose --env-file .env.api -f docker-compose.api.yml ps
-            docker compose --env-file .env.web -f docker-compose.web.yml ps
-            docker image prune -f
+            if $API up -d --no-build && wait_healthy; then
+              $WEB up -d --no-build
+              for i in $(seq 1 12); do
+                curl -fsS -o /dev/null "http://$web_port/" && break
+                [ "$i" = 12 ] && { echo "Фронт не отвечает на http://$web_port/"; exit 1; }
+                sleep 5
+              done
+            else
+              if [ -n "$previous" ]; then
+                echo "Откат API и worker на образ, работавший до деплоя"
+                IMAGE_TAG=rollback $API up -d --no-build mentora-api mentora-worker
+              fi
+              exit 1
+            fi
+
+            $API ps
+            $WEB ps
+            docker image prune -f >/dev/null
+
+      - name: Check from the internet
+        if: vars.VITE_API_BASE_URL != ''
+        run: |
+          for url in ${{ vars.VITE_API_BASE_URL }}/health/live ${{ vars.PUBLIC_WEB_URL }}; do
+            for i in $(seq 1 12); do
+              if curl -fsS -o /dev/null "$url"; then echo "OK $url"; break; fi
+              [ "$i" = 12 ] && { echo "::error::$url не отвечает"; exit 1; }
+              sleep 5
+            done
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Деплой: ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Образы: \`$IMAGE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Откат: Actions → deploy → Run workflow → image_tag = sha рабочего коммита" >> "$GITHUB_STEP_SUMMARY"

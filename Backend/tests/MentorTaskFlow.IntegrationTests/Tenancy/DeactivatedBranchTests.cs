@@ -323,9 +323,14 @@ public sealed class DeactivatedBranchTests(PostgresFixture fixture) : IAsyncLife
         var submittedAt = Seeded.AddHours(2);
 
         var submission = Submission.Record(
-            Guid.CreateVersion7(), assignment, 1,
-            $"submissions/{assignment.Id:N}-1.pdf", "работа.pdf",
-            FileExtension.Pdf, 1024, new string('a', 64), false, _khujandMentorId, submittedAt);
+            Guid.CreateVersion7(),
+            assignment,
+            1,
+            new SubmittedFile($"submissions/{assignment.Id:N}-1.pdf", "работа.pdf", FileExtension.Pdf, 1024, new string('a', 64)),
+            comment: null,
+            false,
+            _khujandMentorId,
+            submittedAt);
 
         context.Submissions.Add(submission);
         assignment.Submit(isFirstVersion: true, submittedAt);

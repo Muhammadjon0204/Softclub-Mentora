@@ -34,8 +34,7 @@ public sealed class UploadedFileInspectorTests
             ZipMaxUncompressedBytes = 4096,
             ZipMaxRatio = 10,
             ZipValidationTimeoutSeconds = 5,
-        }),
-        NullLogger<UploadedFileInspector>.Instance);
+        }));
 
     // -----------------------------------------------------------------
     // Step 7: the allowlist
