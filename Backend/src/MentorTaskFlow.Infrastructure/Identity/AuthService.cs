@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Exceptions;
 using MentorTaskFlow.Application.Common.Security;
@@ -33,6 +34,7 @@ public sealed class AuthService(
     ITokenVersionValidator tokenVersionValidator,
     PasswordPolicy passwordPolicy,
     IAuditWriter auditWriter,
+    IOutboxWriter outboxWriter,
     IOptions<AuthOptions> options,
     IClock clock) : IAuthService
 {
@@ -334,9 +336,8 @@ public sealed class AuthService(
         return await BuildResultAsync(user, refreshToken, cancellationToken);
     }
 
-    public async Task<string?> ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken)
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken)
     {
-        var now = clock.UtcNow;
         var normalizedEmail = Normalization.ToNormalized(request.Email ?? string.Empty);
 
         var user = await dbContext.Users
@@ -348,20 +349,31 @@ public sealed class AuthService(
         // (AUTH-015).
         if (user is null || !user.IsActive)
         {
-            return null;
+            return;
         }
 
-        var (plainToken, _) = await IssueSecurityTokenAsync(
-            user,
-            SecurityTokenPurpose.ResetPassword,
-            _options.ResetPasswordTokenLifetime,
-            ipAddress,
-            now,
+        var viaTelegram = string.Equals(request.Channel, ForgotPasswordRequest.ChannelTelegram, StringComparison.OrdinalIgnoreCase);
+
+        // Only the request is recorded here. The link itself is minted by the dispatcher right before
+        // the message leaves (IssueResetPasswordLinkAsync): the token is stored hashed and may not
+        // travel in the outbox row (NTF-017), so there is no other moment at which its plaintext
+        // exists. Minting also retires any earlier link, keeping exactly one live (AUTH-017).
+        await outboxWriter.EnqueueSystemAsync(
+            new OutboxEntry
+            {
+                RecipientUserId = user.Id,
+                EventType = viaTelegram ? NotificationEventTypes.PasswordResetTelegram : NotificationEventTypes.PasswordReset,
+                EntityId = user.Id,
+
+                // Each request is its own message; the rate limit, not deduplication, bounds repeats.
+                Discriminator = clock.UtcNow.UtcDateTime.ToString("O"),
+                Payload = JsonSerializer.SerializeToDocument(new { fullName = user.FullName }),
+            },
+            user.OrganizationId,
+            user.BranchId,
             cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
-
-        return BuildPasswordLink("reset-password", plainToken);
     }
 
     public Task<string> ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken) =>
@@ -553,6 +565,28 @@ public sealed class AuthService(
             cancellationToken);
 
         return BuildPasswordLink("set-password", plainToken);
+    }
+
+    /// <summary>
+    /// Issues the reset link for a queued <c>PasswordReset</c> message, at the moment it is sent.
+    /// </summary>
+    /// <returns>Null for an account deactivated since the request — it gets no usable link.</returns>
+    internal async Task<string?> IssueResetPasswordLinkAsync(User user, CancellationToken cancellationToken)
+    {
+        if (!user.IsActive)
+        {
+            return null;
+        }
+
+        var (plainToken, _) = await IssueSecurityTokenAsync(
+            user,
+            SecurityTokenPurpose.ResetPassword,
+            _options.ResetPasswordTokenLifetime,
+            ipAddress: null,
+            clock.UtcNow,
+            cancellationToken);
+
+        return BuildPasswordLink("reset-password", plainToken);
     }
 
     private string BuildPasswordLink(string path, string plainToken) =>

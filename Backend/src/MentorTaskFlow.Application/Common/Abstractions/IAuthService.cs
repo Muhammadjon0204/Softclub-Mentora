@@ -85,8 +85,8 @@ public interface IAuthService
     /// <summary>
     /// Starts a password reset. Completes silently for an unknown address (<c>AUTH-015</c>).
     /// </summary>
-    /// <returns>The reset link, or null when nothing was issued. Callers must never return it to the client.</returns>
-    Task<string?> ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
+    /// <remarks>Queues the link for delivery by email or Telegram; it is never returned to the caller.</remarks>
+    Task ForgotPasswordAsync(ForgotPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);
 
     /// <returns>The account's email, for pre-filling the sign-in form.</returns>
     Task<string> ResetPasswordAsync(ResetPasswordRequest request, string? ipAddress, CancellationToken cancellationToken);

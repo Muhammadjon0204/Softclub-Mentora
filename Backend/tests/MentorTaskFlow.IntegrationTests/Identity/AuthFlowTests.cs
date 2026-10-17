@@ -6,6 +6,7 @@ using MentorTaskFlow.Contracts.Auth;
 using MentorTaskFlow.Contracts.Common;
 using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Identity;
+using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.IntegrationTests.Persistence;
@@ -451,24 +452,46 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
         (await known.Content.ReadAsStringAsync()).ShouldBe(await unknown.Content.ReadAsStringAsync());
     }
 
-    /// <summary>The link is never returned to the caller — otherwise anyone could reset any account.</summary>
+    /// <summary>
+    /// The request only queues a message: the link is minted when the message is sent, so the response
+    /// has nothing to leak — otherwise anyone could reset any account by asking.
+    /// </summary>
     [Fact]
-    public async Task Forgot_password_never_returns_the_token()
+    public async Task Forgot_password_queues_a_message_and_returns_no_token()
     {
         using var client = CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/v1/auth/forgot-password",
             new ForgotPasswordRequest("lead-head@mentortaskflow.test"));
 
-        var body = await response.Content.ReadAsStringAsync();
+        (await response.Content.ReadAsStringAsync()).ShouldBeEmpty();
 
         await using var context = fixture.CreateContext(suppressTenantFilter: true);
-        var issued = await context.UserSecurityTokens
-            .Where(t => t.Purpose == SecurityTokenPurpose.ResetPassword)
+
+        var queued = await context.NotificationOutbox
+            .Where(n => n.EventType == NotificationEventTypes.PasswordReset)
             .ToListAsync();
 
-        issued.ShouldHaveSingleItem();
-        body.ShouldNotContain(issued[0].TokenHash);
+        queued.ShouldHaveSingleItem().Channel.ShouldBe(NotificationChannel.Email);
+        (await context.UserSecurityTokens.AnyAsync(t => t.Purpose == SecurityTokenPurpose.ResetPassword)).ShouldBeFalse();
+    }
+
+    /// <summary>Asking for Telegram without a bound chat still reaches the person — by email.</summary>
+    [Fact]
+    public async Task Forgot_password_via_telegram_falls_back_to_email_without_a_binding()
+    {
+        using var client = CreateClient();
+
+        await client.PostAsJsonAsync("/api/v1/auth/forgot-password",
+            new ForgotPasswordRequest("lead-head@mentortaskflow.test", ForgotPasswordRequest.ChannelTelegram));
+
+        await using var context = fixture.CreateContext(suppressTenantFilter: true);
+
+        var queued = await context.NotificationOutbox
+            .Where(n => n.EventType == NotificationEventTypes.PasswordResetTelegram)
+            .ToListAsync();
+
+        queued.ShouldHaveSingleItem().Channel.ShouldBe(NotificationChannel.Email);
     }
 
     [Fact]

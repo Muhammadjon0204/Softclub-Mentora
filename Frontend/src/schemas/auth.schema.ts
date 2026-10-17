@@ -10,7 +10,10 @@ export const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-export const forgotPasswordSchema = z.object({ email: emailField });
+export const forgotPasswordSchema = z.object({
+  email: emailField,
+  channel: z.enum(['email', 'telegram']),
+});
 
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 

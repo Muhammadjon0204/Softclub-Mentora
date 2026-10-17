@@ -181,25 +181,17 @@ public sealed class AuthController(
     /// <c>POST /auth/forgot-password</c> — always 202 with an identical body (<c>AUTH-015</c>).
     /// </summary>
     /// <remarks>
-    /// The generated link is never returned to the caller. Doing so would let anyone reset any
-    /// account by simply asking; delivery is by email, to the address that already owns the account.
-    /// Until the notification module lands in Phase 3, the link is written to the log at Information.
+    /// The generated link is never returned to the caller, nor written to the log. Doing either would
+    /// let anyone who reads it reset the account; it goes only to the account's own mailbox or bound
+    /// Telegram chat, through the notification outbox.
     /// </remarks>
     [HttpPost("forgot-password")]
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitPolicies.ForgotPassword)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
-    public async Task<IActionResult> ForgotPasswordAsync(
-        ForgotPasswordRequest request,
-        [FromServices] ILogger<AuthController> logger,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
-        var link = await authService.ForgotPasswordAsync(request, RemoteIp, cancellationToken);
-
-        if (link is not null)
-        {
-            logger.LogInformation("Password reset link issued: {ResetLink}", link);
-        }
+        await authService.ForgotPasswordAsync(request, RemoteIp, cancellationToken);
 
         NoStore();
         return Accepted();

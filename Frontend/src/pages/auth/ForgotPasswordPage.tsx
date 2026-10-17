@@ -7,7 +7,7 @@ export function ForgotPasswordPage(): JSX.Element {
   return (
     <AuthCard
       title="Восстановление пароля"
-      description="Укажите email, привязанный к аккаунту. Мы отправим на него ссылку для установки нового пароля."
+      description="Укажите email аккаунта — пришлём ссылку для нового пароля на почту или в Telegram."
       footer={
         <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-700">
           Вернуться ко входу

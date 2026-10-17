@@ -28,8 +28,9 @@ public sealed class OutboxDispatcher(
     ILogger<OutboxDispatcher> logger,
     IClock clock,
 
-    // Only for minting a fresh set-password link at send time, for UserInvitation (see DeliverAsync)
-    // — NTF-017 forbids putting the token in the outbox row, so it cannot be resolved any earlier.
+    // Only for minting a fresh one-time link at send time — set-password for UserInvitation, reset for
+    // PasswordReset (see DeliverAsync). NTF-017 forbids putting the token in the outbox row, so it
+    // cannot be resolved any earlier.
     AuthService authService)
 {
     private readonly NotificationOptions _options = options.Value;
@@ -129,15 +130,29 @@ public sealed class OutboxDispatcher(
 
         var actionUrl = await BuildActionUrlAsync(row, cancellationToken);
 
-        var result = await sender.SendAsync(
-            new NotificationMessage(
-                row.EventType,
-                recipient.FullName,
-                recipient.Email,
-                recipient.TelegramChatId,
-                row.Payload,
-                actionUrl),
-            cancellationToken);
+        DeliveryResult result;
+
+        try
+        {
+            result = await sender.SendAsync(
+                new NotificationMessage(
+                    row.EventType,
+                    recipient.FullName,
+                    recipient.Email,
+                    recipient.TelegramChatId,
+                    row.Payload,
+                    actionUrl),
+                cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // An exception a sender did not classify must cost this row one attempt — not the batch.
+            // Left to propagate, it aborts the whole pass: every other row claimed with it (Telegram
+            // rows included) stays in Processing until its lease expires, and repeats of that burn
+            // their attempts until all of them dead-letter.
+            logger.LogError(exception, "Notification {EventType} failed on {Channel} with an unexpected error.", row.EventType, channel);
+            result = DeliveryResult.Retryable(exception.Message);
+        }
 
         if (result.Succeeded)
         {
@@ -196,7 +211,9 @@ public sealed class OutboxDispatcher(
     /// </remarks>
     private async Task<string?> BuildActionUrlAsync(NotificationOutbox row, CancellationToken cancellationToken)
     {
-        if (row.EventType != NotificationEventTypes.UserInvitation)
+        var isReset = row.EventType is NotificationEventTypes.PasswordReset or NotificationEventTypes.PasswordResetTelegram;
+
+        if (row.EventType != NotificationEventTypes.UserInvitation && !isReset)
         {
             return null;
         }
@@ -205,8 +222,13 @@ public sealed class OutboxDispatcher(
             .IgnoreQueryFilters()
             .FirstOrDefaultAsync(u => u.Id == row.UserId, cancellationToken);
 
-        return user is null
-            ? null
+        if (user is null)
+        {
+            return null;
+        }
+
+        return isReset
+            ? await authService.IssueResetPasswordLinkAsync(user, cancellationToken)
             : await authService.IssueSetPasswordLinkAsync(user, ipAddress: null, cancellationToken);
     }
 

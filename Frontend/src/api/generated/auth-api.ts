@@ -279,6 +279,11 @@ export interface components {
         ForgotPasswordRequest: {
             /** Format: email */
             email: string;
+            /**
+             * @description Куда отправить ссылку. telegram без привязанного чата уходит на почту.
+             * @enum {string}
+             */
+            channel?: "email" | "telegram";
         };
         ForgotPasswordResponse: {
             message: string;

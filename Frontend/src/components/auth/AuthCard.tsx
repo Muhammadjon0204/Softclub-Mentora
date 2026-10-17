@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { OfflineBanner } from '../OfflineBanner';
-import { BrandLogo } from './BrandLogo';
+import { BrandLogo } from '../../shared/branding/BrandLogo';
 
 interface AuthCardProps {
   title: string;
@@ -18,7 +18,7 @@ export function AuthCard({ title, description, children, footer }: AuthCardProps
       <div className="flex min-h-screen flex-col items-center justify-center px-4 py-10 sm:px-6">
         <main className="w-full max-w-md">
           <div className="mb-6 flex justify-center">
-            <BrandLogo />
+            <BrandLogo variant="full" />
           </div>
 
           <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-card sm:p-8">
