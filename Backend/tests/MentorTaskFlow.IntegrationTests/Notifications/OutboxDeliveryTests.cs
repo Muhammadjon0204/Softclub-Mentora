@@ -457,6 +457,7 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
             new TokenVersionValidator(context, new MemoryCache(new MemoryCacheOptions()), authOptions),
             new PasswordPolicy(),
             new AuditWriter(context, new StubCurrentUserAccessor(), new StubBranchContext(Guid.Empty, Guid.Empty), new StubRequestContext(), clock),
+            new OutboxWriter(context, new StubBranchContext(Guid.Empty, Guid.Empty), Metrics(), clock),
             authOptions,
             clock);
     }

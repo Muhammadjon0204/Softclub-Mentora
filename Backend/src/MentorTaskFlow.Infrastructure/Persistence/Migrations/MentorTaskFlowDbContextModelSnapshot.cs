@@ -999,7 +999,7 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_notification_outbox_attempts", "attempts BETWEEN 0 AND 5");
 
-                            t.HasCheckConstraint("ck_notification_outbox_branch_scope", "branch_id IS NOT NULL OR event_type IN ('BranchWithoutAdmin','NotificationDeadLetter','OrganizationSystemAlert','UserInvitation')");
+                            t.HasCheckConstraint("ck_notification_outbox_branch_scope", "branch_id IS NOT NULL OR event_type IN ('BranchWithoutAdmin','NotificationDeadLetter','OrganizationSystemAlert','PasswordReset','PasswordResetTelegram','UserInvitation')");
                         });
                 });
 

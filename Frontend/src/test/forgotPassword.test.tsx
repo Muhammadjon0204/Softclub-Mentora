@@ -30,6 +30,15 @@ describe('ForgotPasswordPage', () => {
     expect(unknownText).toBe(knownText);
   });
 
+  it('по выбору отправляет ссылку в Telegram и говорит, что без привязки она придёт на почту', async () => {
+    const { user } = renderApp('/forgot-password');
+    await user.type(await screen.findByLabelText('Email'), TEST_ACCOUNTS.admin);
+    await user.click(screen.getByRole('radio', { name: /в telegram/i }));
+    await user.click(screen.getByRole('button', { name: /отправить ссылку/i }));
+
+    expect(await screen.findByText(/отправлена в Telegram/i)).toHaveTextContent(/придёт на почту/i);
+  });
+
   it('не раскрывает существование аккаунта и не предлагает регистрацию', async () => {
     const { user } = renderApp('/forgot-password');
     await submitEmail(user, 'no-such-user@nowhere.test');

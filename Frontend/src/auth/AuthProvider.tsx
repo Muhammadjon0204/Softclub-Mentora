@@ -21,6 +21,9 @@ interface AuthProviderProps {
 
 const getServerSnapshot = (): string | null => null;
 
+/** Публичные страницы, с которых bootstrap никого не уводит на /login. */
+const PASSWORD_RECOVERY_PATHS = new Set(['/forgot-password', '/reset-password', '/set-password']);
+
 export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -66,9 +69,11 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
         clearSession();
 
         // Обычное «сессии нет» на первом визите — молча. А вот компрометация
-        // и провал CSRF должны быть видимы пользователю.
+        // и провал CSRF должны быть видимы пользователю — но не ценой страниц
+        // восстановления пароля: человек, который забыл пароль и пришёл со
+        // старыми cookie, иначе вообще не попадёт на форму сброса.
         const reason = sessionEndReasonFromError(error);
-        if (reason !== 'session-expired') {
+        if (reason !== 'session-expired' && !PASSWORD_RECOVERY_PATHS.has(window.location.pathname)) {
           navigate(`/login?reason=${reason}`, { replace: true });
         }
       }

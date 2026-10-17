@@ -114,6 +114,11 @@ public static class NotificationTemplates
             NotificationEventTypes.UserInvitation =>
                 ("Приглашение в Mentora", "Для вас создана учётная запись. Установите пароль, чтобы войти.", "Установить пароль"),
 
+            NotificationEventTypes.PasswordReset or NotificationEventTypes.PasswordResetTelegram =>
+                ("Сброс пароля Mentora",
+                    "Вы запросили сброс пароля. Ссылка действует 30 минут и сработает один раз. Если это были не вы — просто проигнорируйте сообщение, пароль останется прежним.",
+                    "Задать новый пароль"),
+
             _ => ("Уведомление Mentora", "Произошло событие в системе.", "Открыть приложение"),
         };
 
@@ -169,8 +174,8 @@ public static class NotificationTemplates
             details.Add($"Не доставлено уведомлений за период: {count}.");
         }
 
-        // UserInvitation carries a real, single-use action link (minted by the dispatcher at send
-        // time, never persisted — NTF-017); assignment events a relative path into the app; anything
+        // UserInvitation and PasswordReset carry a real, single-use action link (minted by the
+        // dispatcher at send time, never persisted — NTF-017); assignment events a relative path into the app; anything
         // else the start page.
         var link = actionUrl ?? (TryGetString(body, "actionPath") is { } path && path.StartsWith('/')
             ? appBaseUrl.TrimEnd('/') + path
@@ -208,6 +213,7 @@ public static class NotificationTemplates
             NotificationEventTypes.ReviewApproved => "🎉 ",
             NotificationEventTypes.ReviewNeedsRework => "🔁 ",
             NotificationEventTypes.AssignmentAssigned => "📌 ",
+            NotificationEventTypes.PasswordReset or NotificationEventTypes.PasswordResetTelegram => "🔑 ",
             _ => string.Empty,
         };
 

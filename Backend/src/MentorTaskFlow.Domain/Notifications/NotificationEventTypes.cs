@@ -47,6 +47,18 @@ public static class NotificationEventTypes
     /// <summary>Invitation to set a first password, produced on user creation and on bootstrap.</summary>
     public const string UserInvitation = "UserInvitation";
 
+    /// <summary>A password reset link the person asked for on the sign-in page, sent by email.</summary>
+    /// <remarks>Like the invitation, the link is minted by the dispatcher at send time and never stored
+    /// in the row (<c>NTF-017</c>).</remarks>
+    public const string PasswordReset = "PasswordReset";
+
+    /// <summary>The same reset link, sent to the bound Telegram chat — or by email when there is none.</summary>
+    /// <remarks>
+    /// A separate event rather than both channels at once: only one reset link may be live
+    /// (<c>AUTH-017</c>), and each send mints a new one, so a second channel would void the first.
+    /// </remarks>
+    public const string PasswordResetTelegram = "PasswordResetTelegram";
+
     /// <summary>
     /// The only event types permitted to carry <c>BranchId IS NULL</c> (<c>TEN-042</c>).
     /// </summary>
@@ -59,7 +71,8 @@ public static class NotificationEventTypes
     /// <para>
     /// <see cref="UserInvitation"/> is here because the bootstrap administrator is an Organization
     /// Admin with no branch (<c>DEPLOY-031</c>); an invitation to a Branch Admin, Lead or Mentor always
-    /// carries their branch.
+    /// carries their branch. The two reset events are here for the same administrator, who can forget
+    /// a password like anyone else.
     /// </para>
     /// </remarks>
     public static readonly IReadOnlySet<string> OrganizationLevelEvents = new HashSet<string>(StringComparer.Ordinal)
@@ -68,5 +81,7 @@ public static class NotificationEventTypes
         OrganizationSystemAlert,
         NotificationDeadLetter,
         UserInvitation,
+        PasswordReset,
+        PasswordResetTelegram,
     };
 }

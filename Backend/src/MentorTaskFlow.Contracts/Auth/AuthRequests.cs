@@ -20,7 +20,11 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 /// Always answered with 202 and an identical body whether or not the address exists, so the endpoint
 /// cannot be used to enumerate accounts (<c>AUTH-015</c>).
 /// </remarks>
-public sealed record ForgotPasswordRequest(string Email);
+public sealed record ForgotPasswordRequest(string Email, string? Channel = null)
+{
+    /// <summary>Delivery channel for the link: <c>email</c> (default) or <c>telegram</c>.</summary>
+    public const string ChannelTelegram = "telegram";
+}
 
 /// <summary><c>POST /auth/reset-password</c> — token from the emailed link, TTL 30 minutes.</summary>
 public sealed record ResetPasswordRequest(string Token, string NewPassword);

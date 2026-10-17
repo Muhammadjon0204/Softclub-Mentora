@@ -32,10 +32,11 @@ public sealed class NotificationCatalogTests
         ChannelPolicies.KnownEventTypes.ShouldBeSubsetOf(EventTypes);
 
     /// <summary>
-    /// The 19 of Приложение E, counted so an addition to one list without the other is caught.
+    /// The 19 of Приложение E, counted so an addition to one list without the other is caught — plus
+    /// the submission receipt and the two password-reset deliveries.
     /// </summary>
     [Fact]
-    public void The_catalog_holds_the_nineteen_events_and_the_submission_receipt() => EventTypes.Length.ShouldBe(20);
+    public void The_catalog_holds_the_nineteen_events_and_the_additions() => EventTypes.Length.ShouldBe(22);
 
     [Fact]
     public void The_submission_receipt_never_becomes_an_email() =>
@@ -54,6 +55,8 @@ public sealed class NotificationCatalogTests
                 NotificationEventTypes.OrganizationSystemAlert,
                 NotificationEventTypes.NotificationDeadLetter,
                 NotificationEventTypes.UserInvitation,
+                NotificationEventTypes.PasswordReset,
+                NotificationEventTypes.PasswordResetTelegram,
             ],
             ignoreOrder: true);
     }

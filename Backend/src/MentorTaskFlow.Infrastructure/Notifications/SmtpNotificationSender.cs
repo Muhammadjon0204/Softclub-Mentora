@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using MailKit;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MentorTaskFlow.Application.Common.Abstractions;
@@ -28,6 +29,16 @@ public sealed class SmtpNotificationSender(
             return DeliveryResult.Fatal("У получателя нет адреса электронной почты.");
         }
 
+        // A login without a password is a configuration error, not a network blip. Said plainly here it
+        // lands in the row's LastError and on the delivery health page, instead of surfacing as an
+        // authentication exception from the provider.
+        if (!string.IsNullOrEmpty(_options.SmtpUser) && string.IsNullOrEmpty(_options.SmtpPassword))
+        {
+            logger.LogError("SMTP is configured with a user but no password (Notifications__SmtpPassword).");
+
+            return DeliveryResult.Retryable("Не задан пароль SMTP (Notifications__SmtpPassword).");
+        }
+
         var rendered = NotificationTemplates.Render(message.EventType, message.Payload, _options.AppBaseUrl, message.ActionUrl);
 
         var mail = new MimeMessage
@@ -51,7 +62,7 @@ public sealed class SmtpNotificationSender(
 
             if (!string.IsNullOrEmpty(_options.SmtpUser))
             {
-                await client.AuthenticateAsync(_options.SmtpUser, _options.SmtpPassword, cancellationToken);
+                await client.AuthenticateAsync(_options.SmtpUser, _options.SmtpPassword!, cancellationToken);
             }
 
             var response = await client.SendAsync(mail, cancellationToken);
@@ -67,6 +78,22 @@ public sealed class SmtpNotificationSender(
             logger.LogWarning(exception, "SMTP rejected the recipient permanently.");
 
             return DeliveryResult.Fatal($"SMTP {exception.StatusCode}: {exception.Message}");
+        }
+        catch (AuthenticationException exception)
+        {
+            // Wrong or revoked credentials — for Gmail, an app password that was deleted or never set.
+            // Retryable, so the mail goes out once the password is fixed instead of being discarded.
+            logger.LogError(exception, "SMTP authentication failed. Check Notifications__SmtpUser and Notifications__SmtpPassword.");
+
+            return DeliveryResult.Retryable($"Ошибка входа в SMTP: {exception.Message}");
+        }
+        catch (Exception exception) when (exception is SslHandshakeException
+                                              or ServiceNotConnectedException
+                                              or ServiceNotAuthenticatedException)
+        {
+            logger.LogWarning(exception, "SMTP connection could not be established.");
+
+            return DeliveryResult.Retryable(exception.Message);
         }
         catch (Exception exception) when (exception is SmtpCommandException
                                               or SmtpProtocolException

@@ -61,6 +61,11 @@ public static class ChannelPolicies
             // The link is the whole message and it must reach a mailbox, not a chat the person has not
             // connected yet — they cannot have connected it before their first sign-in (AUTH-020).
             [NotificationEventTypes.UserInvitation] = ChannelPolicy.EmailOnly,
+
+            // The person picks the channel on the sign-in page. The Telegram variant falls back to the
+            // mailbox when no chat is bound, so asking for Telegram never leaves them with nothing.
+            [NotificationEventTypes.PasswordReset] = ChannelPolicy.EmailOnly,
+            [NotificationEventTypes.PasswordResetTelegram] = ChannelPolicy.TelegramPreferred,
         };
 
     /// <summary>
