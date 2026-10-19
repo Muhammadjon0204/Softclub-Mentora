@@ -7,6 +7,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -59,7 +60,7 @@ public sealed class OrphanObjectCleanupJob(
         DateTimeOffset cutoff,
         CancellationToken cancellationToken)
     {
-        var prefix = $"submissions/{organizationId}/{branchId}/";
+        var prefix = SubmissionStorageKey.BranchPrefix(organizationId, branchId);
         var deleted = 0;
 
         // The client paginates internally and yields one object at a time, so there is no

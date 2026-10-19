@@ -15,6 +15,7 @@ using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Identity;
+using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.IntegrationTests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -195,9 +196,15 @@ public sealed class ReviewTests(PostgresFixture postgres, MinioFixture minio) : 
 
         notification.UserId.ShouldBe(_mentorId);
 
-        // NTF-005: review text can be long and blunt, and email is not where it belongs. The
-        // notification says a decision exists; the interface shows what it was.
-        notification.Payload.RootElement.ToString().ShouldNotContain("индексы");
+        // NTF-005, as amended on 2026-10-11: the comment rides in the payload for Telegram, where a
+        // mentor reads «what to fix» on the move — but the email still only says that a decision
+        // exists and points to the interface.
+        var rendered = NotificationTemplates.Render(
+            notification.EventType, notification.Payload, "https://mentora.test");
+
+        rendered.PlainText.ShouldNotContain("индексы");
+        rendered.Html.ShouldNotContain("индексы");
+        rendered.TelegramHtml.ShouldContain("индексы");
     }
 
     [Theory]

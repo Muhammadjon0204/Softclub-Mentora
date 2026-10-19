@@ -502,11 +502,11 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
         using var client = CreateClient();
 
         var setResponse = await client.PostAsJsonAsync("/api/v1/auth/set-password",
-            new SetPasswordRequest(token, "Invited2026Task"));
+            new SetPasswordRequest(token, "Inv2026x"));
         setResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var login = await client.PostAsJsonAsync("/api/v1/auth/login",
-            new LoginRequest("invited@mentortaskflow.test", "Invited2026Task"));
+            new LoginRequest("invited@mentortaskflow.test", "Inv2026x"));
         login.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
@@ -518,9 +518,9 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
 
         using var client = CreateClient();
 
-        await client.PostAsJsonAsync("/api/v1/auth/set-password", new SetPasswordRequest(token, "Invited2026Task"));
+        await client.PostAsJsonAsync("/api/v1/auth/set-password", new SetPasswordRequest(token, "Inv2026x"));
         var replay = await client.PostAsJsonAsync("/api/v1/auth/set-password",
-            new SetPasswordRequest(token, "Another2026Task"));
+            new SetPasswordRequest(token, "Ano2026x"));
 
         replay.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await ReadCodeAsync(replay)).ShouldBe(ErrorCodes.SecurityTokenInvalid);
@@ -532,7 +532,7 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
         using var client = CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/v1/auth/set-password",
-            new SetPasswordRequest("made-up-token", "Invited2026Task"));
+            new SetPasswordRequest("made-up-token", "Inv2026x"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.SecurityTokenInvalid);
@@ -550,11 +550,11 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
         using var client = CreateClient();
 
         var weakWithBadToken = await client.PostAsJsonAsync("/api/v1/auth/set-password",
-            new SetPasswordRequest("made-up-token", "short"));
+            new SetPasswordRequest("made-up-token", "abc"));
         (await ReadCodeAsync(weakWithBadToken)).ShouldBe(ErrorCodes.SecurityTokenInvalid);
 
         var weakWithGoodToken = await client.PostAsJsonAsync("/api/v1/auth/set-password",
-            new SetPasswordRequest(token, "short"));
+            new SetPasswordRequest(token, "abc"));
         (await ReadCodeAsync(weakWithGoodToken)).ShouldBe(ErrorCodes.ValidationFailed);
     }
 
@@ -570,7 +570,7 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
 
         client.DefaultRequestHeaders.Authorization = new("Bearer", first.AccessToken);
         var change = await client.PostAsJsonAsync("/api/v1/auth/change-password",
-            new ChangePasswordRequest(ValidPassword, "Rotated2026Task"));
+            new ChangePasswordRequest(ValidPassword, "Rot2026x"));
 
         change.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -591,7 +591,7 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
 
         client.DefaultRequestHeaders.Authorization = new("Bearer", login.AccessToken);
         var response = await client.PostAsJsonAsync("/api/v1/auth/change-password",
-            new ChangePasswordRequest("WrongCurrent2026", "Rotated2026Task"));
+            new ChangePasswordRequest("WrongCurrent2026", "Rot2026x"));
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.ValidationFailed);
