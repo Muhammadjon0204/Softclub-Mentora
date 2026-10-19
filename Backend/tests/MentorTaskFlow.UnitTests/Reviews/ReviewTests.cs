@@ -127,11 +127,8 @@ public sealed class ReviewTests
             Guid.CreateVersion7(),
             assignment,
             versionNumber: 1,
-            "submissions/key.pdf",
-            "работа.pdf",
-            FileExtension.Pdf,
-            fileSizeBytes: 1024,
-            new string('a', 64),
+            new SubmittedFile("submissions/key.pdf", "работа.pdf", FileExtension.Pdf, 1024, new string('a', 64)),
+            comment: null,
             isLate: false,
             mentorId,
             Now);

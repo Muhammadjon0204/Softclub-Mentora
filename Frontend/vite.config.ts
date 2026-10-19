@@ -59,6 +59,9 @@ export default defineConfig({
     testTimeout: 15_000,
     css: false,
     restoreMocks: true,
+    // The tests run against the MSW mocks. Set here rather than in .env.test, which .gitignore keeps
+    // out of the repository — CI never had it, so mock-dependent tests passed locally and failed there.
+    env: { VITE_USE_MOCKS: 'true', VITE_API_BASE_URL: '' },
     include: ['src/**/*.test.{ts,tsx}'],
   },
 });

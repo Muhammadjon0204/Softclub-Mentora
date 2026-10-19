@@ -444,6 +444,10 @@ uploads/
 storage/
 local-storage/
 object-storage/
+# The rule above is for runtime folders. On Windows (case-insensitive) it also swallowed the
+# Storage namespaces of the backend, so their tests never reached the repository or CI.
+!Backend/src/**/Storage/
+!Backend/tests/**/Storage/
 generated-files/
 signed-files/
 quarantine/

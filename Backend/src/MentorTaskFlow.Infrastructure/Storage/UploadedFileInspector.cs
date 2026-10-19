@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
 using MentorTaskFlow.Application.Common.Exceptions;
+using MentorTaskFlow.Contracts.Common;
 using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Infrastructure.Options;
 using Microsoft.Extensions.Options;
@@ -11,12 +13,31 @@ namespace MentorTaskFlow.Infrastructure.Storage;
 /// Validates an uploaded file against the limits before it reaches the bucket.
 /// </summary>
 /// <remarks>
-/// The order follows TZ 17.2 steps 8–9: size → magic bytes → archive safety. A rejected file never
-/// reaches storage, so a temporary file is the only side effect of a bad upload.
+/// The order follows TZ 17.2 steps 7–9: allowlist → size → signature → archive safety → structure.
+/// A rejected file never reaches storage, so a temporary file is the only side effect of a bad upload.
+/// Each failure has its own code and status (415, 413, 422), so a client can tell «wrong type» from
+/// «too big» from «damaged».
 /// </remarks>
 public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 {
+    private const string PdfMime = "application/pdf";
+    private const string PptxMime = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+    // The content type a presentation's own [Content_Types].xml declares for its main part.
+    private const string PresentationMainContentType = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+
+    private const string ContentTypesPart = "[Content_Types].xml";
+    private const string PresentationPart = "ppt/presentation.xml";
+
+    // 17.3: the trailer is looked for in the last kilobyte only.
+    private const int PdfTrailerWindow = 1024;
+    private const int MaxEntryNameLength = 255;
+
+    // [Content_Types].xml is a short manifest; anything bigger is not read into memory.
+    private const int MaxContentTypesBytes = 1024 * 1024;
+
     private static readonly byte[] PdfMagic = "%PDF"u8.ToArray();
+    private static readonly byte[] PdfTrailer = "%%EOF"u8.ToArray();
 
     // PPTX is a ZIP: PK\x03\x04.
     private static readonly byte[] ZipMagic = [0x50, 0x4B, 0x03, 0x04];
@@ -24,27 +45,42 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
     private readonly StorageOptions _options = options.Value;
 
     /// <summary>
-    /// Resolves the canonical <see cref="FileExtension"/> from the file name and content type.
+    /// Resolves the canonical <see cref="FileExtension"/> from the file name (<c>SUB-011</c>).
     /// </summary>
+    /// <remarks>
+    /// The name decides; the declared content type can only veto. A PDF declared as a presentation is
+    /// either a confused client or an attempt to store a file under one type and serve it as another.
+    /// <c>application/octet-stream</c> and anything unrelated are let through — browsers send them
+    /// often enough that refusing would break real uploads, and the signature check follows anyway.
+    /// </remarks>
     public static FileExtension ResolveExtension(string? fileName, string? contentType)
     {
-        var ext = Path.GetExtension(fileName)?.ToLowerInvariant();
-
-        return ext switch
+        var extension = Path.GetExtension(fileName)?.ToLowerInvariant() switch
         {
             ".pdf" => FileExtension.Pdf,
             ".pptx" => FileExtension.Pptx,
-            _ => contentType?.ToLowerInvariant() switch
-            {
-                "application/pdf" => FileExtension.Pdf,
-                "application/vnd.openxmlformats-officedocument.presentationml.presentation" => FileExtension.Pptx,
-                _ => throw new ValidationAppException("file", "Допустимы только PDF и PPTX файлы."),
-            },
+            _ => throw new UnsupportedMediaTypeException(ErrorCodes.FileTypeNotAllowed, "Допустимы только PDF и PPTX файлы."),
         };
+
+        var declared = contentType?.Split(';')[0].Trim().ToLowerInvariant();
+        var contradicts = (extension, declared) switch
+        {
+            (FileExtension.Pdf, PptxMime) => true,
+            (FileExtension.Pptx, PdfMime) => true,
+            _ => false,
+        };
+
+        if (contradicts)
+        {
+            throw new UnsupportedMediaTypeException(ErrorCodes.FileTypeNotAllowed, "Тип файла не совпадает с его расширением.");
+        }
+
+        return extension;
     }
 
     /// <summary>
-    /// Spools the upload to a temporary file, checks size, magic bytes and (for PPTX) archive safety.
+    /// Spools the upload to a temporary file, checks size, signature and (for PPTX) archive safety and
+    /// structure.
     /// </summary>
     public async Task<InspectedFile> InspectAsync(
         Stream source,
@@ -52,11 +88,10 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
         long? declaredLength,
         CancellationToken cancellationToken)
     {
-        // Step 8: reject obviously oversized uploads before reading the body.
+        // SUB-014: an oversized declared length is refused before the body is read at all.
         if (declaredLength > _options.MaxFileBytes)
         {
-            throw new ValidationAppException("file",
-                $"Размер файла не должен превышать {_options.MaxFileBytes / (1024 * 1024)} МБ.");
+            throw TooLarge();
         }
 
         // Spool to a temporary file so memory stays flat regardless of file size.
@@ -85,10 +120,11 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
             {
                 totalBytes += bytesRead;
 
+                // SUB-012: the limit is enforced on bytes actually read, not on a header the client
+                // controls.
                 if (totalBytes > _options.MaxFileBytes)
                 {
-                    throw new ValidationAppException("file",
-                        $"Размер файла не должен превышать {_options.MaxFileBytes / (1024 * 1024)} МБ.");
+                    throw TooLarge();
                 }
 
                 sha256.AppendData(buffer.AsSpan(0, bytesRead));
@@ -97,20 +133,25 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
             if (totalBytes == 0)
             {
-                throw new ValidationAppException("file", "Файл пуст.");
+                throw new UnprocessableEntityException(ErrorCodes.FileEmpty, "Файл пуст.");
+            }
+
+            // SUB-014 from the other side: neither value is trustworthy alone, and the disagreement is
+            // itself the problem.
+            if (declaredLength is { } declared && declared != totalBytes)
+            {
+                throw new ValidationAppException("file", "Размер файла не совпадает с заявленным.");
             }
 
             var hash = Convert.ToHexStringLower(sha256.GetHashAndReset());
 
-            // Step 9a: magic bytes.
             tempStream.Position = 0;
-            await ValidateMagicBytesAsync(tempStream, extension, cancellationToken);
+            await ValidateSignatureAsync(tempStream, extension, totalBytes, cancellationToken);
 
-            // Step 9b: archive safety for PPTX (which is a ZIP).
             if (extension is FileExtension.Pptx)
             {
                 tempStream.Position = 0;
-                ValidateArchiveSafety(tempStream);
+                ValidatePresentation(tempStream);
             }
 
             tempStream.Position = 0;
@@ -124,21 +165,51 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
         }
     }
 
-    private static async Task ValidateMagicBytesAsync(
-        Stream stream, FileExtension extension, CancellationToken cancellationToken)
+    private PayloadTooLargeException TooLarge() =>
+        new(ErrorCodes.FileTooLarge, $"Размер файла не должен превышать {_options.MaxFileBytes / (1024 * 1024)} МБ.");
+
+    private static UnprocessableEntityException SignatureMismatch(FileExtension extension) =>
+        new(ErrorCodes.FileSignatureMismatch, $"Файл не является допустимым {(extension is FileExtension.Pdf ? "PDF" : "PPTX")}.");
+
+    private static UnprocessableEntityException ZipLimit(string detail) => new(ErrorCodes.ZipSafetyLimitExceeded, detail);
+
+    private static UnprocessableEntityException BrokenPresentation() =>
+        new(ErrorCodes.PptxStructureInvalid, "Файл не является презентацией PowerPoint.");
+
+    /// <summary>Magic bytes, and for PDF the <c>%%EOF</c> trailer in the last kilobyte (17.3).</summary>
+    private static async Task ValidateSignatureAsync(
+        Stream stream, FileExtension extension, long length, CancellationToken cancellationToken)
     {
         var expected = extension is FileExtension.Pdf ? PdfMagic : ZipMagic;
         var header = new byte[expected.Length];
         var read = await stream.ReadAtLeastAsync(header, expected.Length, throwOnEndOfStream: false, cancellationToken);
 
-        if (read < expected.Length || !header.AsSpan(0, expected.Length).SequenceEqual(expected))
+        if (read < expected.Length || !header.AsSpan().SequenceEqual(expected))
         {
-            var label = extension is FileExtension.Pdf ? "PDF" : "PPTX";
-            throw new ValidationAppException("file", $"Файл не является допустимым {label}.");
+            throw SignatureMismatch(extension);
+        }
+
+        if (extension is not FileExtension.Pdf)
+        {
+            return;
+        }
+
+        var window = (int)Math.Min(PdfTrailerWindow, length);
+        var tail = new byte[window];
+        stream.Position = length - window;
+        await stream.ReadExactlyAsync(tail, cancellationToken);
+
+        if (tail.AsSpan().IndexOf(PdfTrailer) < 0)
+        {
+            throw SignatureMismatch(extension);
         }
     }
 
-    private void ValidateArchiveSafety(Stream stream)
+    /// <summary>
+    /// <c>SUB-017</c> and <c>SUB-018</c>: the archive limits first, from the central directory alone —
+    /// nothing is extracted — then the OPC parts that distinguish a presentation from any renamed ZIP.
+    /// </summary>
+    private void ValidatePresentation(Stream stream)
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.ZipValidationTimeoutSeconds));
 
@@ -148,8 +219,7 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
 
             if (archive.Entries.Count > _options.ZipMaxEntries)
             {
-                throw new ValidationAppException("file",
-                    $"Архив содержит больше {_options.ZipMaxEntries} файлов.");
+                throw ZipLimit($"Архив содержит больше {_options.ZipMaxEntries} файлов.");
             }
 
             long totalUncompressed = 0;
@@ -158,27 +228,52 @@ public sealed class UploadedFileInspector(IOptions<StorageOptions> options)
             {
                 cts.Token.ThrowIfCancellationRequested();
 
+                var name = entry.FullName;
+
+                // A name that could leave its directory if anything ever unpacked the file.
+                if (name.Length > MaxEntryNameLength
+                    || name.StartsWith('/')
+                    || name.Contains('\\')
+                    || name.Split('/').Contains(".."))
+                {
+                    throw ZipLimit("Архив содержит недопустимое имя файла.");
+                }
+
                 totalUncompressed += entry.Length;
 
                 if (totalUncompressed > _options.ZipMaxUncompressedBytes)
                 {
-                    throw new ValidationAppException("file", "Архив превышает допустимый размер после распаковки.");
+                    throw ZipLimit("Архив превышает допустимый размер после распаковки.");
                 }
 
                 if (entry.CompressedLength > 0
                     && entry.Length / entry.CompressedLength > _options.ZipMaxRatio)
                 {
-                    throw new ValidationAppException("file", "Подозрительная степень сжатия (возможная zip-бомба).");
+                    throw ZipLimit("Подозрительная степень сжатия (возможная zip-бомба).");
                 }
+            }
+
+            var contentTypes = archive.GetEntry(ContentTypesPart);
+
+            if (contentTypes is null || archive.GetEntry(PresentationPart) is null || contentTypes.Length > MaxContentTypesBytes)
+            {
+                throw BrokenPresentation();
+            }
+
+            using var reader = new StreamReader(contentTypes.Open(), Encoding.UTF8);
+
+            if (!reader.ReadToEnd().Contains(PresentationMainContentType, StringComparison.OrdinalIgnoreCase))
+            {
+                throw BrokenPresentation();
             }
         }
         catch (InvalidDataException)
         {
-            throw new ValidationAppException("file", "Файл PPTX повреждён или не является валидным ZIP-архивом.");
+            throw BrokenPresentation();
         }
         catch (OperationCanceledException)
         {
-            throw new ValidationAppException("file", "Проверка архива превысила допустимое время.");
+            throw ZipLimit("Проверка архива превысила допустимое время.");
         }
     }
 }

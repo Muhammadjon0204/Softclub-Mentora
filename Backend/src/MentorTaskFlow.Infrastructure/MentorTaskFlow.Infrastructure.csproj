@@ -26,4 +26,9 @@
     <ProjectReference Include="..\MentorTaskFlow.Domain\MentorTaskFlow.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Fixtures build storage clients and keys the same way production does. -->
+    <InternalsVisibleTo Include="MentorTaskFlow.IntegrationTests" />
+  </ItemGroup>
+
 </Project>
