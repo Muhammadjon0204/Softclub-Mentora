@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, EyeOff, LogOut, Monitor } from 'lucide-react';
+import { Eye, EyeOff, LogOut, Monitor, Smartphone } from 'lucide-react';
 import { useState } from 'react';
 
 import { getGenericErrorMessage } from '../../api/problemDetails';
@@ -11,7 +11,7 @@ import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { FormField, FormInput } from '../../shared/ui/FormField';
 import { pluralizeRu } from '../admin-assignments/assignmentPresentation';
-import { describeBrowser } from './profilePresentation';
+import { describeBrowser, isHandheld } from './profilePresentation';
 
 const SESSIONS_QUERY_KEY = ['auth', 'sessions'] as const;
 
@@ -93,25 +93,39 @@ export function ProfileSecurityCard(): JSX.Element {
           </FormField>
         </div>
         <div className="flex justify-end">
-          <Button variant="primary" type="submit" disabled={!canSubmit}>{saving ? 'Обновляем…' : 'Обновить пароль'}</Button>
+          <Button variant="primary" type="submit" className="w-full sm:w-auto" disabled={!canSubmit}>{saving ? 'Обновляем…' : 'Обновить пароль'}</Button>
         </div>
       </form>
 
-      <div className="flex flex-wrap items-center gap-4 border-t border-divider px-5 py-4 sm:px-6">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-control bg-surface-muted text-ink-secondary">
-          <Monitor className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-medium text-ink">
-            Это устройство · {describeBrowser(navigator.userAgent)}
-          </p>
-          <p className="text-[12px] text-ink-muted">
-            {lastLogin ? `Последний вход: ${new Date(lastLogin).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Последний вход: —'}
-            {' · '}
-            {sessionsQuery.isPending ? 'проверяем другие устройства…' : others === 0 ? 'других активных сессий нет' : `ещё ${String(others)} ${pluralizeRu(others, 'активная сессия', 'активные сессии', 'активных сессий')}`}
-          </p>
+      {/* Телефон: текст на всю ширину, кнопка под ним во всю строку. С sm — одна строка, кнопка справа. */}
+      <div className="flex flex-col gap-4 border-t border-divider px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+        <div className="flex min-w-0 flex-1 items-start gap-3.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-control bg-surface-muted text-ink-secondary">
+            {isHandheld(navigator.userAgent)
+              ? <Smartphone className="h-5 w-5" aria-hidden="true" />
+              : <Monitor className="h-5 w-5" aria-hidden="true" />}
+          </span>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13.5px] font-medium leading-5 text-ink">
+              <span>{describeBrowser(navigator.userAgent)}</span>
+              <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">Это устройство</span>
+            </p>
+            <p className="text-[12px] leading-[17px] text-ink-muted">
+              {lastLogin ? `Последний вход: ${new Date(lastLogin).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Последний вход: —'}
+            </p>
+            <p className="flex items-center gap-1.5 text-[12px] leading-[17px] text-ink-muted">
+              <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${others > 0 ? 'bg-warning' : 'bg-success'}`} />
+              {sessionsQuery.isPending ? 'Проверяем другие устройства…' : others === 0 ? 'Других активных сессий нет' : `Ещё ${String(others)} ${pluralizeRu(others, 'активная сессия', 'активные сессии', 'активных сессий')}`}
+            </p>
+          </div>
         </div>
-        <Button variant="secondary" leadingIcon={<LogOut className="h-4 w-4" aria-hidden="true" />} disabled={others === 0 || revoke.isPending} onClick={() => { setConfirmRevoke(true); }}>
+        <Button
+          variant="secondary"
+          className="w-full shrink-0 sm:w-auto"
+          leadingIcon={<LogOut className="h-4 w-4" aria-hidden="true" />}
+          disabled={others === 0 || revoke.isPending}
+          onClick={() => { setConfirmRevoke(true); }}
+        >
           Завершить другие сессии
         </Button>
       </div>
