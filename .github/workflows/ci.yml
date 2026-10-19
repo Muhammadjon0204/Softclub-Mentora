@@ -62,6 +62,24 @@ jobs:
           --configuration Release --no-build
           --logger "trx;LogFileName=integration.trx" --results-directory TestResults
 
+      # Логи job видны только с правами администратора, а аннотации — всем, кто видит PR:
+      # имя упавшего теста и первая строка ошибки сразу на странице проверки.
+      - name: Report failed tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          ns = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+          for path in glob.glob('TestResults/*.trx'):
+              for result in ET.parse(path).getroot().iterfind('.//t:UnitTestResult', ns):
+                  if result.get('outcome') != 'Failed':
+                      continue
+                  message = result.find('.//t:Message', ns)
+                  text = ' '.join((message.text if message is not None else '').split())[:900]
+                  name = result.get('testName', '?').split('.')[-1][:120]
+                  print(f'::error title={name}::{text}')
+          PY
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

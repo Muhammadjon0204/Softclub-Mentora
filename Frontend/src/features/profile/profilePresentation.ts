@@ -72,6 +72,11 @@ export function timeZoneLabel(timeZoneId: string): string {
 }
 
 /** «Chrome · Windows» — грубо, но достаточно, чтобы узнать своё устройство. */
+/** Телефон или планшет — для иконки устройства в блоке сессий. */
+export function isHandheld(userAgent: string): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile/.test(userAgent);
+}
+
 export function describeBrowser(userAgent: string): string {
   const browser = /Edg\//.test(userAgent)
     ? 'Edge'
