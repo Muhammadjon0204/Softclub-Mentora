@@ -15,6 +15,7 @@ import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { MentorDirectoryEntry } from '../../features/lead/scope/leadWorkspace';
+import { UserAvatar } from '../../features/avatars/UserAvatar';
 
 // Deactivated mentors are not listed at all: a Lead cannot reactivate them (an admin action) and they
 // only cluttered the roster. Invited ones stay one click away — they were just added and are waiting
@@ -27,10 +28,6 @@ const STATUS_OPTIONS: { value: VisibleStatus; label: string }[] = [
 
 const STATUS_TONE: Record<MentorDirectoryEntry['status'], 'success' | 'neutral' | 'danger'> = { Active: 'success', Invited: 'neutral', Locked: 'danger' };
 const STATUS_LABEL: Record<MentorDirectoryEntry['status'], string> = { Active: 'Активен', Invited: 'Приглашён', Locked: 'Заблокирован' };
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
 
 /**
  * `/lead/team` (ТЗ 2.2, раздел 24.4 — маршрут в таблице называется «Команда»,
@@ -139,9 +136,7 @@ export function TeamPage(): JSX.Element {
                     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMentor(mentor.id); } }}
                     className={`flex cursor-pointer items-center gap-3.5 px-5 py-3.5 outline-none transition-colors duration-150 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand sm:px-6 ${mentor.id === mentorId ? 'bg-brand-soft' : ''}`}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12.5px] font-semibold text-brand">
-                      {initialsOf(mentor.fullName)}
-                    </span>
+                    <UserAvatar userId={mentor.id} name={mentor.fullName} size={null} className="h-10 w-10 text-[12.5px]" fallbackClassName="bg-brand-soft text-brand" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-semibold text-ink">{mentor.fullName}</p>
                       <p className="mt-0.5 truncate text-[12px] text-ink-muted">{mentor.email}</p>

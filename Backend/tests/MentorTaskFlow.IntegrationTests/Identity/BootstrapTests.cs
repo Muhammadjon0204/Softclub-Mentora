@@ -11,6 +11,8 @@ using MentorTaskFlow.IntegrationTests.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 
 namespace MentorTaskFlow.IntegrationTests.Identity;
 
@@ -178,6 +180,10 @@ public sealed class BootstrapTests(PostgresFixture fixture) : IAsyncLifetime
         services.AddScoped<IRequestContext, BackgroundRequestContext>();
         services.AddScoped<ICurrentUserAccessor, NoPrincipalAccessor>();
         services.AddScoped<IBranchContext, UnavailableBranchContext>();
+
+        // Production, so the development-only password shortcut stays out of these tests: they are
+        // about the set-password link a real deployment issues.
+        services.AddSingleton<IHostEnvironment>(new HostingEnvironment { EnvironmentName = Environments.Production });
 
         await using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();

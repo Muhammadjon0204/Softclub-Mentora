@@ -1276,7 +1276,8 @@ public sealed class UserService(
         user.LastLoginAt,
         user.CreatedAt,
         concurrencyToken,
-        branch);
+        branch,
+        AvatarService.UrlFor(user.AvatarKey));
 
     /// <summary>Carries the shadow <c>xmin</c> out of a no-tracking query alongside its entity.</summary>
     private sealed record UserRow(User User, uint Xmin);

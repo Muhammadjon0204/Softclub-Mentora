@@ -29,9 +29,8 @@ export function MentorTopbar({ onOpenMobileSidebar }: MentorTopbarProps): JSX.El
       <div className="hidden min-w-0 flex-1 lg:block">
         <MentorBreadcrumbs />
       </div>
-      <div className="min-w-0 flex-1 lg:hidden" />
-
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      {/* На телефоне правая группа может сжиматься: бейдж обрезается, а не выталкивает аватар за край. */}
+      <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
         <MentorWorkspaceBadge />
 
         {!isOnline ? (

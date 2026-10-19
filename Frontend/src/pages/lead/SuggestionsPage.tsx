@@ -18,10 +18,7 @@ import { Badge } from '../../shared/ui/Badge';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
+import { UserAvatar } from '../../features/avatars/UserAvatar';
 
 /**
  * `/lead/suggestions` (ТЗ 2.2, раздел 24.4) — очередь предложений планировщика
@@ -83,9 +80,7 @@ export function SuggestionsPage(): JSX.Element {
               </div>
 
               {/* Ряд 1 (шапка) — аватар фиксированного размера, высота ряда не варьируется. */}
-              <span className="mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-semibold text-brand">
-                {initialsOf(mentorNameOf(a.mentorId))}
-              </span>
+              <UserAvatar userId={a.mentorId} name={mentorNameOf(a.mentorId)} size={null} className="mb-3 h-10 w-10 text-[12px]" fallbackClassName="bg-brand-soft text-brand" />
 
               {/* Ряд 2 (заголовок) — `min-h` резервирует высоту ровно под 2 строки (leading-5 = 20px × 2) независимо
                   от фактической длины текста, поэтому ряды 3–6 у всех карточек в одной строке grid стартуют

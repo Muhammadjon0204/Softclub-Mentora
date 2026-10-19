@@ -20,10 +20,7 @@ import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignment
 import { useToast } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
+import { UserAvatar } from '../../features/avatars/UserAvatar';
 
 /** Убирает суффикс «назад» из `formatRelative` — на этой странице длительность ожидания подписана колонкой, повторное «назад» лишнее. */
 function waitingLabel(waitingSinceMs: number): string {
@@ -78,9 +75,7 @@ function ReviewQueueRow({ assignment: a, timeZoneId, waitingSince, selected, onO
 
   const mentorBlock = (
     <div className="flex min-w-0 items-center gap-2">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[9.5px] font-semibold text-brand">
-        {initialsOf(mentorNameOf(a.mentorId))}
-      </span>
+      <UserAvatar userId={a.mentorId} name={mentorNameOf(a.mentorId)} size={null} className="h-6 w-6 text-[9.5px]" fallbackClassName="bg-brand-soft text-brand" />
       <span className="truncate text-[12.5px] font-medium text-ink-secondary">{mentorNameOf(a.mentorId)}</span>
     </div>
   );

@@ -6,6 +6,7 @@ import { MotionConfig } from 'framer-motion';
 
 import { AuthProvider } from './auth/AuthProvider';
 import { RealtimeSync } from './realtime/RealtimeSync';
+import { AppUpdateWatcher } from './shared/update/AppUpdateWatcher';
 import { AppRouter } from './routes/AppRouter';
 import { OverlayProvider, ToastProvider } from './shared/overlays';
 import './index.css';
@@ -38,6 +39,7 @@ createRoot(container).render(
             <OverlayProvider>
               <ToastProvider>
                 <AppRouter />
+                <AppUpdateWatcher />
               </ToastProvider>
             </OverlayProvider>
           </MotionConfig>

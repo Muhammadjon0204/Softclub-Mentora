@@ -23,7 +23,15 @@ internal static class SubmissionStorageKey
     {
         var suffix = Submission.SuffixOf(extension);
 
-        return $"orgs/{organizationId}/branches/{branchId}/categories/{categoryId}" +
+        return $"{BranchPrefix(organizationId, branchId)}categories/{categoryId}" +
                $"/assignments/{assignmentId}/submissions/{submissionId}{suffix}";
     }
+
+    /// <summary>
+    /// The prefix every key of one branch starts with — the unit the orphan sweep lists (<c>TEN-067</c>).
+    /// </summary>
+    /// <remarks>Built here, next to <see cref="For"/>, so the two cannot drift apart again: they once
+    /// did, and the sweep listed a prefix no object lived under.</remarks>
+    public static string BranchPrefix(Guid organizationId, Guid branchId) =>
+        $"orgs/{organizationId}/branches/{branchId}/";
 }

@@ -71,6 +71,16 @@ public sealed class User : AuditableEntity
     public string? TelegramChatId { get; private set; }
 
     /// <summary>
+    /// File name of the profile photo in storage, or null for the initials avatar.
+    /// </summary>
+    /// <remarks>
+    /// Random and replaced on every upload, never reused: the name is the photo's address, so a new
+    /// photo is a new URL and every cache — the browser's, a proxy's — can keep the old one for ever
+    /// without ever showing it in place of the new.
+    /// </remarks>
+    public string? AvatarKey { get; private set; }
+
+    /// <summary>
     /// Incremented on any change to scope or access level: password, role, admin scope, category,
     /// branch, deactivation, refresh-token reuse (<c>AUTH-034</c>). Carried in the access token as
     /// the <c>tv</c> claim, which is what makes revocation effective within 30 seconds.
@@ -202,6 +212,44 @@ public sealed class User : AuditableEntity
     /// its own operation (<c>API-009</c>). The email is not editable either: it is the sign-in
     /// identity and globally unique (<c>TEN-028</c>).
     /// </remarks>
+    /// <summary>Sets a new profile photo and returns the previous one's key, for removal from storage.</summary>
+    public string? ReplaceAvatar(string avatarKey, DateTimeOffset now)
+    {
+        if (!IsValidAvatarKey(avatarKey))
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Недопустимое имя файла фотографии.");
+        }
+
+        var previous = AvatarKey;
+        AvatarKey = avatarKey;
+        UpdatedAt = now;
+        return previous;
+    }
+
+    /// <summary>Back to the initials avatar; returns the removed photo's key, or null if there was none.</summary>
+    public string? RemoveAvatar(DateTimeOffset now)
+    {
+        var previous = AvatarKey;
+
+        if (previous is not null)
+        {
+            AvatarKey = null;
+            UpdatedAt = now;
+        }
+
+        return previous;
+    }
+
+    /// <summary>
+    /// 32 lowercase hex characters and the extension — exactly what the server generates, so nothing a
+    /// client sends can become a storage path.
+    /// </summary>
+    public static bool IsValidAvatarKey(string? key) =>
+        key is { Length: <= AvatarKeyMaxLength }
+        && System.Text.RegularExpressions.Regex.IsMatch(key, "^[0-9a-f]{32}\\.(webp|jpg)$");
+
+    public const int AvatarKeyMaxLength = 40;
+
     public void Rename(string fullName, DateTimeOffset now)
     {
         var trimmed = (fullName ?? string.Empty).Trim();

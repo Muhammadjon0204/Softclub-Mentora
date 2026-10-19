@@ -25,7 +25,8 @@ public sealed record UserDto(
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt,
     string ConcurrencyToken,
-    BranchSummaryDto? Branch);
+    BranchSummaryDto? Branch,
+    string? AvatarUrl = null);
 
 /// <summary>
 /// <c>POST /users</c>.

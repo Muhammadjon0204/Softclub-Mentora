@@ -19,6 +19,7 @@ export type PriorityReason = 'overdue' | 'waiting-review' | 'rework-due-soon' | 
 export interface PriorityQueueItem {
   assignmentId: string;
   title: string;
+  mentorId: string;
   mentorName: string;
   status: LeadAssignmentStatus;
   reason: PriorityReason;
@@ -115,6 +116,7 @@ export function useLeadDashboard(): {
       priorityCandidates.push({
         assignmentId: a.id,
         title: a.title,
+        mentorId: a.mentorId,
         mentorName: mentorNameFallback(a.mentorId, mentors),
         status: a.status,
         reason: 'overdue',
@@ -129,6 +131,7 @@ export function useLeadDashboard(): {
       priorityCandidates.push({
         assignmentId: a.id,
         title: a.title,
+        mentorId: a.mentorId,
         mentorName: mentorNameFallback(a.mentorId, mentors),
         status: a.status,
         reason: 'waiting-review',
@@ -144,7 +147,8 @@ export function useLeadDashboard(): {
         priorityCandidates.push({
           assignmentId: a.id,
           title: a.title,
-          mentorName: mentorNameFallback(a.mentorId, mentors),
+          mentorId: a.mentorId,
+        mentorName: mentorNameFallback(a.mentorId, mentors),
           status: a.status,
           reason: 'rework-due-soon',
           detailLabel: `Новый дедлайн ${formatRelative(a.currentDueAt).label}`,
@@ -160,7 +164,8 @@ export function useLeadDashboard(): {
         priorityCandidates.push({
           assignmentId: a.id,
           title: a.title,
-          mentorName: mentorNameFallback(a.mentorId, mentors),
+          mentorId: a.mentorId,
+        mentorName: mentorNameFallback(a.mentorId, mentors),
           status: a.status,
           reason: 'in-review-long',
           detailLabel: `На проверке ${formatRelative(reviewingSince).label}`,

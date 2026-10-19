@@ -4,10 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { TeamSummaryRow } from './useLeadDashboard';
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
+import { UserAvatar } from '../avatars/UserAvatar';
 
 const STATUS_DOT: Record<TeamSummaryRow['status'], string> = {
   Active: 'bg-success',
@@ -41,8 +38,8 @@ export function TeamSummaryCard({ team }: { team: TeamSummaryRow[] }): JSX.Eleme
         <ul className="divide-y divide-divider">
           {team.slice(0, 6).map((mentor) => (
             <li key={mentor.mentorId} className="flex items-center gap-3.5 px-5 py-3.5 sm:px-6">
-              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand">
-                {initialsOf(mentor.fullName)}
+              <span className="relative shrink-0">
+                <UserAvatar userId={mentor.mentorId} name={mentor.fullName} size={null} className="h-9 w-9 text-[11px]" />
                 <span aria-hidden="true" className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface ${STATUS_DOT[mentor.status]}`} />
               </span>
               <div className="min-w-0 flex-1">

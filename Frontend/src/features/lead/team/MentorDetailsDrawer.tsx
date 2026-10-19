@@ -10,15 +10,12 @@ import type { MentorDirectoryEntry } from '../scope/leadWorkspace';
 import { useLeadScope } from '../scope/useLeadScope';
 import { useScopedLeadAssignments } from '../scope/useScopedLeadAssignments';
 import type { RealLeadMentor } from '../scope/useScopedLeadMentors';
+import { UserAvatar } from '../../avatars/UserAvatar';
 
 export interface MentorDetailsDrawerProps {
   mentor: RealLeadMentor | undefined;
   mentorId: string | null;
   onClose: () => void;
-}
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
 }
 
 const STATUS_LABEL: Record<MentorDirectoryEntry['status'], string> = { Active: 'Активен', Invited: 'Приглашён', Locked: 'Заблокирован' };
@@ -47,9 +44,7 @@ export function MentorDetailsDrawer({ mentor, mentorId, onClose }: MentorDetails
       ) : (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[15px] font-semibold text-brand">
-              {initialsOf(mentor.fullName)}
-            </span>
+            <UserAvatar userId={mentor.id} name={mentor.fullName} size={null} className="h-12 w-12 text-[15px]" fallbackClassName="bg-brand-soft text-brand" />
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold text-ink">{mentor.fullName}</p>
               <p className="truncate text-[12.5px] text-ink-muted">{mentor.email}</p>

@@ -6,10 +6,7 @@ import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PreviewBranchDetails } from './branchPresentation';
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
+import { UserAvatar } from '../avatars/UserAvatar';
 
 export interface BranchAdminSectionProps {
   branch: PreviewBranchDetails;
@@ -40,7 +37,7 @@ export function BranchAdminSection({ branch, isOrgAdmin, onOpenUser, onAssignAdm
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3.5 rounded-control border border-line bg-surface p-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[15px] font-semibold text-brand">{initialsOf(admin.fullName)}</span>
+        <UserAvatar userId={admin.id} name={admin.fullName} size={null} className="h-11 w-11 text-[15px]" fallbackClassName="bg-brand-soft text-brand" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-semibold text-ink">{admin.fullName}</p>
           <p className="truncate text-[12.5px] text-ink-muted">{admin.email}</p>

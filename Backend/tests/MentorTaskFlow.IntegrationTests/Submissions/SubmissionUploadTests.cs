@@ -95,7 +95,7 @@ public sealed class SubmissionUploadTests(PostgresFixture postgres, MinioFixture
         var key = (await minio.ListKeysAsync()).ShouldHaveSingleItem();
 
         key.ShouldBe(
-            $"submissions/{_organizationId}/{_headOfficeId}/{_sharpId}/{assignmentId}/{submission.Id}.pdf");
+            $"orgs/{_organizationId}/branches/{_headOfficeId}/categories/{_sharpId}/assignments/{assignmentId}/submissions/{submission.Id}.pdf");
 
         // SUB-009: the name the person chose is not part of the path — that is what removes traversal
         // and collisions at once.
