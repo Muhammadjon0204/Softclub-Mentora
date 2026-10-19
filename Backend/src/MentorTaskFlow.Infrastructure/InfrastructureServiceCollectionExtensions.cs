@@ -381,6 +381,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<IFileStorage, MinioFileStorage>();
+        services.AddScoped<IAvatarService, AvatarService>();
         services.AddSingleton<UploadedFileInspector>();
         services.AddScoped<ISubmissionService, SubmissionService>();
         services.AddScoped<IReviewService, ReviewService>();

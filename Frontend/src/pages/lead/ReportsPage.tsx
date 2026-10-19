@@ -13,6 +13,7 @@ import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { FormCheckbox } from '../../shared/ui/FormField';
 import { StaggerContainer } from '../../shared/ui/motion';
+import { UserAvatar } from '../../features/avatars/UserAvatar';
 
 const PERIOD_OPTIONS = [
   { value: '7', label: '7 дней' },
@@ -29,10 +30,6 @@ function formatHoursMetric(hours: number | null): string {
   if (hours === null) return '—';
   if (hours < 24) return `${hours.toFixed(1)} ч`;
   return `${(hours / 24).toFixed(1)} дн.`;
-}
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
 }
 
 /**
@@ -138,9 +135,7 @@ export function ReportsPage(): JSX.Element {
               const approvedShare = row.total === 0 ? 0 : Math.round((row.approved / row.total) * 100);
               return (
                 <li key={row.mentorId} className="flex items-center gap-3.5 px-5 py-3.5 sm:px-6">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand">
-                    {initialsOf(row.fullName)}
-                  </span>
+                  <UserAvatar userId={row.mentorId} name={row.fullName} size={null} className="h-8 w-8 text-[11px]" fallbackClassName="bg-brand-soft text-brand" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-medium text-ink">{row.fullName}</p>
                     <div className="mt-1.5 h-1 w-full max-w-[160px] overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">

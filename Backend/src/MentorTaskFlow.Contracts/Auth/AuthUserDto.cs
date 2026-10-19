@@ -33,7 +33,8 @@ public sealed record AuthUserDto(
     string? AdminScope,
     OrganizationSummaryDto Organization,
     BranchSummaryDto? Branch,
-    CategorySummaryDto? Category);
+    CategorySummaryDto? Category,
+    string? AvatarUrl = null);
 
 /// <summary>Response of <c>POST /auth/login</c> — the profile plus the access token (<c>AUTH-039</c>).</summary>
 /// <remarks>

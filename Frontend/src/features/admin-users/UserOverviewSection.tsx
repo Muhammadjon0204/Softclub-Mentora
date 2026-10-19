@@ -5,15 +5,7 @@ import { branchDisplayName, emptyOrValue, NOTIFICATION_LANGUAGE_LABEL, ROLE_ICON
 import type { PreviewUserDetails } from './userPresentation';
 import { UserWorkStats } from './UserWorkStats';
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
-
-function initialsOf(fullName: string): string {
-  return fullName
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .toUpperCase();
-}
+import { UserAvatar } from '../avatars/UserAvatar';
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
@@ -67,9 +59,7 @@ export function UserOverviewSection({ user }: { user: PreviewUserDetails }): JSX
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3.5 rounded-control border border-line bg-surface-muted p-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[16px] font-semibold text-brand">
-          {initialsOf(user.fullName)}
-        </span>
+        <UserAvatar userId={user.id} name={user.fullName} size={null} className="h-11 w-11 text-[16px]" fallbackClassName="bg-brand-soft text-brand" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold text-ink">{user.fullName}</p>
           <p className="truncate text-[12.5px] text-ink-muted">{user.email}</p>

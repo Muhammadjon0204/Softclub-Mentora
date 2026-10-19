@@ -61,6 +61,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.TokenVersion).IsRequired().HasDefaultValue(0);
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.FailedLoginCount).IsRequired().HasDefaultValue(0);
+        builder.Property(x => x.AvatarKey).HasMaxLength(User.AvatarKeyMaxLength);
 
         builder.HasOne<Organization>()
             .WithMany()

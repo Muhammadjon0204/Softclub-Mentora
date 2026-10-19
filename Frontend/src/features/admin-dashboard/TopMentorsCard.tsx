@@ -5,18 +5,10 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { DashboardCardFooterLink } from './DashboardCardFooterLink';
 import { DashboardRankingRow } from './DashboardRankingRow';
 import { InsightCard } from './InsightCard';
+import { UserAvatar } from '../avatars/UserAvatar';
 
 interface TopMentorsCardProps {
   mentors: TopMentorRow[];
-}
-
-function initialsOf(fullName: string): string {
-  return fullName
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0] ?? '')
-    .join('')
-    .toUpperCase();
 }
 
 /**
@@ -51,12 +43,7 @@ export function TopMentorsCard({ mentors }: TopMentorsCardProps): JSX.Element {
                 <DashboardRankingRow
                   rank={index + 1}
                   avatar={
-                    <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[10.5px] font-semibold text-brand"
-                      aria-hidden="true"
-                    >
-                      {initialsOf(mentor.mentorName)}
-                    </span>
+                    <UserAvatar userId={mentor.mentorId} name={mentor.mentorName} size={null} className="h-8 w-8 text-[10.5px]" fallbackClassName="bg-brand-soft text-brand" />
                   }
                   title={mentor.mentorName}
                   subtitle={mentor.categoryName ?? undefined}

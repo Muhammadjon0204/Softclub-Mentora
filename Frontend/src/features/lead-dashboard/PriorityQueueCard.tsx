@@ -6,6 +6,7 @@ import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignm
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PriorityQueueItem } from './useLeadDashboard';
+import { UserAvatar } from '../avatars/UserAvatar';
 
 const REASON_ICON_TONE: Record<PriorityQueueItem['reason'], string> = {
   overdue: 'text-danger',
@@ -26,10 +27,6 @@ const STATUS_PILL_BG: Record<PriorityQueueItem['status'], string> = {
   Approved: 'bg-success-soft',
   Cancelled: 'bg-surface-muted',
 };
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
 
 /** «Требуют внимания» — до 7 самых срочных заданий категории, клик открывает то же detail/review UI, что и обычная страница (раздел 14 задачи Phase 3). */
 export function PriorityQueueCard({ items }: { items: PriorityQueueItem[] }): JSX.Element {
@@ -59,9 +56,7 @@ export function PriorityQueueCard({ items }: { items: PriorityQueueItem[] }): JS
                   onClick={() => { navigate(item.targetPath); }}
                   className="group flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition-colors duration-150 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand sm:px-6"
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-semibold text-brand">
-                    {initialsOf(item.mentorName)}
-                  </span>
+                  <UserAvatar userId={item.mentorId} name={item.mentorName} size={null} className="h-9 w-9 text-[11px]" fallbackClassName="bg-brand-soft text-brand" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[14px] font-semibold leading-5 text-ink" title={item.title}>{item.title}</p>
                     <p className="mt-0.5 truncate text-[12px] text-ink-muted">{item.mentorName}</p>

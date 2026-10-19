@@ -1543,6 +1543,11 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("admin_scope");
 
+                    b.Property<string>("AvatarKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("avatar_key");
+
                     b.Property<Guid?>("BranchId")
                         .HasColumnType("uuid")
                         .HasColumnName("branch_id");
@@ -1704,7 +1709,7 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_users_role_category", "(role = 'Admin' AND category_id IS NULL) OR (role IN ('Lead','Mentor') AND category_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\r\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\r\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
                         });
                 });
 

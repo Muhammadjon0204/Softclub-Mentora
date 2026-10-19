@@ -256,6 +256,8 @@ export interface components {
             organization: components["schemas"]["OrganizationSummary"];
             branch: components["schemas"]["BranchSummary"] | null;
             category: components["schemas"]["CategorySummary"] | null;
+            /** @description Путь к фотографии профиля (`/api/v1/avatars/...`) или null — тогда инициалы. */
+            avatarUrl?: string | null;
         };
         LoginRequest: {
             /** Format: email */

@@ -540,6 +540,11 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CategorySummary'
             - type: 'null'
+        avatarUrl:
+          description: Путь к фотографии профиля (`/api/v1/avatars/...`) или null — тогда инициалы.
+          oneOf:
+            - type: string
+            - type: 'null'
 
     LoginRequest:
       type: object

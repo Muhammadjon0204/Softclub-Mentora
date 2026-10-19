@@ -23,6 +23,7 @@ import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignment
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
 import { PreviewActionMenu } from '../admin-preview/PreviewActionMenu';
 import type { PreviewActionMenuItem } from '../admin-preview/PreviewActionMenu';
+import { UserAvatar } from '../avatars/UserAvatar';
 
 const THIN_SCROLLBAR_X = '[&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line-strong';
 const THIN_SCROLLBAR_Y = '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-line-strong';
@@ -31,10 +32,6 @@ const CARD_BASE = 'flex flex-col gap-2.5 rounded-control border bg-surface p-3.5
 // A click that lands right after a drop (pointer released over the card it started on) is the tail of
 // the drag gesture, not a request to open the drawer.
 const CLICK_AFTER_DRAG_GRACE_MS = 250;
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
 
 /** «Просрочено на N дней/часов» — не derived-статус (см. `leadAssignmentKanban.ts`), только форматирование существующего `OverdueAt`/`CurrentDueAt`. */
 function overdueLabel(a: LeadAssignmentRecord): string {
@@ -88,9 +85,7 @@ function KanbanCardBody({ assignment: a, timeZoneId, mentorNameOf, actionSlot }:
       </p>
 
       <div className="flex min-w-0 items-center gap-1.5">
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[9px] font-semibold text-brand">
-          {initialsOf(mentorNameOf(a.mentorId))}
-        </span>
+        <UserAvatar userId={a.mentorId} name={mentorNameOf(a.mentorId)} size={null} className="h-5 w-5 text-[9px]" fallbackClassName="bg-brand-soft text-brand" />
         <span className="truncate text-[12px] font-medium text-ink-secondary">{mentorNameOf(a.mentorId)}</span>
       </div>
 

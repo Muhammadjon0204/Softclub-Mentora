@@ -653,7 +653,8 @@ public sealed class AuthService(
             user.AdminScope?.ToString(),
             organization,
             branch,
-            category);
+            category,
+            Users.AvatarService.UrlFor(user.AvatarKey));
     }
 
     private static UnauthorizedException InvalidCredentials() =>

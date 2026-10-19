@@ -4,7 +4,8 @@ import type { ComponentType, ReactNode } from 'react';
 import type { AuthUser } from '../../api/auth';
 import { Badge, StatusDot } from '../../shared/ui/Badge';
 import { Card } from '../../shared/ui/Card';
-import { AVATAR_COLORS, avatarColorClass, initialsOf, roleLabel, writeAvatarColor } from './profilePresentation';
+import { ProfileAvatarEditor } from './ProfileAvatarEditor';
+import { AVATAR_COLORS, roleLabel, writeAvatarColor } from './profilePresentation';
 import { useAvatarColor } from './useAvatarColor';
 
 function MetaRow({ icon: Icon, label, children }: { icon: ComponentType<{ className?: string }>; label: string; children: ReactNode }): JSX.Element {
@@ -19,9 +20,10 @@ function MetaRow({ icon: Icon, label, children }: { icon: ComponentType<{ classN
   );
 }
 
-/** Визитка: аватар с выбором цвета, имя, email, роль и где человек работает. */
+/** Визитка: фото (или инициалы с выбором цвета), имя, email, роль и где человек работает. */
 export function ProfileIdentityCard({ user }: { user: AuthUser }): JSX.Element {
   const color = useAvatarColor(user.id);
+  const hasPhoto = (user.avatarUrl ?? null) !== null;
   const isOrgAdmin = user.role === 'Admin' && user.adminScope === 'Organization';
   const branch = isOrgAdmin ? 'Все филиалы' : (user.branch?.name ?? '—');
   const direction = user.category?.name ?? (user.role === 'Admin' ? 'Управление' : '—');
@@ -29,10 +31,9 @@ export function ProfileIdentityCard({ user }: { user: AuthUser }): JSX.Element {
   return (
     <Card padded={false} className="overflow-hidden">
       <div className="flex flex-col items-center px-5 pb-5 pt-6 text-center">
-        <span className={`grid h-20 w-20 place-items-center rounded-full text-[26px] font-semibold transition-colors ${avatarColorClass(color)}`}>
-          {initialsOf(user.fullName)}
-        </span>
-        <div className="mt-3 flex items-center gap-1.5" role="radiogroup" aria-label="Цвет аватара">
+        <ProfileAvatarEditor user={user} />
+        {/* Цвет нужен только инициалам: с фото его не видно, и выбор только сбивал бы с толку. */}
+        <div className={`mt-3 flex items-center gap-1.5 ${hasPhoto ? 'hidden' : ''}`} role="radiogroup" aria-label="Цвет аватара">
           {AVATAR_COLORS.map((option) => (
             <button
               key={option.id}

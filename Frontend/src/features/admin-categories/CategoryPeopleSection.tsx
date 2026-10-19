@@ -6,10 +6,7 @@ import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { Button } from '../../shared/ui/Button';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PreviewCategoryDetails } from './categoryPresentation';
-
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
+import { UserAvatar } from '../avatars/UserAvatar';
 
 export interface CategoryPeopleSectionProps {
   category: PreviewCategoryDetails;
@@ -37,7 +34,7 @@ export function CategoryPeopleSection({ category, canManage, onOpenUser, onChang
               onClick={() => { onOpenUser(lead.id); }}
               className="flex w-full items-center gap-3 rounded-control border border-line bg-surface p-3 text-left transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[13px] font-semibold text-brand">{initialsOf(lead.fullName)}</span>
+              <UserAvatar userId={lead.id} name={lead.fullName} size={null} className="h-10 w-10 text-[13px]" fallbackClassName="bg-brand-soft text-brand" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13.5px] font-semibold text-ink">{lead.fullName}</span>
                 <span className="block truncate text-[12px] text-ink-muted">{lead.email}</span>
@@ -71,7 +68,7 @@ export function CategoryPeopleSection({ category, canManage, onOpenUser, onChang
                   onClick={() => { onOpenUser(mentor.id); }}
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-muted text-[11px] font-semibold text-ink-secondary">{initialsOf(mentor.fullName)}</span>
+                  <UserAvatar userId={mentor.id} name={mentor.fullName} size={null} className="h-8 w-8 text-[11px]" fallbackClassName="bg-surface-muted text-ink-secondary" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium text-ink">{mentor.fullName}</span>
                     <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">

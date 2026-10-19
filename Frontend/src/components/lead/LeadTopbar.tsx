@@ -30,9 +30,8 @@ export function LeadTopbar({ onOpenMobileSidebar }: LeadTopbarProps): JSX.Elemen
       <div className="hidden min-w-0 flex-1 lg:block">
         <LeadBreadcrumbs />
       </div>
-      <div className="min-w-0 flex-1 lg:hidden" />
-
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      {/* На телефоне правая группа может сжиматься: бейдж обрезается, а не выталкивает аватар за край. */}
+      <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
         <LeadWorkspaceBadge />
 
         {!isOnline ? (

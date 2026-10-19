@@ -105,6 +105,53 @@ public sealed class AuthController(
         return Ok(await authService.UpdateProfileAsync(user.UserId, request, cancellationToken));
     }
 
+    /// <summary>
+    /// <c>PUT /auth/me/avatar</c> — a new profile photo for the caller (multipart, field <c>file</c>).
+    /// </summary>
+    /// <remarks>Returns the updated profile, whose <c>avatarUrl</c> is the photo's new address.</remarks>
+    [HttpPut("me/avatar")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [RequestSizeLimit(1024 * 1024)]
+    [ProducesResponseType<AuthUserDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AuthUserDto>> UploadAvatarAsync(
+        IFormFile? file,
+        [FromServices] IAvatarService avatars,
+        CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        if (file is null)
+        {
+            throw new Application.Common.Exceptions.ValidationAppException("file", "Выберите фотографию.");
+        }
+
+        await using (var content = file.OpenReadStream())
+        {
+            await avatars.UploadAsync(user.UserId, content, file.Length, cancellationToken);
+        }
+
+        NoStore();
+        return Ok(await authService.GetProfileAsync(user.UserId, cancellationToken));
+    }
+
+    /// <summary><c>DELETE /auth/me/avatar</c> — back to the initials avatar.</summary>
+    [HttpDelete("me/avatar")]
+    [Authorize(Policy = MtfPolicies.Authenticated)]
+    [ProducesResponseType<AuthUserDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<AuthUserDto>> RemoveAvatarAsync(
+        [FromServices] IAvatarService avatars,
+        CancellationToken cancellationToken)
+    {
+        var user = currentUser.Current
+            ?? throw new Application.Common.Exceptions.UnauthorizedException();
+
+        await avatars.RemoveAsync(user.UserId, cancellationToken);
+
+        NoStore();
+        return Ok(await authService.GetProfileAsync(user.UserId, cancellationToken));
+    }
+
     /// <summary><c>GET /auth/me/notification-preferences</c> — the profile page's switches.</summary>
     [HttpGet("me/notification-preferences")]
     [Authorize(Policy = MtfPolicies.Authenticated)]

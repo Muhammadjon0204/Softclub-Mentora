@@ -17,6 +17,18 @@ import { getAccessToken } from '../auth/tokenStore';
 
 export const REALTIME_HUB_PATH = '/api/v1/realtime';
 
+/** Что именно поменялось — `{ kind, id }` события `dataChanged`; без него — «всё могло». */
+export interface RealtimeChange {
+  kind: string;
+  id: string;
+}
+
+function toChange(payload: unknown): RealtimeChange | undefined {
+  if (typeof payload !== 'object' || payload === null) return undefined;
+  const { kind, id } = payload as Record<string, unknown>;
+  return typeof kind === 'string' && typeof id === 'string' ? { kind, id } : undefined;
+}
+
 /**
  * Всё, кроме сессии, живое: на событие сервера запросы помечаются устаревшими —
  * смонтированные тихо перезапрашиваются в фоне (старые данные остаются на экране
@@ -118,7 +130,7 @@ class UnauthorizedAwareHttpClient extends DefaultHttpClient {
   }
 }
 
-export function connect(baseUrl: string, onChange: () => void): () => void {
+export function connect(baseUrl: string, onChange: (change?: RealtimeChange) => void): () => void {
   let disposed = false;
   let restartTimer: ReturnType<typeof setTimeout> | undefined;
   let tokenRejected = false;
@@ -140,10 +152,10 @@ export function connect(baseUrl: string, onChange: () => void): () => void {
 
   // Сервер шлёт `dataChanged` на любое изменение (задание, пользователь, категория, филиал,
   // уведомление, расписание); `assignmentChanged` дублирует задания только для старых вкладок.
-  connection.on('dataChanged', onChange);
-  connection.on('resync', onChange);
+  connection.on('dataChanged', (payload: unknown) => { onChange(toChange(payload)); });
+  connection.on('resync', () => { onChange(); });
   // Пока соединения не было, события могли пройти мимо — догоняем одним перезапросом.
-  connection.onreconnected(onChange);
+  connection.onreconnected(() => { onChange(); });
 
   const start = (attempt: number, afterOutage: boolean): void => {
     if (disposed) return;

@@ -27,8 +27,27 @@ function stripMockWorker(): Plugin {
   };
 }
 
+/**
+ * Номер сборки: sha коммита в CI, иначе время сборки. Вшивается в бандл и кладётся
+ * рядом в `version.json` — по их расхождению открытая вкладка узнаёт о деплое.
+ */
+const BUILD_VERSION = process.env.GITHUB_SHA?.slice(0, 12) ?? process.env.APP_VERSION ?? Date.now().toString(36);
+
+function emitVersion(): Plugin {
+  return {
+    name: 'mtf:emit-version',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: BUILD_VERSION }) });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), stripMockWorker()],
+  plugins: [react(), stripMockWorker(), emitVersion()],
+  define: {
+    'import.meta.env.VITE_APP_VERSION': JSON.stringify(BUILD_VERSION),
+  },
   resolve: {
     // Абсолютный путь от корня проекта — без зависимости от @types/node.
     alias: { '@': '/src' },

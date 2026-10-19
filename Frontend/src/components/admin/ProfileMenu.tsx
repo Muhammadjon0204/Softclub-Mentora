@@ -6,16 +6,9 @@ import { profilePathForRole } from '../../auth/roleRedirect';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
 import { Popover } from '../../shared/ui/Popover';
 import { ProfileMenuItem } from './ProfileMenuItem';
+import { Avatar } from '../../shared/ui/Avatar';
 import { avatarColorClass } from '../../features/profile/profilePresentation';
 import { useAvatarColor } from '../../features/profile/useAvatarColor';
-
-function initialsOf(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean);
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 const ROLE_LABEL: Record<AuthUser['role'], string> = {
   Admin: 'Администратор',
@@ -66,13 +59,11 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
           aria-haspopup="true"
           aria-expanded={isOpen}
           aria-label="Открыть меню профиля"
-          className={`flex h-12 items-center gap-2.5 rounded-dropdown border px-2.5 transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+          className={`flex h-12 shrink-0 items-center gap-2.5 rounded-dropdown border px-2.5 transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
             isOpen ? 'border-brand/30 bg-brand-soft' : 'border-transparent hover:bg-surface-hover'
           }`}
         >
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold transition-colors ${avatarClass}`}>
-            {initialsOf(user.fullName)}
-          </span>
+          <Avatar name={user.fullName} src={user.avatarUrl} size="base" fallbackClassName={avatarClass} />
           <span className="hidden min-w-0 flex-col items-start text-left sm:flex">
             <span className="max-w-[150px] truncate text-[13px] font-semibold leading-tight text-ink">
               {user.fullName}
@@ -92,9 +83,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
         <div data-testid="profile-menu-panel" className="flex flex-col gap-2.5">
           {/* 5.1 — заголовок профиля. */}
           <div className="flex items-start gap-3 px-1 pt-0.5">
-            <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-semibold ${avatarClass}`}>
-              {initialsOf(user.fullName)}
-            </span>
+            <Avatar name={user.fullName} src={user.avatarUrl} size="lg" fallbackClassName={avatarClass} />
             <div className="min-w-0 flex-1 pt-0.5">
               <p className="truncate text-sm font-semibold text-ink">{user.fullName}</p>
               <p className="truncate text-[12.5px] text-ink-muted">{user.email}</p>

@@ -33,6 +33,7 @@ import { useToast } from '../../shared/overlays';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { StaggerContainer } from '../../shared/ui/motion';
+import { UserAvatar } from '../../features/avatars/UserAvatar';
 
 const ROLE_OPTIONS = [
   { value: 'all', label: 'Все роли' },
@@ -62,10 +63,6 @@ function formatLastLogin(label: string): { primary: string; secondary?: string }
   return { primary: `${Number(day)} ${monthName} ${year}`, secondary: time };
 }
 
-function initialsOf(fullName: string): string {
-  return fullName.split(' ').slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase();
-}
-
 function buildNewUsersSeries(users: readonly PreviewUserDetails[]): { label: string; value: number }[] {
   const now = new Date();
   return Array.from({ length: 5 }, (_, index) => {
@@ -90,7 +87,7 @@ function getAccessScope(user: PreviewUserDetails): { primary: string; secondary?
 function UserCell({ user }: { user: PreviewUserDetails }): JSX.Element {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[12px] font-semibold text-brand">{initialsOf(user.fullName)}</span>
+      <UserAvatar userId={user.id} name={user.fullName} size={null} className="h-8 w-8 text-[12px]" fallbackClassName="bg-brand-soft text-brand" />
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold leading-5 text-ink" title={user.fullName}>{user.fullName}</p>
         <p className="truncate text-[12px] leading-[17px] text-ink-muted" title={user.email}>{user.email}</p>

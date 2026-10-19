@@ -3,6 +3,7 @@ import { setupWorker } from 'msw/browser';
 import { clearSessionCookies } from './cookies';
 import { db, findUserByEmail, resetDb } from './db';
 import { authHandlers } from './handlers/auth';
+import { avatarHandlers } from './handlers/avatars';
 import { branchesHandlers } from './handlers/branches';
 import { dashboardHandlers } from './handlers/dashboard';
 import { organizationHandlers } from './handlers/organization';
@@ -21,6 +22,7 @@ const restored = restoreMockServerState();
 
 export const worker = setupWorker(
   ...authHandlers,
+  ...avatarHandlers,
   ...organizationHandlers,
   ...branchesHandlers,
   ...dashboardHandlers,
