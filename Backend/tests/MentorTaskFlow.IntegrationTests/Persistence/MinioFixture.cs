@@ -20,9 +20,16 @@ public sealed class MinioFixture : IAsyncLifetime
     public const string AccessKey = "minioadmin";
     public const string SecretKey = "minioadmin";
 
-    private readonly MinioContainer _container = new MinioBuilder("minio/minio:RELEASE.2025-04-22T22-12-26Z")
+    /// <summary>
+    /// <c>minio/minio</c> is gone from Docker Hub and quay.io (MinIO stopped publishing community
+    /// images), so a clean CI runner could not pull it at all. Chainguard's build is the same server,
+    /// kept up to date. It runs as a non-root user that cannot write <c>/data</c> in a bare container,
+    /// hence root — acceptable for a throwaway test container.
+    /// </summary>
+    private readonly MinioContainer _container = new MinioBuilder("cgr.dev/chainguard/minio:latest")
         .WithUsername(AccessKey)
         .WithPassword(SecretKey)
+        .WithCreateParameterModifier(parameters => parameters.User = "0")
         .Build();
 
     public string Endpoint => _container.GetConnectionString();
