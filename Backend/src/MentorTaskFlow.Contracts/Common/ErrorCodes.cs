@@ -103,9 +103,15 @@ public static class ErrorCodes
     public const string AiProviderUnavailable = "AI_PROVIDER_UNAVAILABLE";
     public const string StorageUnavailable = "STORAGE_UNAVAILABLE";
 
+    /// <summary>The Omuz CRM integration has no API key on this installation.</summary>
+    public const string IntegrationNotConfigured = "INTEGRATION_NOT_CONFIGURED";
+
+    /// <summary>The CRM refused the key, could not be reached, or rejected the request.</summary>
+    public const string IntegrationUnavailable = "INTEGRATION_UNAVAILABLE";
+
     /// <summary>
     /// The canonical HTTP status for every code. Приложение C is the single source of truth;
-    /// the catalog must contain exactly 54 entries (verified by <c>ErrorCatalogTests</c>).
+    /// the catalog must contain exactly 56 entries (54 of Приложение C plus the two CRM integration codes) (verified by <c>ErrorCatalogTests</c>).
     /// </summary>
     public static readonly IReadOnlyDictionary<string, int> StatusByCode = new Dictionary<string, int>(StringComparer.Ordinal)
     {
@@ -173,6 +179,8 @@ public static class ErrorCodes
 
         [AiProviderUnavailable] = 503,
         [StorageUnavailable] = 503,
+        [IntegrationNotConfigured] = 503,
+        [IntegrationUnavailable] = 503,
     };
 
     /// <summary>

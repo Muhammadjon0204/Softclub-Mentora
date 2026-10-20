@@ -33,6 +33,7 @@ const AdminReportsPage = lazyPage(() => import('../pages/admin/ReportsPage'), (m
 const AdminAuditPage = lazyPage(() => import('../pages/admin/AuditPage'), (m) => m.AuditPage);
 const AdminNotificationsPage = lazyPage(() => import('../pages/admin/NotificationsPage'), (m) => m.NotificationsPage);
 const AdminHealthPage = lazyPage(() => import('../pages/admin/HealthPage'), (m) => m.HealthPage);
+const AdminCrmIntegrationPage = lazyPage(() => import('../pages/admin/CrmIntegrationPage'), (m) => m.CrmIntegrationPage);
 const AdminSettingsPage = lazyPage(() => import('../pages/admin/SettingsPage'), (m) => m.SettingsPage);
 
 const LeadDashboardPage = lazyPage(() => import('../pages/lead/DashboardPage'), (m) => m.DashboardPage);
@@ -135,6 +136,7 @@ export function AppRouter(): JSX.Element {
         <Route path="audit" element={page(AdminAuditPage)} />
         <Route path="notifications" element={page(AdminNotificationsPage)} />
         <Route path="health" element={page(AdminHealthPage)} />
+        <Route path="integrations/crm" element={page(AdminCrmIntegrationPage)} />
         <Route path="settings" element={page(AdminSettingsPage)} />
         <Route path="profile" element={page(ProfilePage)} />
       </Route>
