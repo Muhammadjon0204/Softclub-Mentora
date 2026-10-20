@@ -45,6 +45,8 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   'notification.retry': 'Повторная отправка уведомления',
   'telegram.bind': 'Telegram подключён',
   'telegram.unbind': 'Telegram отключён',
+  'crm.mentor_link': 'Связь с ментором CRM изменена',
+  'crm.branch_link': 'Связь филиала с CRM изменена',
   'storage.orphan_cleanup': 'Очистка неиспользуемых файлов',
   'storage.cross_scope_inconsistency': 'Несоответствие в хранилище файлов',
   'report.organization_export': 'Экспорт отчёта организации',

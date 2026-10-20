@@ -150,11 +150,70 @@ export interface CrmGroupPreview {
   journalUnavailable?: string | null;
 }
 
+/**
+ * Что человек видит из CRM: `Organization` — всё, `Branch` — свой филиал, `Team` — группы своих
+ * менторов (тимлид), `Own` — свои группы (ментор). `ready=false` — не хватает связи, `message` — какой.
+ */
+export interface CrmAccess {
+  scope: 'Organization' | 'Branch' | 'Team' | 'Own';
+  ready: boolean;
+  message?: string | null;
+  linkedMentors: number;
+}
+
+export interface CrmMentorLink {
+  crmMentorId: number;
+  fullName: string;
+  phone?: string | null;
+  branch?: string | null;
+  isActive: boolean;
+  currentGroups: number;
+  linkedUserId?: string | null;
+  linkedUserName?: string | null;
+  suggestedUserId?: string | null;
+  suggestedUserName?: string | null;
+}
+
+export interface CrmBranchLink {
+  crmBranchId: number;
+  name: string;
+  linkedBranchId?: string | null;
+  linkedBranchName?: string | null;
+  suggestedBranchId?: string | null;
+}
+
+export interface CrmLinks {
+  mentors: CrmMentorLink[];
+  branches: CrmBranchLink[];
+  users: { id: string; fullName: string; role: string; branch?: string | null; crmMentorId?: number | null }[];
+  mentoraBranches: { id: string; name: string; crmBranchId?: number | null }[];
+}
+
 export const CRM_QUERY_KEYS = {
   status: ['crm', 'status'] as const,
+  access: ['crm', 'access'] as const,
+  links: ['crm', 'links'] as const,
   groups: (status: CrmGroupStatus) => ['crm', 'groups', status] as const,
   group: (id: number) => ['crm', 'group', id] as const,
 };
+
+export async function getCrmAccess(): Promise<CrmAccess> {
+  const { data } = await apiClient.get<CrmAccess>('/api/v1/integrations/crm/access');
+  return data;
+}
+
+export async function getCrmLinks(): Promise<CrmLinks> {
+  const { data } = await apiClient.get<CrmLinks>('/api/v1/integrations/crm/links');
+  return data;
+}
+
+export async function linkCrmMentor(crmMentorId: number, userId: string | null): Promise<void> {
+  await apiClient.put(`/api/v1/integrations/crm/links/mentors/${String(crmMentorId)}`, { userId });
+}
+
+export async function linkCrmBranch(crmBranchId: number, branchId: string | null): Promise<void> {
+  await apiClient.put(`/api/v1/integrations/crm/links/branches/${String(crmBranchId)}`, { branchId });
+}
 
 export async function getCrmStatus(): Promise<CrmStatus> {
   const { data } = await apiClient.get<CrmStatus>('/api/v1/integrations/crm/status');

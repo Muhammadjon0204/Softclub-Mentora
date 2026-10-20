@@ -22,6 +22,7 @@ const ForgotPasswordPage = lazyPage(() => import('../pages/auth/ForgotPasswordPa
 const ResetPasswordPage = lazyPage(() => import('../pages/auth/ResetPasswordPage'), (m) => m.ResetPasswordPage);
 const SetPasswordPage = lazyPage(() => import('../pages/auth/SetPasswordPage'), (m) => m.SetPasswordPage);
 const ProfilePage = lazyPage(() => import('../pages/ProfilePage'), (m) => m.ProfilePage);
+const CrmGroupsPage = lazyPage(() => import('../pages/CrmGroupsPage'), (m) => m.CrmGroupsPage);
 
 const AdminDashboardPage = lazyPage(() => import('../pages/admin/DashboardPage'), (m) => m.DashboardPage);
 const AdminBranchesPage = lazyPage(() => import('../pages/admin/BranchesPage'), (m) => m.BranchesPage);
@@ -54,10 +55,10 @@ const ADMIN_PAGES = [
   AdminDashboardPage, AdminBranchesPage, AdminUsersPage, AdminCategoriesPage, AdminAssignmentsPage,
   AdminCalendarPage, AdminReportsPage, AdminAuditPage, AdminNotificationsPage, AdminHealthPage, AdminSettingsPage, ProfilePage,
 ];
-const LEAD_PAGES = [LeadDashboardPage, LeadAssignmentsPage, LeadReviewQueuePage, LeadTeamPage, LeadCalendarPage, LeadReportsPage, ProfilePage];
+const LEAD_PAGES = [LeadDashboardPage, LeadAssignmentsPage, LeadReviewQueuePage, LeadTeamPage, LeadCalendarPage, LeadReportsPage, CrmGroupsPage, ProfilePage];
 const MENTOR_PAGES = [
   MentorDashboardPage, MentorAssignmentsPage, MentorCalendarPage, MentorHistoryPage, MentorReportsPage,
-  MentorNotificationsPage, ProfilePage,
+  MentorNotificationsPage, CrmGroupsPage, ProfilePage,
 ];
 
 function page(Page: ComponentType): JSX.Element {
@@ -167,6 +168,7 @@ export function AppRouter(): JSX.Element {
         <Route path="team" element={page(LeadTeamPage)} />
         <Route path="calendar" element={page(LeadCalendarPage)} />
         <Route path="reports" element={page(LeadReportsPage)} />
+        <Route path="crm" element={page(CrmGroupsPage)} />
         <Route path="profile" element={page(ProfilePage)} />
       </Route>
 
@@ -191,6 +193,7 @@ export function AppRouter(): JSX.Element {
         <Route path="history" element={page(MentorHistoryPage)} />
         <Route path="reports" element={page(MentorReportsPage)} />
         <Route path="notifications" element={page(MentorNotificationsPage)} />
+        <Route path="crm" element={page(CrmGroupsPage)} />
         <Route path="profile" element={page(ProfilePage)} />
       </Route>
 

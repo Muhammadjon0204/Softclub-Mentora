@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, School, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 /**
@@ -30,4 +30,5 @@ export const LEAD_NAV_ITEMS: LeadNavItem[] = [
   { key: 'calendar', label: 'Календарь', path: '/lead/calendar', icon: CalendarDays },
   { key: 'team', label: 'Команда', path: '/lead/team', icon: Users },
   { key: 'reports', label: 'Отчёты', path: '/lead/reports', icon: BarChart3 },
+  { key: 'crm', label: 'Группы в CRM', path: '/lead/crm', icon: School },
 ];

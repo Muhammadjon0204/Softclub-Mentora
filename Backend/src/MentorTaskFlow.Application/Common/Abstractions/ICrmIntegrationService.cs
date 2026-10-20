@@ -14,8 +14,15 @@ public interface ICrmIntegrationService
 {
     Task<CrmStatusDto> GetStatusAsync(CancellationToken cancellationToken);
 
-    /// <summary><paramref name="status"/>: <c>Preparing</c>, <c>Started</c> or <c>Finished</c>.</summary>
+    /// <summary>What the caller sees of the CRM — every role has a scope.</summary>
+    Task<CrmAccessDto> GetAccessAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The groups the caller may see. <paramref name="status"/>: <c>Preparing</c>, <c>Started</c> or
+    /// <c>Finished</c>.
+    /// </summary>
     Task<CrmGroupListDto> ListGroupsAsync(string status, CancellationToken cancellationToken);
 
+    /// <summary>A group outside the caller's scope is «not found», not «forbidden».</summary>
     Task<CrmGroupPreviewDto> GetGroupPreviewAsync(int groupId, CancellationToken cancellationToken);
 }

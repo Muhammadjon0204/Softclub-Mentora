@@ -1403,6 +1403,10 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at");
 
+                    b.Property<int?>("CrmBranchId")
+                        .HasColumnType("integer")
+                        .HasColumnName("crm_branch_id");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -1455,6 +1459,11 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrganizationId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ux_branches_organization_code");
+
+                    b.HasIndex("OrganizationId", "CrmBranchId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_branches_organization_crm_branch")
+                        .HasFilter("crm_branch_id IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "IsActive")
                         .HasDatabaseName("ix_branches_organization_is_active");
@@ -1565,6 +1574,10 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamptz")
                         .HasColumnName("created_at");
+
+                    b.Property<int?>("CrmMentorId")
+                        .HasColumnType("integer")
+                        .HasColumnName("crm_mentor_id");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -1683,6 +1696,11 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                     b.HasIndex("BranchId", "OrganizationId")
                         .HasDatabaseName("ix_users_branch_id_organization_id");
 
+                    b.HasIndex("OrganizationId", "CrmMentorId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_users_organization_crm_mentor")
+                        .HasFilter("crm_mentor_id IS NOT NULL");
+
                     b.HasIndex("CategoryId", "OrganizationId", "BranchId")
                         .HasDatabaseName("ix_users_category_id_organization_id_branch_id");
 
@@ -1709,7 +1727,7 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_users_role_category", "(role = 'Admin' AND category_id IS NULL) OR (role IN ('Lead','Mentor') AND category_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\r\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\r\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
                         });
                 });
 

@@ -74,6 +74,8 @@ public static class AuditActions
     public const string NotificationRetry = "notification.retry";
     public const string TelegramBind = "telegram.bind";
     public const string TelegramUnbind = "telegram.unbind";
+    public const string CrmMentorLink = "crm.mentor_link";
+    public const string CrmBranchLink = "crm.branch_link";
     public const string StorageOrphanCleanup = "storage.orphan_cleanup";
     public const string StorageCrossScopeInconsistency = "storage.cross_scope_inconsistency";
     public const string ReportOrganizationExport = "report.organization_export";

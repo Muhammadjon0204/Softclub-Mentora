@@ -96,6 +96,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasFilter("telegram_chat_id IS NOT NULL")
             .HasDatabaseName("ux_users_telegram_chat_id");
 
+        // One CRM mentor is one person: two accounts linked to the same CRM mentor would both see
+        // that mentor's groups.
+        builder.HasIndex(x => new { x.OrganizationId, x.CrmMentorId })
+            .IsUnique()
+            .HasFilter("crm_mentor_id IS NOT NULL")
+            .HasDatabaseName("ux_users_organization_crm_mentor");
+
         // At most one active Lead per category. Because a category belongs to exactly one branch,
         // the constraint is branch-scoped automatically (USER-003, TZ 12.1).
         builder.HasIndex(x => x.CategoryId)
