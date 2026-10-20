@@ -78,10 +78,11 @@ export interface CrmStudentScore {
   filledDays: number;
   lateDays: { date: string; minutes: number; note?: string | null }[];
   /** Только то, что ментор отметил как пропуск / «отпросился». */
-  absentDays: { date: string; kind: 'Absence' | 'Excused' | 'Other'; note?: string | null }[];
+  /** Прошедший день без галочки «был». kind — причина: пропуск / отпросился / другое / без причины / нет отметки в CRM. */
+  absentDays: { date: string; kind: 'Absence' | 'Excused' | 'Other' | 'NoReason' | 'NoMark'; note?: string | null }[];
   /** Замечания ментора: культура, списывание, поведение, «другое» в день, когда студент был. */
   remarks: { date: string; kind: 'CultureViolation' | 'Cheating' | 'BadBehavior' | 'Other'; text: string; author?: string | null }[];
-  /** Дни, которые ментор ещё не заполнил — это не пропуск. */
+  /** Сегодня и дальше: ещё не отмечено — это не пропуск. */
   unfilledDays: string[];
   zeroHomeworkDays: string[];
   issues: CrmIssue[];

@@ -4,8 +4,9 @@ namespace MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 public sealed record CrmLateDay(DateOnly Date, int Minutes, string? Note);
 
 /// <summary>
-/// A missed day — only what the mentor marked as such. <c>Kind</c>: <c>Absence</c>, <c>Excused</c>
-/// («отпросился») or <c>Other</c> («другое» on a day the student was not there — agreed to be an absence).
+/// A missed day: a past day without the attendance tick. <c>Kind</c> is the reason the mentor gave —
+/// <c>Absence</c> («пропуск»), <c>Excused</c> («отпросился»), <c>Other</c> («другое») — or
+/// <c>NoReason</c> (no note), or <c>NoMark</c> (the CRM has no mark for the day at all).
 /// </summary>
 public sealed record CrmAbsentDay(DateOnly Date, string Kind, string? Note);
 
@@ -75,9 +76,11 @@ public static class CrmFill
 /// source of truth and the overflow is flagged, not capped.
 /// </para>
 /// <para>
-/// A day is an absence only when the mentor said so — a «пропуск» or «отпросился» note. A day that
-/// is just not ticked (<c>isAttended=false</c>, no note) is a journal the mentor has not filled in
-/// yet: it earns nothing, as in the CRM, but the student is not called absent.
+/// The attendance tick is set for every student on the day of the lesson — the academy's
+/// administration makes sure of it. So a day that has passed without the tick is an absence, with or
+/// without a note; the note («пропуск», «отпросился», «другое») only gives the reason. Only today's
+/// and later days can still be «not marked yet». A past day the CRM has no mark for at all counts as
+/// an absence too (it earns nothing in the CRM either) and is flagged as a hole in the journal.
 /// </para>
 /// <para>
 /// The weeks themselves come from the CRM: it lays the calendar out as six lesson days ending with
@@ -97,8 +100,15 @@ public static class CrmJournalScoring
     public static string ZoneOf(double total) =>
         total >= CrmStudentPeriodScore.PassMark ? "Pass" : total >= CrmStudentPeriodScore.SupportMark ? "Support" : "Risk";
 
-    public static CrmStudentPeriodScore Score(CrmJournalPeriod period, CrmJournalStudent student, DateOnly? joinedOn = null, DateOnly? leftOn = null)
+    /// <param name="today">The current day in Dushanbe: it and later days may not be marked yet. <c>null</c> — every day has passed.</param>
+    public static CrmStudentPeriodScore Score(
+        CrmJournalPeriod period,
+        CrmJournalStudent student,
+        DateOnly? joinedOn = null,
+        DateOnly? leftOn = null,
+        DateOnly? today = null)
     {
+        bool Passed(DateOnly date) => today is null || date < today;
         var days = period.Days
             .GroupBy(d => DateOf(d.Date))
             .ToDictionary(g => g.Key, g => g.First());
@@ -113,6 +123,7 @@ public static class CrmJournalScoring
         var zeroHomework = new List<DateOnly>();
         var issues = new List<CrmDataIssue>();
         var markedDays = new HashSet<DateOnly>();
+        var inactiveDays = new HashSet<DateOnly>();
         var beforeJoined = new List<DateOnly>();
 
         foreach (var mark in student.Marks.OrderBy(m => m.Date))
@@ -126,6 +137,7 @@ public static class CrmJournalScoring
 
             if (mark.Status.Id != CrmValues.MarkActive)
             {
+                inactiveDays.Add(date);
                 continue;
             }
 
@@ -204,24 +216,19 @@ public static class CrmJournalScoring
                 var kind = notes.Any(n => n.Type.Id == CrmValues.NoteExcused) ? "Excused"
                     : notes.Any(n => n.Type.Id == CrmValues.NoteAbsence) ? "Absence"
                     : notes.Any(n => n.Type.Id == CrmValues.NoteOther) ? "Other"
+                    : Passed(date) ? "NoReason"
                     : null;
                 var note = NotesOf(CrmValues.NoteExcused, CrmValues.NoteAbsence, CrmValues.NoteOther);
 
-                if (kind is null)
-                {
-                    if (mark.Grade > 0)
-                    {
-                        issues.Add(new("GradeWithoutAttendance", $"{date:dd.MM}: оценка {mark.Grade}, а посещение не отмечено — балл за посещение не начислен."));
-                    }
-                }
-                else
+                // No tick on today's lesson: it may simply not be marked yet.
+                if (kind is not null)
                 {
                     absent++;
                     filledDays.Add(date);
                     absences.Add(new(date, kind, note));
                     if (mark.Grade > 0)
                     {
-                        issues.Add(new("GradeWhileAbsent", $"{date:dd.MM}: оценка {mark.Grade} при отметке «пропуск»."));
+                        issues.Add(new("GradeWhileAbsent", $"{date:dd.MM}: оценка {mark.Grade}, а галочки «был» нет — балл за посещение не начислен."));
                     }
                 }
             }
@@ -234,13 +241,26 @@ public static class CrmJournalScoring
                 $"Отметки раньше, чем студент пришёл в группу ({joinedOn:dd.MM}): {string.Join(", ", beforeJoined.Select(d => d.ToString("dd.MM")))}."));
         }
 
-        // The days the student was in the group, and which of them the mentor has not filled in — an
-        // unticked day and a day with no mark at all are the same thing for the report.
+        // The days the student was in the group. A past one with no mark at all is a hole in the CRM's
+        // journal: no tick, so an absence, but flagged. What is left unmarked is today or later.
         var memberDays = days
-            .Where(d => !d.Value.IsDayOff && (joinedOn is null || d.Key >= joinedOn) && (leftOn is null || d.Key <= leftOn))
+            .Where(d => !d.Value.IsDayOff && !inactiveDays.Contains(d.Key) && (joinedOn is null || d.Key >= joinedOn) && (leftOn is null || d.Key <= leftOn))
             .Select(d => d.Key)
             .Order()
             .ToList();
+        var holes = memberDays.Where(d => !markedDays.Contains(d) && Passed(d)).ToList();
+        foreach (var hole in holes)
+        {
+            absent++;
+            filledDays.Add(hole);
+            absences.Add(new(hole, "NoMark", null));
+        }
+
+        if (holes.Count > 0)
+        {
+            issues.Add(new("MissingMarks", $"В CRM нет отметки за {holes.Count} дн.: {string.Join(", ", holes.Select(d => d.ToString("dd.MM")))} — считаем как «не был»."));
+        }
+
         var unfilled = memberDays.Where(d => !filledDays.Contains(d)).ToList();
 
         var total = attendance + homework + bonus + (exam ?? 0);
@@ -262,7 +282,7 @@ public static class CrmJournalScoring
             attended,
             absent,
             late,
-            absences,
+            absences.OrderBy(a => a.Date).ToList(),
             unfilled,
             zeroHomework,
             issues,

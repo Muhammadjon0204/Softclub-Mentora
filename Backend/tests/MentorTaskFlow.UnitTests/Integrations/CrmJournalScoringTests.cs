@@ -24,8 +24,10 @@ public sealed class CrmJournalScoringTests
 
     private static CrmNote Note(int type, string text) => new(1, new CrmRef(type, "t"), text, "Ментор", Day(1));
 
-    private static CrmStudentPeriodScore Score(CrmJournalPeriod period, DateOnly? joined = null) =>
-        CrmJournalScoring.Score(period, period.Students[0], joined);
+    private static CrmStudentPeriodScore Score(CrmJournalPeriod period, DateOnly? joined = null, DateOnly? today = null) =>
+        CrmJournalScoring.Score(period, period.Students[0], joined, today: today);
+
+    private static DateOnly Oct(int day) => new(2026, 10, day);
 
     [Fact]
     public void A_perfect_week_is_100_the_way_the_crm_counts_it()
@@ -72,7 +74,7 @@ public sealed class CrmJournalScoringTests
     {
         var score = Score(Week(
             Mark(5, attended: false, notes: Note(CrmValues.NoteExcused, "к врачу")),
-            Mark(6, attended: false, notes: Note(CrmValues.NoteAbsence, "без причины"))));
+            Mark(6, attended: false, notes: Note(CrmValues.NoteAbsence, "без причины"))), today: Oct(7));
 
         score.AttendancePoints.ShouldBe(0);
         score.Absent.ShouldBe(2);
@@ -80,26 +82,33 @@ public sealed class CrmJournalScoringTests
     }
 
     /// <summary>
-    /// A day not ticked and with no «пропуск» note is a journal not filled in yet — the student is not
-    /// called absent. It earns nothing, as in the CRM.
+    /// The academy ticks every student on the day of the lesson, so a past day without the tick is an
+    /// absence even with no note.
     /// </summary>
     [Fact]
-    public void A_day_without_an_absence_note_is_unfilled_not_absent()
+    public void A_past_day_without_the_tick_is_an_absence_even_without_a_note()
     {
-        var score = Score(Week(Mark(5, attended: false), Mark(6, grade: 4)));
+        var score = Score(Week(Mark(5, attended: false), Mark(6, grade: 4)), today: Oct(7));
+
+        score.AbsentDays.ShouldHaveSingleItem().ShouldBe(new CrmAbsentDay(Oct(5), "NoReason", null));
+        score.Total.ShouldBe(5);
+    }
+
+    /// <summary>Today's lesson may simply not be marked yet.</summary>
+    [Fact]
+    public void Today_without_the_tick_is_not_marked_yet()
+    {
+        var score = Score(Week(Mark(5, grade: 5), Mark(6, attended: false)), today: Oct(6));
 
         score.Absent.ShouldBe(0);
-        score.AbsentDays.ShouldBeEmpty();
-        score.UnfilledDays.ShouldContain(new DateOnly(2026, 10, 5));
-        score.UnfilledDays.ShouldNotContain(new DateOnly(2026, 10, 6));
-        score.Total.ShouldBe(5);
+        score.UnfilledDays.ShouldBe([Oct(6), Oct(7), Oct(8), Oct(9), Oct(10)]);
         score.Fill.ShouldBe(CrmFill.Partial);
     }
 
     [Fact]
-    public void A_week_with_nothing_filled_in_is_empty()
+    public void A_week_that_has_not_started_is_empty()
     {
-        var score = Score(Week(Mark(5, attended: false), Mark(6, attended: false)));
+        var score = Score(Week(Mark(5, attended: false), Mark(6, attended: false)), today: Oct(5));
 
         score.Fill.ShouldBe(CrmFill.Empty);
         score.UnfilledDays.Count.ShouldBe(6);
@@ -139,7 +148,7 @@ public sealed class CrmJournalScoringTests
     [Fact]
     public void Other_on_a_missed_day_is_an_absence()
     {
-        var score = Score(Week(Mark(5, attended: false, notes: Note(CrmValues.NoteOther, "семейные обстоятельства"))));
+        var score = Score(Week(Mark(5, attended: false, notes: Note(CrmValues.NoteOther, "семейные обстоятельства"))), today: Oct(6));
 
         score.AbsentDays.ShouldHaveSingleItem().ShouldBe(new CrmAbsentDay(new DateOnly(2026, 10, 5), "Other", "семейные обстоятельства"));
         score.Remarks.ShouldBeEmpty();
@@ -150,7 +159,7 @@ public sealed class CrmJournalScoringTests
     {
         var score = Score(Week(
             Mark(5, grade: 5, notes: Note(CrmValues.NoteCheating, "списал у соседа")),
-            Mark(6, grade: 5, notes: Note(CrmValues.NoteOther, "помогал другим"))));
+            Mark(6, grade: 5, notes: Note(CrmValues.NoteOther, "помогал другим"))), today: Oct(7));
 
         score.Remarks.Select(r => (r.Kind, r.Text)).ShouldBe([("Cheating", "списал у соседа"), ("Other", "помогал другим")]);
         score.AbsentDays.ShouldBeEmpty();
@@ -160,7 +169,7 @@ public sealed class CrmJournalScoringTests
     [Fact]
     public void Every_distinct_note_text_of_a_day_is_kept()
     {
-        var score = Score(Week(Mark(5, attended: false, notes: [Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "звонил маме")])));
+        var score = Score(Week(Mark(5, attended: false, notes: [Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "звонил маме")])), today: Oct(6));
 
         score.AbsentDays.ShouldHaveSingleItem().Note.ShouldBe("болеет · звонил маме");
     }
@@ -168,7 +177,7 @@ public sealed class CrmJournalScoringTests
     [Fact]
     public void A_grade_on_an_unticked_day_is_flagged()
     {
-        Score(Week(Mark(5, attended: false, grade: 4))).Issues.ShouldContain(i => i.Code == "GradeWithoutAttendance");
+        Score(Week(Mark(5, attended: false, grade: 4))).Issues.ShouldContain(i => i.Code == "GradeWhileAbsent");
     }
 
     [Fact]
@@ -183,9 +192,10 @@ public sealed class CrmJournalScoringTests
     [Fact]
     public void Inactive_marks_count_for_nothing()
     {
-        var score = Score(Week(Mark(5, attended: false, status: Inactive), Mark(6, grade: 5)));
+        var score = Score(Week(Mark(5, attended: false, status: Inactive), Mark(6, grade: 5)), today: Oct(7));
 
         score.Absent.ShouldBe(0);
+        score.ExpectedDays.ShouldBe(5);
         score.Total.ShouldBe(6);
         score.LessonsCounted.ShouldBe(1);
     }
@@ -209,7 +219,7 @@ public sealed class CrmJournalScoringTests
         var score = Score(Week(Mark(5, grade: 95, bonus: 10)));
 
         score.Total.ShouldBe(106);
-        score.Issues.Select(i => i.Code).ShouldBe(["LessonGradeOverFive", "TotalOver100"], ignoreOrder: true);
+        score.Issues.Select(i => i.Code).ShouldBe(["LessonGradeOverFive", "MissingMarks", "TotalOver100"], ignoreOrder: true);
     }
 
     [Fact]
@@ -223,8 +233,9 @@ public sealed class CrmJournalScoringTests
     {
         var score = Score(Week(Mark(5, grade: 5), Mark(10, grade: 60)));
 
-        score.UnfilledDays.ShouldContain(new DateOnly(2026, 10, 6));
-        score.Fill.ShouldBe(CrmFill.Partial);
+        score.AbsentDays.Select(a => (a.Date, a.Kind)).ShouldContain((Oct(6), "NoMark"));
+        score.Issues.ShouldContain(i => i.Code == "MissingMarks" && i.Message.Contains("06.10"));
+        score.Fill.ShouldBe(CrmFill.Full);
     }
 
     /// <summary>Seen on the test server: active marks weeks before the student's own joining date.</summary>

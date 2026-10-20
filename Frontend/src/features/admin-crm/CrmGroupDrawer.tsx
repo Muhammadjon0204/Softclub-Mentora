@@ -49,7 +49,7 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
         <span className="w-12 shrink-0 text-right text-[20px] font-semibold text-ink-muted">—</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-semibold text-ink-secondary">{student.fullName}</span>
-          <span className="block text-[12px] text-ink-muted">ментор не заполнил ни одного дня — в средний балл не идёт</span>
+          <span className="block text-[12px] text-ink-muted">дни этой недели ещё не отмечены</span>
         </span>
       </li>
     );
@@ -71,7 +71,7 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
           <span className="block truncate text-[14px] font-semibold text-ink">{student.fullName}</span>
           <span className="block text-[12px] text-ink-muted">
             {partial
-              ? `заполнено ${String(student.filledDays)} из ${String(student.expectedDays)} дн. — в средний не идёт`
+              ? `неделя идёт: отмечено ${String(student.filledDays)} из ${String(student.expectedDays)} дн.`
               : scoreParts(student, examMax)}
           </span>
         </span>
@@ -96,7 +96,7 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
             <p key={`r${r.date}${String(index)}`}><span className="font-medium text-info">{formatDay(r.date)}: {REMARK_LABEL[r.kind] ?? r.kind}</span> — {r.text}{r.author ? <span className="text-ink-muted"> ({r.author})</span> : null}</p>
           ))}
           {student.unfilledDays.length > 0 ? (
-            <p><span className="font-medium text-ink">Ментор не заполнил:</span> {student.unfilledDays.map((d) => formatDay(d)).join(', ')}</p>
+            <p><span className="font-medium text-ink">Ещё не отмечено:</span> {student.unfilledDays.map((d) => formatDay(d)).join(', ')}</p>
           ) : null}
           {student.zeroHomeworkDays.length > 0 ? (
             <p><span className="font-medium text-ink">Ноль за задание:</span> {student.zeroHomeworkDays.map((d) => formatDay(d)).join(', ')}</p>
@@ -128,14 +128,13 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Средний итог" value={s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal)} hint={`по ${String(s.students)} студ.`} />
         <Zones passed={s.passed} support={s.support} risk={s.risk} />
-        <Stat label="Посещаемость" value={percent(s.attendanceRate)} hint="по заполненным дням" />
-        <Stat label="Журнал заполнен" value={percent(s.fillRate)} />
+        <Stat label="Посещаемость" value={percent(s.attendanceRate)} hint="по прошедшим дням" />
+        <Stat label="Отмечено дней" value={percent(s.fillRate)} />
       </div>
       {s.partialStudents + s.emptyStudents > 0 ? (
         <p className="text-[12.5px] text-ink-muted">
-          В средний идут только полностью заполненные недели.
-          {s.partialStudents > 0 ? ` Заполнено не до конца: ${String(s.partialStudents)} студ.` : ''}
-          {s.emptyStudents > 0 ? ` Не заполнено совсем: ${String(s.emptyStudents)} студ.` : ''}
+          Неделя ещё идёт — средний и зоны появятся, когда пройдут все дни.
+          {s.partialStudents > 0 ? ` Отмечено не до конца: ${String(s.partialStudents)} студ.` : ''}
         </p>
       ) : null}
       {period.students.length === 0 ? (
@@ -157,10 +156,10 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} hint={`закрытых недель: ${String(overall.periods)}`} />
+        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} hint="средний из недельных итогов" />
         <Zones passed={overall.passed} support={overall.support} risk={overall.risk} />
-        <Stat label="Посещаемость" value={percent(overall.attendanceRate)} hint="по заполненным дням" />
-        <Stat label="Журнал заполнен" value={percent(overall.fillRate)} />
+        <Stat label="Посещаемость" value={percent(overall.attendanceRate)} hint="по прошедшим дням" />
+        <Stat label="Закрытых недель" value={String(overall.periods)} />
       </div>
       <ul className="divide-y divide-divider">
         {overall.studentResults.map((s) => {
@@ -172,8 +171,8 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14px] font-semibold text-ink">{s.fullName}</span>
                 <span className="block text-[12px] text-ink-muted">
-                  в группе {s.weeks} нед. · заполнено полностью {s.fullWeeks}
-                  {notFull > 0 ? ` · не до конца или пусто ${String(notFull)}` : ''}
+                  недель в группе {s.weeks}
+                  {notFull > 0 ? ` · не отмечено ${String(notFull)}` : ''}
                   {s.fullWeeks > 1 ? ` · от ${String(s.minTotal)} до ${String(s.maxTotal)}` : ''}
                   {s.absent > 0 ? ` · пропусков ${String(s.absent)}` : ''}
                   {s.late > 0 ? ` · опозданий ${String(s.late)}` : ''}

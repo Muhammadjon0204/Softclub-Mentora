@@ -121,7 +121,7 @@ public sealed class CrmIntegrationService(
             var today = Local(clock.UtcNow);
             var scored = (journal ?? [])
                 .OrderByDescending(p => p.Week)
-                .Select(p => (Period: p, Scores: ScorePeriod(p, membership), Closed: IsClosed(p, today)))
+                .Select(p => (Period: p, Scores: ScorePeriod(p, membership, today), Closed: IsClosed(p, today)))
                 .ToList();
 
             return new CrmGroupPreviewDto(
@@ -135,11 +135,12 @@ public sealed class CrmIntegrationService(
 
     private static List<CrmStudentPeriodScore> ScorePeriod(
         CrmJournalPeriod period,
-        IReadOnlyDictionary<int, (DateOnly Joined, DateOnly? Left)> membership) =>
+        IReadOnlyDictionary<int, (DateOnly Joined, DateOnly? Left)> membership,
+        DateOnly today) =>
         period.Students
             .Select(s => membership.TryGetValue(s.Id, out var m)
-                ? CrmJournalScoring.Score(period, s, m.Joined, m.Left)
-                : CrmJournalScoring.Score(period, s))
+                ? CrmJournalScoring.Score(period, s, m.Joined, m.Left, today)
+                : CrmJournalScoring.Score(period, s, today: today))
 
             // Not in the group that week (joined later, left earlier) and nothing counted either.
             .Where(s => s.ExpectedDays > 0 || s.LessonsCounted > 0 || s.ExamGrade is not null)

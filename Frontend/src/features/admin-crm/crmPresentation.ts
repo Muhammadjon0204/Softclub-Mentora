@@ -36,6 +36,8 @@ export const ABSENCE_LABEL: Record<string, string> = {
   Absence: 'пропуск',
   Excused: 'отпросился',
   Other: 'другое',
+  NoReason: 'не был, без причины',
+  NoMark: 'не был (в CRM нет отметки)',
 };
 
 export const REMARK_LABEL: Record<string, string> = {
