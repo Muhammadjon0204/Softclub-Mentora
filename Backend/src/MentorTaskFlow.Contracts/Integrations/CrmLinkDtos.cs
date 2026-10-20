@@ -7,8 +7,17 @@ namespace MentorTaskFlow.Contracts.Integrations;
 /// <c>Scope</c>: <c>Organization</c> (everything), <c>Branch</c> (the CRM branch linked to the caller's
 /// branch), <c>Team</c> (the groups of the Lead's mentors and the Lead's own), <c>Own</c> (the mentor's
 /// own groups). <c>Ready</c> is false while the link it needs is missing — <c>Message</c> says which.
+/// <c>CanSelfLink</c>: a mentor or Lead not linked yet, who can link themselves by sharing their phone
+/// in the bot (<c>BotUrl</c>) — once <c>TelegramBound</c>, the chat is connected to this account.
 /// </remarks>
-public sealed record CrmAccessDto(string Scope, bool Ready, string? Message, int LinkedMentors);
+public sealed record CrmAccessDto(
+    string Scope,
+    bool Ready,
+    string? Message,
+    int LinkedMentors,
+    bool CanSelfLink = false,
+    bool TelegramBound = false,
+    string? BotUrl = null);
 
 /// <summary>A CRM mentor and the Mentora account linked to it, or the one that looks like it.</summary>
 public sealed record CrmMentorLinkDto(

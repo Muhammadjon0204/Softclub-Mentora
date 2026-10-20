@@ -1655,6 +1655,11 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("phone_number");
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(16)

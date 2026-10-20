@@ -62,6 +62,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.FailedLoginCount).IsRequired().HasDefaultValue(0);
         builder.Property(x => x.AvatarKey).HasMaxLength(User.AvatarKeyMaxLength);
+        builder.Property(x => x.PhoneNumber).HasMaxLength(User.PhoneNumberMaxLength);
 
         builder.HasOne<Organization>()
             .WithMany()

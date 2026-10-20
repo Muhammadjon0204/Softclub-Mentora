@@ -38,6 +38,26 @@ public sealed record CrmAccess(string Scope, string? Missing, int? CrmBranchId, 
 /// <summary>Works out the caller's <see cref="CrmAccess"/> from their role and the CRM links.</summary>
 public sealed class CrmAccessResolver(MentorTaskFlowDbContext dbContext, ICurrentUserAccessor currentUser)
 {
+    /// <summary>
+    /// Whether the caller — a mentor or a Lead without a CRM link — can link themselves through the bot,
+    /// and whether their Telegram is connected yet.
+    /// </summary>
+    public async Task<(bool CanSelfLink, bool TelegramBound)> SelfLinkAsync(CancellationToken cancellationToken)
+    {
+        var actor = currentUser.Current ?? throw new UnauthorizedException();
+        if (actor.Role is UserRole.Admin)
+        {
+            return (false, false);
+        }
+
+        var user = await dbContext.Users
+            .Where(u => u.Id == actor.UserId)
+            .Select(u => new { u.CrmMentorId, Bound = u.TelegramChatId != null })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return (user is { CrmMentorId: null }, user?.Bound == true);
+    }
+
     public async Task<CrmAccess> ResolveAsync(CancellationToken cancellationToken)
     {
         var actor = currentUser.Current ?? throw new UnauthorizedException();
@@ -89,7 +109,7 @@ public sealed class CrmAccessResolver(MentorTaskFlowDbContext dbContext, ICurren
 
                 return new CrmAccess(
                     CrmAccess.Own,
-                    own is null ? "Ваш аккаунт ещё не связан с вашим аккаунтом ментора в CRM — это делает администратор организации." : null,
+                    own is null ? "Ваш аккаунт ещё не связан с аккаунтом ментора в CRM. Свяжите его сами через Telegram-бота или попросите администратора организации." : null,
                     null,
                     own is { } id ? new HashSet<int> { id } : new HashSet<int>());
             }

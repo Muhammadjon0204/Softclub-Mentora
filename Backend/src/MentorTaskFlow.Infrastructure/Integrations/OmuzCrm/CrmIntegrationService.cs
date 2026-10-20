@@ -21,6 +21,8 @@ public sealed class CrmIntegrationService(
     IOptions<OmuzCrmOptions> options,
     IClock clock,
     CrmAccessResolver accessResolver,
+    Telegram.TelegramBotIdentity botIdentity,
+    IOptions<TelegramOptions> telegramOptions,
     ILogger<CrmIntegrationService> logger) : ICrmIntegrationService
 {
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(30);
@@ -64,7 +66,17 @@ public sealed class CrmIntegrationService(
     public async Task<CrmAccessDto> GetAccessAsync(CancellationToken cancellationToken)
     {
         var access = await accessResolver.ResolveAsync(cancellationToken);
-        return new CrmAccessDto(access.Scope, access.Ready, access.Missing, access.MentorIds.Count);
+        var (canSelfLink, telegramBound) = await accessResolver.SelfLinkAsync(cancellationToken);
+        var bot = botIdentity.Username ?? telegramOptions.Value.BotUsername;
+
+        return new CrmAccessDto(
+            access.Scope,
+            access.Ready,
+            access.Missing,
+            access.MentorIds.Count,
+            canSelfLink && client.IsConfigured && !string.IsNullOrWhiteSpace(bot),
+            telegramBound,
+            string.IsNullOrWhiteSpace(bot) ? null : $"https://t.me/{bot}");
     }
 
     public async Task<CrmGroupListDto> ListGroupsAsync(string status, CancellationToken cancellationToken)

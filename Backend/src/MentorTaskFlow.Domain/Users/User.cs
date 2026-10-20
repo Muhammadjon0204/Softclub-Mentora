@@ -81,6 +81,15 @@ public sealed class User : AuditableEntity
     public int? CrmMentorId { get; private set; }
 
     /// <summary>
+    /// The person's phone as Telegram confirmed it — digits only, with the country code
+    /// (<c>992931234567</c>) — or null. Only ever set from a contact the person shared about
+    /// themselves in the bot, never typed in, so it can be trusted to find them in the CRM.
+    /// </summary>
+    public string? PhoneNumber { get; private set; }
+
+    public const int PhoneNumberMaxLength = 20;
+
+    /// <summary>
     /// File name of the profile photo in storage, or null for the initials avatar.
     /// </summary>
     /// <remarks>
@@ -425,6 +434,18 @@ public sealed class User : AuditableEntity
         }
 
         CrmMentorId = crmMentorId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Stores a phone confirmed by Telegram (see <see cref="PhoneNumber"/>).</summary>
+    public void SetVerifiedPhone(string digits, DateTimeOffset now)
+    {
+        if (string.IsNullOrEmpty(digits) || digits.Length is < 7 or > PhoneNumberMaxLength || !digits.All(char.IsAsciiDigit))
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Неверный номер телефона.");
+        }
+
+        PhoneNumber = digits;
         UpdatedAt = now;
     }
 

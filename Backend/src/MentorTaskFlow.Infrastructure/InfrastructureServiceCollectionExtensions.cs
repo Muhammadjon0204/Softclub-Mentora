@@ -359,6 +359,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<CrmAccessResolver>();
         services.AddScoped<ICrmIntegrationService, CrmIntegrationService>();
         services.AddScoped<ICrmLinkService, CrmLinkService>();
+        services.AddScoped<CrmPhoneLinkService>();
     }
 
     /// <summary>Object storage and the file limits of TZ 17.</summary>

@@ -159,6 +159,10 @@ export interface CrmAccess {
   ready: boolean;
   message?: string | null;
   linkedMentors: number;
+  /** Ментор или тимлид без связи с CRM — может связаться сам, поделившись номером в боте. */
+  canSelfLink: boolean;
+  telegramBound: boolean;
+  botUrl?: string | null;
 }
 
 export interface CrmMentorLink {
