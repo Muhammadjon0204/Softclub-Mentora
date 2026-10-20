@@ -53,7 +53,10 @@ public sealed record CrmStudentScoreDto(
     int LessonsCounted,
     int Attended,
     int Absent,
-    bool HasData,
+    string Fill,
+    string Zone,
+    int ExpectedDays,
+    int FilledDays,
     IReadOnlyList<CrmLateDto> LateDays,
     IReadOnlyList<CrmAbsenceDto> AbsentDays,
     IReadOnlyList<DateOnly> UnfilledDays,
@@ -61,40 +64,51 @@ public sealed record CrmStudentScoreDto(
     IReadOnlyList<CrmIssueDto> Issues);
 
 /// <summary>
-/// A period at a glance. <c>Students</c>, the average, <c>Passed</c> and the attendance count only what
-/// the mentor filled in; <c>UnfilledDays</c> — student-days not filled in, <c>EmptyStudents</c> — students
-/// with nothing filled in for the whole period.
+/// A period at a glance. <c>Students</c>, the average and the zones (80+ / 70–79 / below 70) count only
+/// students whose week is filled in completely; attendance — the filled-in days; <c>FillRate</c> — the
+/// share of the students' days the mentor has filled in.
 /// </summary>
 public sealed record CrmPeriodSummaryDto(
     int Students,
     double? AverageTotal,
     int Passed,
+    int Support,
+    int Risk,
     double? AttendanceRate,
-    int UnfilledDays,
+    double? FillRate,
+    int PartialStudents,
     int EmptyStudents,
     int IssueCount);
 
-/// <summary>A student over the closed periods: the average of the weekly totals, never their sum.</summary>
+/// <summary>
+/// A student over the closed weeks: the average of the totals of the fully filled-in weeks, never their
+/// sum. <c>Weeks</c> — the closed weeks the student was in the group, split by how they are filled in.
+/// </summary>
 public sealed record CrmStudentOverallDto(
     int StudentId,
     string FullName,
-    double AverageTotal,
+    double? AverageTotal,
+    string? Zone,
     int Weeks,
-    int MinTotal,
-    int MaxTotal,
+    int FullWeeks,
+    int PartialWeeks,
+    int EmptyWeeks,
+    int? MinTotal,
+    int? MaxTotal,
     int Attended,
     int Absent,
-    int Late,
-    int UnfilledDays);
+    int Late);
 
-/// <summary>The group over its closed periods: the average of its students' averages.</summary>
+/// <summary>The group over its closed weeks: the average of its students' averages.</summary>
 public sealed record CrmOverallDto(
     int Periods,
     int Students,
     double? AverageTotal,
     int Passed,
+    int Support,
+    int Risk,
     double? AttendanceRate,
-    int UnfilledDays,
+    double? FillRate,
     IReadOnlyList<CrmStudentOverallDto> StudentResults);
 
 /// <summary>

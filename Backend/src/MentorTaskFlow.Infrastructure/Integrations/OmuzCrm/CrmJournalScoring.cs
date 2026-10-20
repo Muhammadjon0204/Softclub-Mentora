@@ -26,16 +26,31 @@ public sealed record CrmStudentPeriodScore(
     IReadOnlyList<CrmAbsentDay> AbsentDays,
     IReadOnlyList<DateOnly> UnfilledDays,
     IReadOnlyList<DateOnly> ZeroHomeworkDays,
-    IReadOnlyList<CrmDataIssue> Issues)
+    IReadOnlyList<CrmDataIssue> Issues,
+    int ExpectedDays,
+    int FilledDays)
 {
     /// <summary>The pass mark of the academy: 80 of 100.</summary>
     public const int PassMark = 80;
 
+    /// <summary>From 70 to 79 the student passes but needs a push; below 70 is the risk zone.</summary>
+    public const int SupportMark = 70;
+
     /// <summary>
-    /// The mentor filled in at least one day for this student. A week with nothing filled in has a
-    /// total of 0 that says nothing about the student — it is left out of every average.
+    /// How much of the week the mentor filled in, counting only the days the student was in the group:
+    /// <c>Full</c>, <c>Partial</c> or <c>Empty</c>. Only a full week is a real result — a week with
+    /// two days filled in of six is a total of a third of a week, not a bad student.
     /// </summary>
-    public bool HasData => Attended + Absent > 0 || HomeworkPoints + BonusPoints + (ExamGrade ?? 0) > 0;
+    public string Fill => ExpectedDays > 0 && FilledDays >= ExpectedDays ? CrmFill.Full : FilledDays > 0 ? CrmFill.Partial : CrmFill.Empty;
+
+    public string Zone => CrmJournalScoring.ZoneOf(Total);
+}
+
+public static class CrmFill
+{
+    public const string Full = "Full";
+    public const string Partial = "Partial";
+    public const string Empty = "Empty";
 }
 
 /// <summary>
@@ -55,6 +70,11 @@ public sealed record CrmStudentPeriodScore(
 /// yet: it earns nothing, as in the CRM, but the student is not called absent.
 /// </para>
 /// <para>
+/// The weeks themselves come from the CRM: it lays the calendar out as six lesson days ending with
+/// the exam, then a day off, and moves the days around holidays. A student is expected only on the
+/// days between joining and leaving the group.
+/// </para>
+/// <para>
 /// Marks are matched to days by calendar date only: the CRM stores days at midnight UTC, but some marks
 /// carry the time they were entered (<c>…T11:27:37</c>), and that time is not a different day.
 /// </para>
@@ -63,7 +83,11 @@ public static class CrmJournalScoring
 {
     public static DateOnly DateOf(DateTimeOffset value) => DateOnly.FromDateTime(value.UtcDateTime);
 
-    public static CrmStudentPeriodScore Score(CrmJournalPeriod period, CrmJournalStudent student, DateOnly? joinedOn = null)
+    /// <summary><c>Pass</c> (80+), <c>Support</c> (70–79) or <c>Risk</c> (below 70).</summary>
+    public static string ZoneOf(double total) =>
+        total >= CrmStudentPeriodScore.PassMark ? "Pass" : total >= CrmStudentPeriodScore.SupportMark ? "Support" : "Risk";
+
+    public static CrmStudentPeriodScore Score(CrmJournalPeriod period, CrmJournalStudent student, DateOnly? joinedOn = null, DateOnly? leftOn = null)
     {
         var days = period.Days
             .GroupBy(d => DateOf(d.Date))
@@ -74,7 +98,7 @@ public static class CrmJournalScoring
         bool? examAttended = null;
         var late = new List<CrmLateDay>();
         var absences = new List<CrmAbsentDay>();
-        var unfilled = new List<DateOnly>();
+        var filledDays = new HashSet<DateOnly>();
         var zeroHomework = new List<DateOnly>();
         var issues = new List<CrmDataIssue>();
         var markedDays = new HashSet<DateOnly>();
@@ -147,6 +171,7 @@ public static class CrmJournalScoring
             if (mark.IsAttended)
             {
                 attended++;
+                filledDays.Add(date);
                 var lateNote = notes.FirstOrDefault(n => n.Type.Id == CrmValues.NoteLateness);
                 if (mark.LateMinutes > 0 || lateNote is not null)
                 {
@@ -161,7 +186,6 @@ public static class CrmJournalScoring
 
                 if (kind is null)
                 {
-                    unfilled.Add(date);
                     if (mark.Grade > 0)
                     {
                         issues.Add(new("GradeWithoutAttendance", $"{date:dd.MM}: оценка {mark.Grade}, а посещение не отмечено — балл за посещение не начислен."));
@@ -170,6 +194,7 @@ public static class CrmJournalScoring
                 else
                 {
                     absent++;
+                    filledDays.Add(date);
                     absences.Add(new(date, kind, note));
                     if (mark.Grade > 0)
                     {
@@ -186,14 +211,14 @@ public static class CrmJournalScoring
                 $"Отметки раньше, чем студент пришёл в группу ({joinedOn:dd.MM}): {string.Join(", ", beforeJoined.Select(d => d.ToString("dd.MM")))}."));
         }
 
-        // A day of the period the student has no mark for at all: neither attended nor absent in the
-        // CRM's eyes, so it earns nothing — but the mentor should know the journal has a hole.
-        var activeDays = days.Where(d => !d.Value.IsDayOff).Select(d => d.Key).ToList();
-        var missing = activeDays.Where(d => !markedDays.Contains(d) && (joinedOn is null || d >= joinedOn)).ToList();
-        if (missing.Count > 0 && markedDays.Count > 0)
-        {
-            issues.Add(new("MissingMarks", $"Нет отметки за {missing.Count} дн.: {string.Join(", ", missing.Select(d => d.ToString("dd.MM")))}."));
-        }
+        // The days the student was in the group, and which of them the mentor has not filled in — an
+        // unticked day and a day with no mark at all are the same thing for the report.
+        var memberDays = days
+            .Where(d => !d.Value.IsDayOff && (joinedOn is null || d.Key >= joinedOn) && (leftOn is null || d.Key <= leftOn))
+            .Select(d => d.Key)
+            .Order()
+            .ToList();
+        var unfilled = memberDays.Where(d => !filledDays.Contains(d)).ToList();
 
         var total = attendance + homework + bonus + (exam ?? 0);
         if (total > 100)
@@ -217,7 +242,9 @@ public static class CrmJournalScoring
             absences,
             unfilled,
             zeroHomework,
-            issues);
+            issues,
+            memberDays.Count,
+            memberDays.Count - unfilled.Count);
     }
 
     /// <summary>The CRM keeps names as typed: «Hakim  Jumaev » — collapse the spaces.</summary>

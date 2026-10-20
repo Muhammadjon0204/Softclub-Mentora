@@ -42,9 +42,17 @@ export function periodTitle(label: string): string {
   return label.includes('-') ? `Недели ${label.replace('-', '–')}` : `Неделя ${label}`;
 }
 
-export function totalTone(total: number): string {
-  if (total > 100) return 'text-danger';
-  if (total >= 80) return 'text-success';
-  if (total >= 60) return 'text-warning';
-  return 'text-ink';
+export const ZONE: Record<string, { label: string; tone: 'success' | 'warning' | 'danger'; text: string }> = {
+  Pass: { label: 'проходит', tone: 'success', text: 'text-success' },
+  Support: { label: 'нужна поддержка', tone: 'warning', text: 'text-warning' },
+  Risk: { label: 'зона риска', tone: 'danger', text: 'text-danger' },
+};
+
+/** Цвет балла по зоне: 80+ зелёный, 70–79 жёлтый, ниже 70 красный. */
+export function zoneText(zone: string | null | undefined): string {
+  return zone ? ZONE[zone]?.text ?? 'text-ink' : 'text-ink-muted';
+}
+
+export function percent(value: number | null | undefined): string {
+  return value === null || value === undefined ? '—' : `${String(value)}%`;
 }

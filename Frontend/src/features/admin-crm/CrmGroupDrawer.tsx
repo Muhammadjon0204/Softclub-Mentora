@@ -8,22 +8,42 @@ import { Badge } from '../../shared/ui/Badge';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
-import { ABSENCE_LABEL, STUDENT_STATUS, formatDay, formatRange, periodTitle, totalTone } from './crmPresentation';
+import { ABSENCE_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
 
-function Stat({ label, value }: { label: string; value: string }): JSX.Element {
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }): JSX.Element {
   return (
     <div className="rounded-control border border-line bg-surface px-3 py-2.5">
       <p className="text-[11.5px] text-ink-muted">{label}</p>
       <p className="mt-0.5 text-[17px] font-semibold tabular-nums text-ink">{value}</p>
+      {hint ? <p className="text-[11.5px] text-ink-muted">{hint}</p> : null}
     </div>
   );
+}
+
+/** 80+ / 70–79 / ниже 70 — три цифры в одной плашке. */
+function Zones({ passed, support, risk }: { passed: number; support: number; risk: number }): JSX.Element {
+  return (
+    <div className="rounded-control border border-line bg-surface px-3 py-2.5">
+      <p className="text-[11.5px] text-ink-muted">80+ · 70–79 · ниже 70</p>
+      <p className="mt-0.5 text-[17px] font-semibold tabular-nums">
+        <span className="text-success">{passed}</span><span className="text-ink-muted"> · </span>
+        <span className="text-warning">{support}</span><span className="text-ink-muted"> · </span>
+        <span className="text-danger">{risk}</span>
+      </p>
+    </div>
+  );
+}
+
+function scoreParts(student: CrmStudentScore, examMax: number): string {
+  const bonus = student.bonusPoints > 0 ? ` · бонус ${String(student.bonusPoints)}` : '';
+  return `посещение ${String(student.attendancePoints)} · задания ${String(student.homeworkPoints)}${bonus} · экзамен ${student.examGrade === null || student.examGrade === undefined ? '—' : String(student.examGrade)}/${String(examMax)}`;
 }
 
 function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: number }): JSX.Element {
   const [open, setOpen] = useState(false);
   const details = student.lateDays.length + student.absentDays.length + student.unfilledDays.length + student.zeroHomeworkDays.length + student.issues.length;
 
-  if (!student.hasData) {
+  if (student.fill === 'Empty') {
     return (
       <li className="flex items-center gap-3 py-3">
         <span className="w-12 shrink-0 text-right text-[20px] font-semibold text-ink-muted">—</span>
@@ -35,6 +55,8 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
     );
   }
 
+  const partial = student.fill === 'Partial';
+  const zone = ZONE[student.zone];
   return (
     <li className="py-3">
       <button
@@ -44,24 +66,25 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
         className="flex w-full items-center gap-3 text-left disabled:cursor-default"
         aria-expanded={open}
       >
-        <span className={`w-12 shrink-0 text-right text-[20px] font-semibold tabular-nums ${totalTone(student.total)}`}>{student.total}</span>
+        <span className={`w-12 shrink-0 text-right text-[20px] font-semibold tabular-nums ${partial ? 'text-ink-muted' : zoneText(student.zone)}`}>{student.total}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[14px] font-semibold text-ink">{student.fullName}</span>
           <span className="block text-[12px] text-ink-muted">
-            посещение {student.attendancePoints} · задания {student.homeworkPoints}
-            {student.bonusPoints > 0 ? ` · бонус ${String(student.bonusPoints)}` : ''}
-            {' · '}экзамен {student.examGrade ?? '—'}/{examMax}
+            {partial
+              ? `заполнено ${String(student.filledDays)} из ${String(student.expectedDays)} дн. — в средний не идёт`
+              : scoreParts(student, examMax)}
           </span>
         </span>
         <span className="flex shrink-0 flex-wrap justify-end gap-1">
+          {!partial && zone ? <Badge tone={zone.tone}>{zone.label}</Badge> : null}
           {student.lateDays.length > 0 ? <Badge tone="warning">опозд. {student.lateDays.length}</Badge> : null}
           {student.absentDays.length > 0 ? <Badge tone="danger">пропуск {student.absentDays.length}</Badge> : null}
-          {student.unfilledDays.length > 0 ? <Badge tone="neutral">не заполнено {student.unfilledDays.length}</Badge> : null}
           {student.issues.length > 0 ? <Badge tone="danger">⚠ {student.issues.length}</Badge> : null}
         </span>
       </button>
       {open ? (
         <div className="ml-[60px] mt-2 space-y-1.5 text-[12.5px] text-ink-secondary">
+          {partial ? <p>Пока посчитано: {scoreParts(student, examMax)}</p> : null}
           {student.lateDays.map((l) => (
             <p key={`l${l.date}`}><span className="font-medium text-warning">Опоздал {formatDay(l.date)}</span>{l.minutes > 0 ? ` на ${String(l.minutes)} мин` : ''}{l.note ? ` — ${l.note}` : ''}</p>
           ))}
@@ -90,7 +113,7 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-secondary">
         <CalendarRange className="h-4 w-4 text-ink-muted" aria-hidden="true" />
         {formatRange(period.from, period.to)}
-        <Badge tone={period.isComplete ? 'success' : 'info'}>{period.isComplete ? 'период закрыт' : 'идёт сейчас'}</Badge>
+        <Badge tone={period.isComplete ? 'success' : 'info'}>{period.isComplete ? 'неделя закрыта' : 'идёт сейчас'}</Badge>
         {!period.hasExam ? <Badge tone="neutral">без экзамена</Badge> : null}
       </div>
       {period.mentors.length > 0 ? (
@@ -99,19 +122,20 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
         <p className="flex items-center gap-1.5 text-[13px] text-warning"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />В CRM у группы нет ментора за этот период — отчёт некому сдать</p>
       )}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Студентов" value={String(s.students)} />
-        <Stat label="Средний итог" value={s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal)} />
-        <Stat label="Набрали 80+" value={`${String(s.passed)} из ${String(s.students)}`} />
-        <Stat label="Посещаемость" value={s.attendanceRate === null || s.attendanceRate === undefined ? '—' : `${String(s.attendanceRate)}%`} />
+        <Stat label="Средний итог" value={s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal)} hint={`по ${String(s.students)} студ.`} />
+        <Zones passed={s.passed} support={s.support} risk={s.risk} />
+        <Stat label="Посещаемость" value={percent(s.attendanceRate)} hint="по заполненным дням" />
+        <Stat label="Журнал заполнен" value={percent(s.fillRate)} />
       </div>
-      {s.unfilledDays > 0 ? (
+      {s.partialStudents + s.emptyStudents > 0 ? (
         <p className="text-[12.5px] text-ink-muted">
-          Не заполнено ментором: {s.unfilledDays} отм.
-          {s.emptyStudents > 0 ? ` · у ${String(s.emptyStudents)} студ. неделя пустая` : ''} — это не пропуски, в средний и посещаемость не идут.
+          В средний идут только полностью заполненные недели.
+          {s.partialStudents > 0 ? ` Заполнено не до конца: ${String(s.partialStudents)} студ.` : ''}
+          {s.emptyStudents > 0 ? ` Не заполнено совсем: ${String(s.emptyStudents)} студ.` : ''}
         </p>
       ) : null}
       {period.students.length === 0 ? (
-        <EmptyState icon={<Users className="h-5 w-5" aria-hidden="true" />} title="Нет студентов с отметками" description="В этом периоде ни у кого нет засчитанных дней." />
+        <EmptyState icon={<Users className="h-5 w-5" aria-hidden="true" />} title="Нет студентов" description="В эту неделю в группе никого не было." />
       ) : (
         <ul className="divide-y divide-divider">
           {period.students.map((student) => <StudentRow key={student.studentId} student={student} examMax={period.examMax} />)}
@@ -121,34 +145,40 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
   );
 }
 
-/** Итог по закрытым неделям: у каждого студента — средний из его недельных итогов, у группы — средний по студентам. */
+/** Итог по закрытым неделям: у студента — средний из полностью заполненных недель, у группы — средний по студентам. */
 function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
   if (overall.studentResults.length === 0) {
-    return <p className="text-[13px] text-ink-muted">Закрытых недель с заполненным журналом пока нет.</p>;
+    return <p className="text-[13px] text-ink-muted">Закрытых недель пока нет.</p>;
   }
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} />
-        <Stat label="Средний 80+" value={`${String(overall.passed)} из ${String(overall.students)}`} />
-        <Stat label="Посещаемость" value={overall.attendanceRate === null || overall.attendanceRate === undefined ? '—' : `${String(overall.attendanceRate)}%`} />
-        <Stat label="Закрытых недель" value={String(overall.periods)} />
+        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} hint={`закрытых недель: ${String(overall.periods)}`} />
+        <Zones passed={overall.passed} support={overall.support} risk={overall.risk} />
+        <Stat label="Посещаемость" value={percent(overall.attendanceRate)} hint="по заполненным дням" />
+        <Stat label="Журнал заполнен" value={percent(overall.fillRate)} />
       </div>
       <ul className="divide-y divide-divider">
-        {overall.studentResults.map((s) => (
-          <li key={s.studentId} className="flex items-center gap-3 py-2.5">
-            <span className={`w-14 shrink-0 text-right text-[18px] font-semibold tabular-nums ${totalTone(s.averageTotal)}`}>{s.averageTotal}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[14px] font-semibold text-ink">{s.fullName}</span>
-              <span className="block text-[12px] text-ink-muted">
-                недель {s.weeks}{s.weeks > 1 ? ` · от ${String(s.minTotal)} до ${String(s.maxTotal)}` : ''}
-                {s.absent > 0 ? ` · пропусков ${String(s.absent)}` : ''}
-                {s.late > 0 ? ` · опозданий ${String(s.late)}` : ''}
-                {s.unfilledDays > 0 ? ` · не заполнено ${String(s.unfilledDays)}` : ''}
+        {overall.studentResults.map((s) => {
+          const zone = s.zone ? ZONE[s.zone] : undefined;
+          const notFull = s.partialWeeks + s.emptyWeeks;
+          return (
+            <li key={s.studentId} className="flex items-center gap-3 py-2.5">
+              <span className={`w-14 shrink-0 text-right text-[18px] font-semibold tabular-nums ${zoneText(s.zone)}`}>{s.averageTotal ?? '—'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold text-ink">{s.fullName}</span>
+                <span className="block text-[12px] text-ink-muted">
+                  в группе {s.weeks} нед. · заполнено полностью {s.fullWeeks}
+                  {notFull > 0 ? ` · не до конца или пусто ${String(notFull)}` : ''}
+                  {s.fullWeeks > 1 ? ` · от ${String(s.minTotal)} до ${String(s.maxTotal)}` : ''}
+                  {s.absent > 0 ? ` · пропусков ${String(s.absent)}` : ''}
+                  {s.late > 0 ? ` · опозданий ${String(s.late)}` : ''}
+                </span>
               </span>
-            </span>
-          </li>
-        ))}
+              {zone ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">нет полных недель</Badge>}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -90,19 +90,50 @@ public sealed class CrmJournalScoringTests
 
         score.Absent.ShouldBe(0);
         score.AbsentDays.ShouldBeEmpty();
-        score.UnfilledDays.ShouldBe([new DateOnly(2026, 10, 5)]);
+        score.UnfilledDays.ShouldContain(new DateOnly(2026, 10, 5));
+        score.UnfilledDays.ShouldNotContain(new DateOnly(2026, 10, 6));
         score.Total.ShouldBe(5);
-        score.HasData.ShouldBeTrue();
+        score.Fill.ShouldBe(CrmFill.Partial);
     }
 
     [Fact]
-    public void A_week_with_nothing_filled_in_has_no_data()
+    public void A_week_with_nothing_filled_in_is_empty()
     {
         var score = Score(Week(Mark(5, attended: false), Mark(6, attended: false)));
 
-        score.HasData.ShouldBeFalse();
-        score.UnfilledDays.Count.ShouldBe(2);
+        score.Fill.ShouldBe(CrmFill.Empty);
+        score.UnfilledDays.Count.ShouldBe(6);
     }
+
+    [Fact]
+    public void A_week_is_full_only_when_every_day_is_filled_in()
+    {
+        var score = Score(Week(
+            Mark(5, grade: 5), Mark(6, grade: 5), Mark(7, attended: false, notes: Note(CrmValues.NoteAbsence, "")),
+            Mark(8, grade: 5), Mark(9, grade: 5), Mark(10, grade: 60)));
+
+        score.Fill.ShouldBe(CrmFill.Full);
+        score.ExpectedDays.ShouldBe(6);
+        score.FilledDays.ShouldBe(6);
+    }
+
+    /// <summary>A student who joined on Thursday is expected only from Thursday.</summary>
+    [Fact]
+    public void Only_the_days_in_the_group_are_expected()
+    {
+        var score = Score(Week(Mark(8, grade: 5), Mark(9, grade: 5), Mark(10, grade: 60)), joined: new DateOnly(2026, 10, 8));
+
+        score.ExpectedDays.ShouldBe(3);
+        score.Fill.ShouldBe(CrmFill.Full);
+    }
+
+    [Theory]
+    [InlineData(100, "Pass")]
+    [InlineData(80, "Pass")]
+    [InlineData(79.5, "Support")]
+    [InlineData(70, "Support")]
+    [InlineData(69.9, "Risk")]
+    public void Zones_are_80_and_70(double total, string zone) => CrmJournalScoring.ZoneOf(total).ShouldBe(zone);
 
     [Fact]
     public void A_grade_on_an_unticked_day_is_flagged()
@@ -148,7 +179,7 @@ public sealed class CrmJournalScoringTests
         var score = Score(Week(Mark(5, grade: 95, bonus: 10)));
 
         score.Total.ShouldBe(106);
-        score.Issues.Select(i => i.Code).ShouldBe(["LessonGradeOverFive", "MissingMarks", "TotalOver100"], ignoreOrder: true);
+        score.Issues.Select(i => i.Code).ShouldBe(["LessonGradeOverFive", "TotalOver100"], ignoreOrder: true);
     }
 
     [Fact]
@@ -162,7 +193,8 @@ public sealed class CrmJournalScoringTests
     {
         var score = Score(Week(Mark(5, grade: 5), Mark(10, grade: 60)));
 
-        score.Issues.ShouldContain(i => i.Code == "MissingMarks" && i.Message.Contains("06.10"));
+        score.UnfilledDays.ShouldContain(new DateOnly(2026, 10, 6));
+        score.Fill.ShouldBe(CrmFill.Partial);
     }
 
     /// <summary>Seen on the test server: active marks weeks before the student's own joining date.</summary>

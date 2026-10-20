@@ -18,6 +18,10 @@ export interface CrmStatus {
   courses: CrmRef[];
 }
 
+export type CrmFill = 'Full' | 'Partial' | 'Empty';
+/** 80+ — проходит, 70–79 — нужна поддержка, ниже 70 — зона риска. */
+export type CrmZone = 'Pass' | 'Support' | 'Risk';
+
 export type CrmGroupStatus = 'Started' | 'Finished' | 'Preparing';
 
 export interface CrmGroup {
@@ -67,8 +71,11 @@ export interface CrmStudentScore {
   lessonsCounted: number;
   attended: number;
   absent: number;
-  /** Ментор заполнил хотя бы один день; без этого итог 0 ничего не значит и в средние не идёт. */
-  hasData: boolean;
+  /** Насколько ментор заполнил неделю (только дни, когда студент был в группе). В средний идёт только Full. */
+  fill: CrmFill;
+  zone: CrmZone;
+  expectedDays: number;
+  filledDays: number;
   lateDays: { date: string; minutes: number; note?: string | null }[];
   /** Только то, что ментор отметил как пропуск / «отпросился». */
   absentDays: { date: string; kind: 'Absence' | 'Excused'; note?: string | null }[];
@@ -91,26 +98,32 @@ export interface CrmPeriod {
     students: number;
     averageTotal?: number | null;
     passed: number;
+    support: number;
+    risk: number;
     attendanceRate?: number | null;
-    unfilledDays: number;
+    fillRate?: number | null;
+    partialStudents: number;
     emptyStudents: number;
     issueCount: number;
   };
   students: CrmStudentScore[];
 }
 
-/** Студент по закрытым периодам: средний из недельных итогов (не сумма). */
+/** Студент по закрытым неделям: средний из итогов полностью заполненных недель (не сумма). */
 export interface CrmStudentOverall {
   studentId: number;
   fullName: string;
-  averageTotal: number;
+  averageTotal?: number | null;
+  zone?: CrmZone | null;
   weeks: number;
-  minTotal: number;
-  maxTotal: number;
+  fullWeeks: number;
+  partialWeeks: number;
+  emptyWeeks: number;
+  minTotal?: number | null;
+  maxTotal?: number | null;
   attended: number;
   absent: number;
   late: number;
-  unfilledDays: number;
 }
 
 export interface CrmOverall {
@@ -118,8 +131,10 @@ export interface CrmOverall {
   students: number;
   averageTotal?: number | null;
   passed: number;
+  support: number;
+  risk: number;
   attendanceRate?: number | null;
-  unfilledDays: number;
+  fillRate?: number | null;
   studentResults: CrmStudentOverall[];
 }
 
