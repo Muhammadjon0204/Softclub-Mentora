@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
+  PlugZap,
   ScrollText,
   Tags,
   Users,
@@ -45,6 +46,15 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'audit', label: 'Журнал аудита', path: '/admin/audit', icon: ScrollText, implemented: true },
   { key: 'notifications', label: 'Уведомления', path: '/admin/notifications', icon: Bell, implemented: true },
   { key: 'health', label: 'Состояние системы', path: '/admin/health', icon: Activity, implemented: true },
+  {
+    key: 'crm',
+    label: 'Интеграция CRM',
+    path: '/admin/integrations/crm',
+    icon: PlugZap,
+    implemented: true,
+    // Ключ CRM читает все филиалы — экран только для Organization Admin, как и сам API.
+    organizationAdminOnly: true,
+  },
   // «Настройки» намеренно не в sidebar: раздел UX-рефактора admin shell убрал его
   // отсюда в пользу profile dropdown (см. ProfileMenu.tsx) — маршрут /admin/settings
   // уже подключён и работает через ту точку входа.

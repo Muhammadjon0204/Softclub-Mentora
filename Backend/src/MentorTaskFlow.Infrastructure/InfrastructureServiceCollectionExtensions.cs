@@ -11,6 +11,7 @@ using MentorTaskFlow.Infrastructure.Auditing;
 using MentorTaskFlow.Infrastructure.Categories;
 using MentorTaskFlow.Infrastructure.Common;
 using MentorTaskFlow.Infrastructure.Identity;
+using MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Reviews;
 using MentorTaskFlow.Infrastructure.Scheduling;
@@ -132,6 +133,7 @@ public static class InfrastructureServiceCollectionExtensions
         AddIdentity(services, configuration);
         AddStorage(services, configuration);
         AddTelegram(services, configuration);
+        AddOmuzCrm(services, configuration);
         AddScheduler(services, configuration);
         AddAi(services, configuration);
 
@@ -331,6 +333,30 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<TelegramBotApi>();
         services.AddScoped<TelegramUpdateHandler>();
         services.AddHostedService<TelegramUpdatesService>();
+    }
+
+    /// <summary>
+    /// The read-only Omuz CRM integration. Registered always; without <c>OmuzCrm__ApiKey</c> it reports
+    /// «not configured» instead of failing the application at startup.
+    /// </summary>
+    private static void AddOmuzCrm(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<OmuzCrmOptions>()
+            .Bind(configuration.GetSection(OmuzCrmOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => o.BaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                           || o.BaseUrl.StartsWith("http://localhost", StringComparison.OrdinalIgnoreCase),
+                "OmuzCrm:BaseUrl — только https: ключ передаётся в заголовке.")
+            .ValidateOnStart();
+
+        services.AddHttpClient(OmuzCrmClient.HttpClientName, (serviceProvider, client) =>
+        {
+            var crm = serviceProvider.GetRequiredService<IOptions<OmuzCrmOptions>>().Value;
+            client.BaseAddress = new Uri(crm.BaseUrl.EndsWith('/') ? crm.BaseUrl : crm.BaseUrl + "/");
+            client.Timeout = TimeSpan.FromSeconds(crm.TimeoutSeconds);
+        });
+        services.AddSingleton<OmuzCrmClient>();
+        services.AddScoped<ICrmIntegrationService, CrmIntegrationService>();
     }
 
     /// <summary>Object storage and the file limits of TZ 17.</summary>

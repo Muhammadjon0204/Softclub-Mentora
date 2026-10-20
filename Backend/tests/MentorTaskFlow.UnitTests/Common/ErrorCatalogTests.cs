@@ -13,8 +13,11 @@ namespace MentorTaskFlow.UnitTests.Common;
 /// </remarks>
 public sealed class ErrorCatalogTests
 {
-    /// <summary>Приложение C: «Версия 2.1 определяла 44 кода… всего 54 кода».</summary>
-    private const int ExpectedCodeCount = 54;
+    /// <summary>
+    /// Приложение C: «Версия 2.1 определяла 44 кода… всего 54 кода» — plus the two codes of the Omuz CRM
+    /// integration (<c>INTEGRATION_NOT_CONFIGURED</c>, <c>INTEGRATION_UNAVAILABLE</c>).
+    /// </summary>
+    private const int ExpectedCodeCount = 56;
 
     private static IReadOnlyList<string> DeclaredCodes() =>
     [
@@ -25,7 +28,7 @@ public sealed class ErrorCatalogTests
     ];
 
     [Fact]
-    public void Catalog_contains_exactly_the_54_codes_of_appendix_C()
+    public void Catalog_contains_the_54_codes_of_appendix_C_and_the_integration_codes()
     {
         ErrorCodes.StatusByCode.Count.ShouldBe(ExpectedCodeCount);
     }
