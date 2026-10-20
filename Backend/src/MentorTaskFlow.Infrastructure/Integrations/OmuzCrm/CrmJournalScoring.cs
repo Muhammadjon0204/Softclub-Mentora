@@ -3,7 +3,7 @@ namespace MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 /// <summary>A lateness: the day, the minutes and the mentor's note if there is one.</summary>
 public sealed record CrmLateDay(DateOnly Date, int Minutes, string? Note);
 
-/// <summary>A missed day. <c>Kind</c>: <c>Absence</c>, <c>Excused</c> («отпросился») or <c>Unmarked</c> (no note).</summary>
+/// <summary>A missed day — only what the mentor marked as such. <c>Kind</c>: <c>Absence</c> or <c>Excused</c> («отпросился»).</summary>
 public sealed record CrmAbsentDay(DateOnly Date, string Kind, string? Note);
 
 /// <summary>Something in the data that does not fit the CRM's own rules — shown, never silently fixed.</summary>
@@ -24,11 +24,18 @@ public sealed record CrmStudentPeriodScore(
     int Absent,
     IReadOnlyList<CrmLateDay> LateDays,
     IReadOnlyList<CrmAbsentDay> AbsentDays,
+    IReadOnlyList<DateOnly> UnfilledDays,
     IReadOnlyList<DateOnly> ZeroHomeworkDays,
     IReadOnlyList<CrmDataIssue> Issues)
 {
     /// <summary>The pass mark of the academy: 80 of 100.</summary>
     public const int PassMark = 80;
+
+    /// <summary>
+    /// The mentor filled in at least one day for this student. A week with nothing filled in has a
+    /// total of 0 that says nothing about the student — it is left out of every average.
+    /// </summary>
+    public bool HasData => Attended + Absent > 0 || HomeworkPoints + BonusPoints + (ExamGrade ?? 0) > 0;
 }
 
 /// <summary>
@@ -41,6 +48,11 @@ public sealed record CrmStudentPeriodScore(
 /// Agreed with the academy: a late student still earns the attendance point (the lateness is reported
 /// separately); «отпросился» is an absence. A total above 100 is reported as it is — the CRM is the
 /// source of truth and the overflow is flagged, not capped.
+/// </para>
+/// <para>
+/// A day is an absence only when the mentor said so — a «пропуск» or «отпросился» note. A day that
+/// is just not ticked (<c>isAttended=false</c>, no note) is a journal the mentor has not filled in
+/// yet: it earns nothing, as in the CRM, but the student is not called absent.
 /// </para>
 /// <para>
 /// Marks are matched to days by calendar date only: the CRM stores days at midnight UTC, but some marks
@@ -62,6 +74,7 @@ public static class CrmJournalScoring
         bool? examAttended = null;
         var late = new List<CrmLateDay>();
         var absences = new List<CrmAbsentDay>();
+        var unfilled = new List<DateOnly>();
         var zeroHomework = new List<DateOnly>();
         var issues = new List<CrmDataIssue>();
         var markedDays = new HashSet<DateOnly>();
@@ -142,15 +155,26 @@ public static class CrmJournalScoring
             }
             else
             {
-                absent++;
                 var kind = notes.Any(n => n.Type.Id == CrmValues.NoteExcused) ? "Excused"
                     : notes.Any(n => n.Type.Id == CrmValues.NoteAbsence) ? "Absence"
-                    : "Unmarked";
-                absences.Add(new(date, kind, note));
+                    : null;
 
-                if (mark.Grade > 0)
+                if (kind is null)
                 {
-                    issues.Add(new("GradeWhileAbsent", $"{date:dd.MM}: оценка {mark.Grade} при отметке «не был»."));
+                    unfilled.Add(date);
+                    if (mark.Grade > 0)
+                    {
+                        issues.Add(new("GradeWithoutAttendance", $"{date:dd.MM}: оценка {mark.Grade}, а посещение не отмечено — балл за посещение не начислен."));
+                    }
+                }
+                else
+                {
+                    absent++;
+                    absences.Add(new(date, kind, note));
+                    if (mark.Grade > 0)
+                    {
+                        issues.Add(new("GradeWhileAbsent", $"{date:dd.MM}: оценка {mark.Grade} при отметке «пропуск»."));
+                    }
                 }
             }
         }
@@ -191,6 +215,7 @@ public static class CrmJournalScoring
             absent,
             late,
             absences,
+            unfilled,
             zeroHomework,
             issues);
     }

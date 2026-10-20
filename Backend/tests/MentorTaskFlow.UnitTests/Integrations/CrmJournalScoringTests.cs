@@ -72,11 +72,42 @@ public sealed class CrmJournalScoringTests
     {
         var score = Score(Week(
             Mark(5, attended: false, notes: Note(CrmValues.NoteExcused, "к врачу")),
-            Mark(6, attended: false, notes: Note(CrmValues.NoteAbsence, "без причины")),
-            Mark(7, attended: false)));
+            Mark(6, attended: false, notes: Note(CrmValues.NoteAbsence, "без причины"))));
 
         score.AttendancePoints.ShouldBe(0);
-        score.AbsentDays.Select(a => a.Kind).ShouldBe(["Excused", "Absence", "Unmarked"]);
+        score.Absent.ShouldBe(2);
+        score.AbsentDays.Select(a => a.Kind).ShouldBe(["Excused", "Absence"]);
+    }
+
+    /// <summary>
+    /// A day not ticked and with no «пропуск» note is a journal not filled in yet — the student is not
+    /// called absent. It earns nothing, as in the CRM.
+    /// </summary>
+    [Fact]
+    public void A_day_without_an_absence_note_is_unfilled_not_absent()
+    {
+        var score = Score(Week(Mark(5, attended: false), Mark(6, grade: 4)));
+
+        score.Absent.ShouldBe(0);
+        score.AbsentDays.ShouldBeEmpty();
+        score.UnfilledDays.ShouldBe([new DateOnly(2026, 10, 5)]);
+        score.Total.ShouldBe(5);
+        score.HasData.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_week_with_nothing_filled_in_has_no_data()
+    {
+        var score = Score(Week(Mark(5, attended: false), Mark(6, attended: false)));
+
+        score.HasData.ShouldBeFalse();
+        score.UnfilledDays.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void A_grade_on_an_unticked_day_is_flagged()
+    {
+        Score(Week(Mark(5, attended: false, grade: 4))).Issues.ShouldContain(i => i.Code == "GradeWithoutAttendance");
     }
 
     [Fact]
@@ -146,6 +177,6 @@ public sealed class CrmJournalScoringTests
     [Fact]
     public void A_grade_on_a_missed_day_is_flagged()
     {
-        Score(Week(Mark(5, attended: false, grade: 4))).Issues.ShouldContain(i => i.Code == "GradeWhileAbsent");
+        Score(Week(Mark(5, attended: false, grade: 4, notes: Note(CrmValues.NoteAbsence, "")))).Issues.ShouldContain(i => i.Code == "GradeWhileAbsent");
     }
 }

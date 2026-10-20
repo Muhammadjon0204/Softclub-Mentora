@@ -67,8 +67,13 @@ export interface CrmStudentScore {
   lessonsCounted: number;
   attended: number;
   absent: number;
+  /** Ментор заполнил хотя бы один день; без этого итог 0 ничего не значит и в средние не идёт. */
+  hasData: boolean;
   lateDays: { date: string; minutes: number; note?: string | null }[];
-  absentDays: { date: string; kind: 'Absence' | 'Excused' | 'Unmarked'; note?: string | null }[];
+  /** Только то, что ментор отметил как пропуск / «отпросился». */
+  absentDays: { date: string; kind: 'Absence' | 'Excused'; note?: string | null }[];
+  /** Дни, которые ментор ещё не заполнил — это не пропуск. */
+  unfilledDays: string[];
   zeroHomeworkDays: string[];
   issues: CrmIssue[];
 }
@@ -82,8 +87,40 @@ export interface CrmPeriod {
   to: string;
   hasExam: boolean;
   mentors: string[];
-  summary: { students: number; averageTotal?: number | null; passed: number; attendanceRate?: number | null; issueCount: number };
+  summary: {
+    students: number;
+    averageTotal?: number | null;
+    passed: number;
+    attendanceRate?: number | null;
+    unfilledDays: number;
+    emptyStudents: number;
+    issueCount: number;
+  };
   students: CrmStudentScore[];
+}
+
+/** Студент по закрытым периодам: средний из недельных итогов (не сумма). */
+export interface CrmStudentOverall {
+  studentId: number;
+  fullName: string;
+  averageTotal: number;
+  weeks: number;
+  minTotal: number;
+  maxTotal: number;
+  attended: number;
+  absent: number;
+  late: number;
+  unfilledDays: number;
+}
+
+export interface CrmOverall {
+  periods: number;
+  students: number;
+  averageTotal?: number | null;
+  passed: number;
+  attendanceRate?: number | null;
+  unfilledDays: number;
+  studentResults: CrmStudentOverall[];
 }
 
 export interface CrmGroupPreview {
@@ -91,6 +128,7 @@ export interface CrmGroupPreview {
   mentors: CrmGroupMentor[];
   students: CrmGroupStudent[];
   periods: CrmPeriod[];
+  overall: CrmOverall;
   journalUnavailable?: string | null;
 }
 

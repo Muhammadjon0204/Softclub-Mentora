@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarRange, Clock3, GraduationCap, UserMinus, Users } from 'lucide-react';
+import { AlertTriangle, CalendarRange, Clock3, GraduationCap, Sigma, UserMinus, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { CRM_QUERY_KEYS, getCrmGroup, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
+import { CRM_QUERY_KEYS, getCrmGroup, type CrmOverall, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
 import { Drawer } from '../../shared/overlays';
 import { Badge } from '../../shared/ui/Badge';
 import { EmptyState } from '../../shared/ui/EmptyState';
@@ -21,7 +21,19 @@ function Stat({ label, value }: { label: string; value: string }): JSX.Element {
 
 function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: number }): JSX.Element {
   const [open, setOpen] = useState(false);
-  const details = student.lateDays.length + student.absentDays.length + student.zeroHomeworkDays.length + student.issues.length;
+  const details = student.lateDays.length + student.absentDays.length + student.unfilledDays.length + student.zeroHomeworkDays.length + student.issues.length;
+
+  if (!student.hasData) {
+    return (
+      <li className="flex items-center gap-3 py-3">
+        <span className="w-12 shrink-0 text-right text-[20px] font-semibold text-ink-muted">—</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold text-ink-secondary">{student.fullName}</span>
+          <span className="block text-[12px] text-ink-muted">ментор не заполнил ни одного дня — в средний балл не идёт</span>
+        </span>
+      </li>
+    );
+  }
 
   return (
     <li className="py-3">
@@ -43,7 +55,8 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
         </span>
         <span className="flex shrink-0 flex-wrap justify-end gap-1">
           {student.lateDays.length > 0 ? <Badge tone="warning">опозд. {student.lateDays.length}</Badge> : null}
-          {student.absentDays.length > 0 ? <Badge tone="neutral">пропуск {student.absentDays.length}</Badge> : null}
+          {student.absentDays.length > 0 ? <Badge tone="danger">пропуск {student.absentDays.length}</Badge> : null}
+          {student.unfilledDays.length > 0 ? <Badge tone="neutral">не заполнено {student.unfilledDays.length}</Badge> : null}
           {student.issues.length > 0 ? <Badge tone="danger">⚠ {student.issues.length}</Badge> : null}
         </span>
       </button>
@@ -55,6 +68,9 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
           {student.absentDays.map((a) => (
             <p key={`a${a.date}`}><span className="font-medium text-ink">{formatDay(a.date)}: {ABSENCE_LABEL[a.kind] ?? a.kind}</span>{a.note ? ` — ${a.note}` : ''}</p>
           ))}
+          {student.unfilledDays.length > 0 ? (
+            <p><span className="font-medium text-ink">Ментор не заполнил:</span> {student.unfilledDays.map((d) => formatDay(d)).join(', ')}</p>
+          ) : null}
           {student.zeroHomeworkDays.length > 0 ? (
             <p><span className="font-medium text-ink">Ноль за задание:</span> {student.zeroHomeworkDays.map((d) => formatDay(d)).join(', ')}</p>
           ) : null}
@@ -88,6 +104,12 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
         <Stat label="Набрали 80+" value={`${String(s.passed)} из ${String(s.students)}`} />
         <Stat label="Посещаемость" value={s.attendanceRate === null || s.attendanceRate === undefined ? '—' : `${String(s.attendanceRate)}%`} />
       </div>
+      {s.unfilledDays > 0 ? (
+        <p className="text-[12.5px] text-ink-muted">
+          Не заполнено ментором: {s.unfilledDays} отм.
+          {s.emptyStudents > 0 ? ` · у ${String(s.emptyStudents)} студ. неделя пустая` : ''} — это не пропуски, в средний и посещаемость не идут.
+        </p>
+      ) : null}
       {period.students.length === 0 ? (
         <EmptyState icon={<Users className="h-5 w-5" aria-hidden="true" />} title="Нет студентов с отметками" description="В этом периоде ни у кого нет засчитанных дней." />
       ) : (
@@ -95,6 +117,39 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
           {period.students.map((student) => <StudentRow key={student.studentId} student={student} examMax={period.examMax} />)}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Итог по закрытым неделям: у каждого студента — средний из его недельных итогов, у группы — средний по студентам. */
+function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
+  if (overall.studentResults.length === 0) {
+    return <p className="text-[13px] text-ink-muted">Закрытых недель с заполненным журналом пока нет.</p>;
+  }
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} />
+        <Stat label="Средний 80+" value={`${String(overall.passed)} из ${String(overall.students)}`} />
+        <Stat label="Посещаемость" value={overall.attendanceRate === null || overall.attendanceRate === undefined ? '—' : `${String(overall.attendanceRate)}%`} />
+        <Stat label="Закрытых недель" value={String(overall.periods)} />
+      </div>
+      <ul className="divide-y divide-divider">
+        {overall.studentResults.map((s) => (
+          <li key={s.studentId} className="flex items-center gap-3 py-2.5">
+            <span className={`w-14 shrink-0 text-right text-[18px] font-semibold tabular-nums ${totalTone(s.averageTotal)}`}>{s.averageTotal}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-semibold text-ink">{s.fullName}</span>
+              <span className="block text-[12px] text-ink-muted">
+                недель {s.weeks}{s.weeks > 1 ? ` · от ${String(s.minTotal)} до ${String(s.maxTotal)}` : ''}
+                {s.absent > 0 ? ` · пропусков ${String(s.absent)}` : ''}
+                {s.late > 0 ? ` · опозданий ${String(s.late)}` : ''}
+                {s.unfilledDays > 0 ? ` · не заполнено ${String(s.unfilledDays)}` : ''}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -146,8 +201,15 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
             )}
           </section>
 
+          {data.journalUnavailable ? null : (
+            <section>
+              <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><Sigma className="h-4 w-4" aria-hidden="true" />Итог по закрытым неделям</h3>
+              <OverallView overall={data.overall} />
+            </section>
+          )}
+
           <section>
-            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><Clock3 className="h-4 w-4" aria-hidden="true" />Журнал</h3>
+            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><Clock3 className="h-4 w-4" aria-hidden="true" />Журнал по неделям</h3>
             {data.journalUnavailable ? (
               <p className="rounded-control border border-warning-border bg-warning-soft px-3 py-2.5 text-[13px] text-warning">{data.journalUnavailable}</p>
             ) : (

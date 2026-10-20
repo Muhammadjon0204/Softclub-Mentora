@@ -115,44 +115,89 @@ public sealed class CrmIntegrationService(
                     string.IsNullOrWhiteSpace(s.Note) ? null : s.Note.Trim()))
                 .ToList();
 
-            var periods = (journal ?? [])
+            var scored = (journal ?? [])
                 .OrderByDescending(p => p.Week)
-                .Select(p => ToPeriod(p, mentors, joined))
+                .Select(p => (Period: p, Scores: ScorePeriod(p, joined)))
                 .ToList();
 
             return new CrmGroupPreviewDto(
                 ToDto(group),
                 mentors,
                 students,
-                periods,
+                scored.Select(p => ToPeriod(p.Period, p.Scores, mentors)).ToList(),
+                Overall(scored),
                 journal is null ? "У группы нет расписания — журнала в CRM нет." : null);
         });
 
-    private CrmPeriodDto ToPeriod(CrmJournalPeriod period, IReadOnlyList<CrmGroupMentorDto> mentors, IReadOnlyDictionary<int, DateOnly> joined)
-    {
-        var dates = period.Days.Select(d => CrmJournalScoring.DateOf(d.Date)).ToList();
-        var from = dates.Count > 0 ? dates.Min() : default;
-        var to = dates.Count > 0 ? dates.Max() : default;
-
-        var scores = period.Students
+    private static List<CrmStudentPeriodScore> ScorePeriod(CrmJournalPeriod period, IReadOnlyDictionary<int, DateOnly> joined) =>
+        period.Students
             .Select(s => CrmJournalScoring.Score(period, s, joined.TryGetValue(s.Id, out var j) ? j : null))
 
             // A student with no counted day in the period was not in the group yet (or any more).
             .Where(s => s.LessonsCounted > 0 || s.ExamGrade is not null)
-            .OrderByDescending(s => s.Total)
+            .OrderByDescending(s => s.HasData)
+            .ThenByDescending(s => s.Total)
             .ToList();
+
+    /// <summary>
+    /// The group over the closed periods: each student's result is the <b>average</b> of their weekly
+    /// totals — weeks are never added up — and the group's is the average of its students. A week the
+    /// mentor left empty for a student is not a week of zeros and is skipped.
+    /// </summary>
+    private static CrmOverallDto Overall(IReadOnlyList<(CrmJournalPeriod Period, List<CrmStudentPeriodScore> Scores)> periods)
+    {
+        var closed = periods.Where(p => p.Period.IsComplete).ToList();
+        var students = closed
+            .SelectMany(p => p.Scores.Where(s => s.HasData))
+            .GroupBy(s => s.StudentId)
+            .Select(g => new CrmStudentOverallDto(
+                g.Key,
+                g.First().FullName,
+                Math.Round(g.Average(s => s.Total), 1),
+                g.Count(),
+                g.Min(s => s.Total),
+                g.Max(s => s.Total),
+                g.Sum(s => s.Attended),
+                g.Sum(s => s.Absent),
+                g.Sum(s => s.LateDays.Count),
+                g.Sum(s => s.UnfilledDays.Count)))
+            .OrderByDescending(s => s.AverageTotal)
+            .ToList();
+
+        var attended = students.Sum(s => s.Attended);
+        var marked = attended + students.Sum(s => s.Absent);
+        return new CrmOverallDto(
+            closed.Count,
+            students.Count,
+            students.Count == 0 ? null : Math.Round(students.Average(s => s.AverageTotal), 1),
+            students.Count(s => s.AverageTotal >= CrmStudentPeriodScore.PassMark),
+            marked == 0 ? null : Math.Round(100.0 * attended / marked, 1),
+            closed.Sum(p => p.Scores.Sum(s => s.UnfilledDays.Count)),
+            students);
+    }
+
+    private static CrmPeriodDto ToPeriod(CrmJournalPeriod period, List<CrmStudentPeriodScore> scores, IReadOnlyList<CrmGroupMentorDto> mentors)
+    {
+        var dates = period.Days.Select(d => CrmJournalScoring.DateOf(d.Date)).ToList();
+        var from = dates.Count > 0 ? dates.Min() : default;
+        var to = dates.Count > 0 ? dates.Max() : default;
 
         var teaching = mentors
             .Where(m => m.From <= to && (m.To is null || m.To >= from))
             .Select(m => m.Role == "Помогает" ? $"{m.FullName} (помогает)" : m.FullName)
             .ToList();
 
-        var lessonMarks = scores.Sum(s => s.LessonsCounted);
+        // Averages and attendance only over what the mentor filled in: an empty day is not an absence.
+        var withData = scores.Where(s => s.HasData).ToList();
+        var attended = withData.Sum(s => s.Attended);
+        var marked = attended + withData.Sum(s => s.Absent);
         var summary = new CrmPeriodSummaryDto(
-            scores.Count,
-            scores.Count == 0 ? null : Math.Round(scores.Average(s => s.Total), 1),
-            scores.Count(s => s.Total >= CrmStudentPeriodScore.PassMark),
-            lessonMarks == 0 ? null : Math.Round(100.0 * scores.Sum(s => s.AttendancePoints) / lessonMarks, 1),
+            withData.Count,
+            withData.Count == 0 ? null : Math.Round(withData.Average(s => s.Total), 1),
+            withData.Count(s => s.Total >= CrmStudentPeriodScore.PassMark),
+            marked == 0 ? null : Math.Round(100.0 * attended / marked, 1),
+            scores.Sum(s => s.UnfilledDays.Count),
+            scores.Count - withData.Count,
             scores.Sum(s => s.Issues.Count));
 
         return new CrmPeriodDto(
@@ -185,9 +230,10 @@ public sealed class CrmIntegrationService(
 
     private static CrmStudentScoreDto ToDto(CrmStudentPeriodScore s) => new(
         s.StudentId, s.FullName, s.Total, s.AttendancePoints, s.HomeworkPoints, s.BonusPoints, s.ExamGrade,
-        s.LessonsCounted, s.Attended, s.Absent,
+        s.LessonsCounted, s.Attended, s.Absent, s.HasData,
         s.LateDays.Select(l => new CrmLateDto(l.Date, l.Minutes, l.Note)).ToList(),
         s.AbsentDays.Select(a => new CrmAbsenceDto(a.Date, a.Kind, a.Note)).ToList(),
+        s.UnfilledDays,
         s.ZeroHomeworkDays,
         s.Issues.Select(i => new CrmIssueDto(i.Code, i.Message)).ToList());
 

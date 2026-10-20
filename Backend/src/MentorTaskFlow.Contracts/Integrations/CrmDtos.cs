@@ -53,12 +53,49 @@ public sealed record CrmStudentScoreDto(
     int LessonsCounted,
     int Attended,
     int Absent,
+    bool HasData,
     IReadOnlyList<CrmLateDto> LateDays,
     IReadOnlyList<CrmAbsenceDto> AbsentDays,
+    IReadOnlyList<DateOnly> UnfilledDays,
     IReadOnlyList<DateOnly> ZeroHomeworkDays,
     IReadOnlyList<CrmIssueDto> Issues);
 
-public sealed record CrmPeriodSummaryDto(int Students, double? AverageTotal, int Passed, double? AttendanceRate, int IssueCount);
+/// <summary>
+/// A period at a glance. <c>Students</c>, the average, <c>Passed</c> and the attendance count only what
+/// the mentor filled in; <c>UnfilledDays</c> — student-days not filled in, <c>EmptyStudents</c> — students
+/// with nothing filled in for the whole period.
+/// </summary>
+public sealed record CrmPeriodSummaryDto(
+    int Students,
+    double? AverageTotal,
+    int Passed,
+    double? AttendanceRate,
+    int UnfilledDays,
+    int EmptyStudents,
+    int IssueCount);
+
+/// <summary>A student over the closed periods: the average of the weekly totals, never their sum.</summary>
+public sealed record CrmStudentOverallDto(
+    int StudentId,
+    string FullName,
+    double AverageTotal,
+    int Weeks,
+    int MinTotal,
+    int MaxTotal,
+    int Attended,
+    int Absent,
+    int Late,
+    int UnfilledDays);
+
+/// <summary>The group over its closed periods: the average of its students' averages.</summary>
+public sealed record CrmOverallDto(
+    int Periods,
+    int Students,
+    double? AverageTotal,
+    int Passed,
+    double? AttendanceRate,
+    int UnfilledDays,
+    IReadOnlyList<CrmStudentOverallDto> StudentResults);
 
 /// <summary>
 /// A journal period: <c>Week</c> is the CRM's key, <c>Label</c> what to show («6», or «13-14» for a
@@ -82,4 +119,5 @@ public sealed record CrmGroupPreviewDto(
     IReadOnlyList<CrmGroupMentorDto> Mentors,
     IReadOnlyList<CrmGroupStudentDto> Students,
     IReadOnlyList<CrmPeriodDto> Periods,
+    CrmOverallDto Overall,
     string? JournalUnavailable);
