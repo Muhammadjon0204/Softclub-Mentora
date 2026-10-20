@@ -41,6 +41,9 @@ public sealed record CrmAbsenceDto(DateOnly Date, string Kind, string? Note);
 
 public sealed record CrmIssueDto(string Code, string Message);
 
+/// <summary>A mentor's remark: <c>CultureViolation</c>, <c>Cheating</c>, <c>BadBehavior</c> or <c>Other</c>.</summary>
+public sealed record CrmRemarkDto(DateOnly Date, string Kind, string Text, string? Author);
+
 /// <summary>One student in one period — the numbers a group report is built from.</summary>
 public sealed record CrmStudentScoreDto(
     int StudentId,
@@ -61,7 +64,8 @@ public sealed record CrmStudentScoreDto(
     IReadOnlyList<CrmAbsenceDto> AbsentDays,
     IReadOnlyList<DateOnly> UnfilledDays,
     IReadOnlyList<DateOnly> ZeroHomeworkDays,
-    IReadOnlyList<CrmIssueDto> Issues);
+    IReadOnlyList<CrmIssueDto> Issues,
+    IReadOnlyList<CrmRemarkDto> Remarks);
 
 /// <summary>
 /// A period at a glance. <c>Students</c>, the average and the zones (80+ / 70–79 / below 70) count only

@@ -19,6 +19,7 @@ public sealed class CrmIntegrationService(
     OmuzCrmClient client,
     IMemoryCache cache,
     IOptions<OmuzCrmOptions> options,
+    IClock clock,
     ILogger<CrmIntegrationService> logger) : ICrmIntegrationService
 {
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(30);
@@ -117,16 +118,17 @@ public sealed class CrmIntegrationService(
                     string.IsNullOrWhiteSpace(s.Note) ? null : s.Note.Trim()))
                 .ToList();
 
+            var today = Local(clock.UtcNow);
             var scored = (journal ?? [])
                 .OrderByDescending(p => p.Week)
-                .Select(p => (Period: p, Scores: ScorePeriod(p, membership)))
+                .Select(p => (Period: p, Scores: ScorePeriod(p, membership), Closed: IsClosed(p, today)))
                 .ToList();
 
             return new CrmGroupPreviewDto(
                 ToDto(group),
                 mentors,
                 students,
-                scored.Select(p => ToPeriod(p.Period, p.Scores, mentors)).ToList(),
+                scored.Select(p => ToPeriod(p.Period, p.Scores, p.Closed, mentors)).ToList(),
                 Overall(scored),
                 journal is null ? "У группы нет расписания — журнала в CRM нет." : null);
         });
@@ -155,9 +157,9 @@ public sealed class CrmIntegrationService(
     /// student was in the group but the journal is partly or not at all filled in are counted, not
     /// averaged. The group's result is the average of its students.
     /// </summary>
-    private static CrmOverallDto Overall(IReadOnlyList<(CrmJournalPeriod Period, List<CrmStudentPeriodScore> Scores)> periods)
+    private static CrmOverallDto Overall(IReadOnlyList<(CrmJournalPeriod Period, List<CrmStudentPeriodScore> Scores, bool Closed)> periods)
     {
-        var closed = periods.Where(p => p.Period.IsComplete).ToList();
+        var closed = periods.Where(p => p.Closed).ToList();
         var students = closed
             .SelectMany(p => p.Scores.Where(s => s.ExpectedDays > 0))
             .GroupBy(s => s.StudentId)
@@ -198,7 +200,15 @@ public sealed class CrmIntegrationService(
             students);
     }
 
-    private static CrmPeriodDto ToPeriod(CrmJournalPeriod period, List<CrmStudentPeriodScore> scores, IReadOnlyList<CrmGroupMentorDto> mentors)
+    /// <summary>
+    /// A period is over when the CRM says so — or when its last day is behind us: the CRM never closes the
+    /// last period of a finished group (seen on the test server: «Python - 1» ended in 2025, its only
+    /// period is still <c>isComplete: false</c>).
+    /// </summary>
+    private static bool IsClosed(CrmJournalPeriod period, DateOnly today) =>
+        period.IsComplete || (period.Days.Count > 0 && period.Days.Max(d => CrmJournalScoring.DateOf(d.Date)) < today);
+
+    private static CrmPeriodDto ToPeriod(CrmJournalPeriod period, List<CrmStudentPeriodScore> scores, bool closed, IReadOnlyList<CrmGroupMentorDto> mentors)
     {
         var dates = period.Days.Select(d => CrmJournalScoring.DateOf(d.Date)).ToList();
         var from = dates.Count > 0 ? dates.Min() : default;
@@ -228,7 +238,7 @@ public sealed class CrmIntegrationService(
         return new CrmPeriodDto(
             period.Week,
             period.Label,
-            period.IsComplete,
+            closed,
             period.ExamMax,
             from,
             to,
@@ -260,7 +270,8 @@ public sealed class CrmIntegrationService(
         s.AbsentDays.Select(a => new CrmAbsenceDto(a.Date, a.Kind, a.Note)).ToList(),
         s.UnfilledDays,
         s.ZeroHomeworkDays,
-        s.Issues.Select(i => new CrmIssueDto(i.Code, i.Message)).ToList());
+        s.Issues.Select(i => new CrmIssueDto(i.Code, i.Message)).ToList(),
+        s.Remarks.Select(r => new CrmRemarkDto(r.Date, r.Kind, r.Text, r.Author)).ToList());
 
     private static string RoleOf(int status) => status switch
     {

@@ -35,6 +35,14 @@ export const STUDENT_STATUS: Record<string, { label: string; tone: 'success' | '
 export const ABSENCE_LABEL: Record<string, string> = {
   Absence: 'пропуск',
   Excused: 'отпросился',
+  Other: 'другое',
+};
+
+export const REMARK_LABEL: Record<string, string> = {
+  CultureViolation: 'нарушение культуры',
+  Cheating: 'списывание',
+  BadBehavior: 'поведение',
+  Other: 'заметка',
 };
 
 /** Период: «Неделя 6» или «Недели 13–14» у детских групп. */

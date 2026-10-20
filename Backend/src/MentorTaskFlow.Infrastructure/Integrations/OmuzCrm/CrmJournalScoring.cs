@@ -3,8 +3,17 @@ namespace MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 /// <summary>A lateness: the day, the minutes and the mentor's note if there is one.</summary>
 public sealed record CrmLateDay(DateOnly Date, int Minutes, string? Note);
 
-/// <summary>A missed day — only what the mentor marked as such. <c>Kind</c>: <c>Absence</c> or <c>Excused</c> («отпросился»).</summary>
+/// <summary>
+/// A missed day — only what the mentor marked as such. <c>Kind</c>: <c>Absence</c>, <c>Excused</c>
+/// («отпросился») or <c>Other</c> («другое» on a day the student was not there — agreed to be an absence).
+/// </summary>
 public sealed record CrmAbsentDay(DateOnly Date, string Kind, string? Note);
+
+/// <summary>
+/// A mentor's remark that is not about attendance: <c>CultureViolation</c>, <c>Cheating</c>,
+/// <c>BadBehavior</c>, or <c>Other</c> on a day the student was there.
+/// </summary>
+public sealed record CrmRemark(DateOnly Date, string Kind, string Text, string? Author);
 
 /// <summary>Something in the data that does not fit the CRM's own rules — shown, never silently fixed.</summary>
 public sealed record CrmDataIssue(string Code, string Message);
@@ -28,7 +37,8 @@ public sealed record CrmStudentPeriodScore(
     IReadOnlyList<DateOnly> ZeroHomeworkDays,
     IReadOnlyList<CrmDataIssue> Issues,
     int ExpectedDays,
-    int FilledDays)
+    int FilledDays,
+    IReadOnlyList<CrmRemark> Remarks)
 {
     /// <summary>The pass mark of the academy: 80 of 100.</summary>
     public const int PassMark = 80;
@@ -99,6 +109,7 @@ public static class CrmJournalScoring
         var late = new List<CrmLateDay>();
         var absences = new List<CrmAbsentDay>();
         var filledDays = new HashSet<DateOnly>();
+        var remarks = new List<CrmRemark>();
         var zeroHomework = new List<DateOnly>();
         var issues = new List<CrmDataIssue>();
         var markedDays = new HashSet<DateOnly>();
@@ -130,8 +141,19 @@ public static class CrmJournalScoring
             }
 
             var notes = mark.Notes ?? [];
-            var note = notes.FirstOrDefault()?.Content;
             bonus += mark.Bonus;
+
+            // Several people may write on one day (the test journal has whole conversations): keep
+            // every distinct text of the kind that matters.
+            string? NotesOf(params int[] types) => Join(notes.Where(n => types.Contains(n.Type.Id)));
+
+            foreach (var remark in notes.Where(n => RemarkKinds.ContainsKey(n.Type.Id) || (n.Type.Id == CrmValues.NoteOther && mark.IsAttended)))
+            {
+                if (!string.IsNullOrWhiteSpace(remark.Content))
+                {
+                    remarks.Add(new(date, remark.Type.Id == CrmValues.NoteOther ? "Other" : RemarkKinds[remark.Type.Id], remark.Content.Trim(), remark.AuthorName));
+                }
+            }
 
             if (mark.Grade < 0 || mark.Bonus < 0)
             {
@@ -172,17 +194,18 @@ public static class CrmJournalScoring
             {
                 attended++;
                 filledDays.Add(date);
-                var lateNote = notes.FirstOrDefault(n => n.Type.Id == CrmValues.NoteLateness);
-                if (mark.LateMinutes > 0 || lateNote is not null)
+                if (mark.LateMinutes > 0 || notes.Any(n => n.Type.Id == CrmValues.NoteLateness))
                 {
-                    late.Add(new(date, mark.LateMinutes, lateNote?.Content ?? note));
+                    late.Add(new(date, mark.LateMinutes, NotesOf(CrmValues.NoteLateness)));
                 }
             }
             else
             {
                 var kind = notes.Any(n => n.Type.Id == CrmValues.NoteExcused) ? "Excused"
                     : notes.Any(n => n.Type.Id == CrmValues.NoteAbsence) ? "Absence"
+                    : notes.Any(n => n.Type.Id == CrmValues.NoteOther) ? "Other"
                     : null;
+                var note = NotesOf(CrmValues.NoteExcused, CrmValues.NoteAbsence, CrmValues.NoteOther);
 
                 if (kind is null)
                 {
@@ -244,7 +267,21 @@ public static class CrmJournalScoring
             zeroHomework,
             issues,
             memberDays.Count,
-            memberDays.Count - unfilled.Count);
+            memberDays.Count - unfilled.Count,
+            remarks);
+    }
+
+    private static readonly Dictionary<int, string> RemarkKinds = new()
+    {
+        [CrmValues.NoteCultureViolation] = "CultureViolation",
+        [CrmValues.NoteCheating] = "Cheating",
+        [CrmValues.NoteBadBehavior] = "BadBehavior",
+    };
+
+    private static string? Join(IEnumerable<CrmNote> notes)
+    {
+        var texts = notes.Select(n => n.Content?.Trim()).Where(t => !string.IsNullOrEmpty(t)).Distinct().ToList();
+        return texts.Count == 0 ? null : string.Join(" · ", texts);
     }
 
     /// <summary>The CRM keeps names as typed: «Hakim  Jumaev » — collapse the spaces.</summary>

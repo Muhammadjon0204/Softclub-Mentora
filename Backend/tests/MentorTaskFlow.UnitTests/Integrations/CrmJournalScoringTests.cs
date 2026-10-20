@@ -135,6 +135,36 @@ public sealed class CrmJournalScoringTests
     [InlineData(69.9, "Risk")]
     public void Zones_are_80_and_70(double total, string zone) => CrmJournalScoring.ZoneOf(total).ShouldBe(zone);
 
+    /// <summary>Agreed with the academy: «другое» on a day the student was not there is an absence.</summary>
+    [Fact]
+    public void Other_on_a_missed_day_is_an_absence()
+    {
+        var score = Score(Week(Mark(5, attended: false, notes: Note(CrmValues.NoteOther, "семейные обстоятельства"))));
+
+        score.AbsentDays.ShouldHaveSingleItem().ShouldBe(new CrmAbsentDay(new DateOnly(2026, 10, 5), "Other", "семейные обстоятельства"));
+        score.Remarks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Behaviour_notes_are_remarks_and_other_on_a_present_day_too()
+    {
+        var score = Score(Week(
+            Mark(5, grade: 5, notes: Note(CrmValues.NoteCheating, "списал у соседа")),
+            Mark(6, grade: 5, notes: Note(CrmValues.NoteOther, "помогал другим"))));
+
+        score.Remarks.Select(r => (r.Kind, r.Text)).ShouldBe([("Cheating", "списал у соседа"), ("Other", "помогал другим")]);
+        score.AbsentDays.ShouldBeEmpty();
+    }
+
+    /// <summary>Seen on the test server: three people writing «пропуск» notes on the same day.</summary>
+    [Fact]
+    public void Every_distinct_note_text_of_a_day_is_kept()
+    {
+        var score = Score(Week(Mark(5, attended: false, notes: [Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "болеет"), Note(CrmValues.NoteAbsence, "звонил маме")])));
+
+        score.AbsentDays.ShouldHaveSingleItem().Note.ShouldBe("болеет · звонил маме");
+    }
+
     [Fact]
     public void A_grade_on_an_unticked_day_is_flagged()
     {

@@ -8,7 +8,7 @@ import { Badge } from '../../shared/ui/Badge';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
-import { ABSENCE_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
+import { ABSENCE_LABEL, REMARK_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }): JSX.Element {
   return (
@@ -41,7 +41,7 @@ function scoreParts(student: CrmStudentScore, examMax: number): string {
 
 function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: number }): JSX.Element {
   const [open, setOpen] = useState(false);
-  const details = student.lateDays.length + student.absentDays.length + student.unfilledDays.length + student.zeroHomeworkDays.length + student.issues.length;
+  const details = student.lateDays.length + student.absentDays.length + student.unfilledDays.length + student.zeroHomeworkDays.length + student.issues.length + student.remarks.length;
 
   if (student.fill === 'Empty') {
     return (
@@ -79,6 +79,7 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
           {!partial && zone ? <Badge tone={zone.tone}>{zone.label}</Badge> : null}
           {student.lateDays.length > 0 ? <Badge tone="warning">опозд. {student.lateDays.length}</Badge> : null}
           {student.absentDays.length > 0 ? <Badge tone="danger">пропуск {student.absentDays.length}</Badge> : null}
+          {student.remarks.length > 0 ? <Badge tone="info">замечаний {student.remarks.length}</Badge> : null}
           {student.issues.length > 0 ? <Badge tone="danger">⚠ {student.issues.length}</Badge> : null}
         </span>
       </button>
@@ -90,6 +91,9 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
           ))}
           {student.absentDays.map((a) => (
             <p key={`a${a.date}`}><span className="font-medium text-ink">{formatDay(a.date)}: {ABSENCE_LABEL[a.kind] ?? a.kind}</span>{a.note ? ` — ${a.note}` : ''}</p>
+          ))}
+          {student.remarks.map((r, index) => (
+            <p key={`r${r.date}${String(index)}`}><span className="font-medium text-info">{formatDay(r.date)}: {REMARK_LABEL[r.kind] ?? r.kind}</span> — {r.text}{r.author ? <span className="text-ink-muted"> ({r.author})</span> : null}</p>
           ))}
           {student.unfilledDays.length > 0 ? (
             <p><span className="font-medium text-ink">Ментор не заполнил:</span> {student.unfilledDays.map((d) => formatDay(d)).join(', ')}</p>

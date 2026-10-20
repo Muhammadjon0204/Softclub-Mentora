@@ -113,6 +113,9 @@ public static class CrmValues
     public const int MentorSupport = 2;
 
     public const int NoteOther = 1;
+    public const int NoteCultureViolation = 2;
+    public const int NoteCheating = 3;
+    public const int NoteBadBehavior = 4;
     public const int NoteAbsence = 5;
     public const int NoteLateness = 6;
     public const int NoteExcused = 8;
