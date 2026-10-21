@@ -52,8 +52,8 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     path: '/admin/integrations/crm',
     icon: PlugZap,
     implemented: true,
-    // Ключ CRM читает все филиалы — экран только для Organization Admin, как и сам API.
-    organizationAdminOnly: true,
+    // Админ организации видит здесь подключение, все группы и связи; админ филиала — группы своего
+    // филиала (сервер сам отдаёт только их).
   },
   // «Настройки» намеренно не в sidebar: раздел UX-рефактора admin shell убрал его
   // отсюда в пользу profile dropdown (см. ProfileMenu.tsx) — маршрут /admin/settings

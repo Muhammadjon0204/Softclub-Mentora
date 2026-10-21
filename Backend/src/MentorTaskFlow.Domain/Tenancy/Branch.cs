@@ -41,6 +41,12 @@ public sealed class Branch : AuditableEntity
 
     public bool IsActive { get; private set; }
 
+    /// <summary>
+    /// The branch in Omuz CRM that is this one, or null while not linked. A Branch Admin sees the CRM
+    /// groups of exactly this CRM branch.
+    /// </summary>
+    public int? CrmBranchId { get; private set; }
+
     private Branch()
     {
     }
@@ -188,6 +194,18 @@ public sealed class Branch : AuditableEntity
     public void Activate(DateTimeOffset now)
     {
         IsActive = true;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Links the branch to a CRM branch, or unlinks it with <c>null</c>.</summary>
+    public void LinkCrmBranch(int? crmBranchId, DateTimeOffset now)
+    {
+        if (crmBranchId is <= 0)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Неверный id филиала в CRM.");
+        }
+
+        CrmBranchId = crmBranchId;
         UpdatedAt = now;
     }
 }

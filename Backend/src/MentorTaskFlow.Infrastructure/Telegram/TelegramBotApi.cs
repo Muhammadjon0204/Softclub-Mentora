@@ -52,6 +52,7 @@ public sealed class TelegramBotApi(IHttpClientFactory httpClientFactory, IOption
                 {
                     new { command = "start", description = "Начать и подключить аккаунт" },
                     new { command = "status", description = "К какому аккаунту подключён этот чат" },
+                    new { command = "crm", description = "Связать аккаунт с CRM по номеру телефона" },
                     new { command = "help", description = "Что умеет бот" },
                 },
             },
@@ -118,18 +119,49 @@ public sealed class TelegramApiException(int errorCode, string message) : Except
 /// The same object is returned inline from the webhook and sent with <c>sendMessage</c> when polling,
 /// so both paths answer identically.
 /// </remarks>
-public sealed record TelegramReply(string ChatId, string Html, string? ButtonLabel = null, string? ButtonUrl = null)
+public sealed record TelegramReply(
+    string ChatId,
+    string Html,
+    string? ButtonLabel = null,
+    string? ButtonUrl = null,
+    TelegramKeyboard Keyboard = TelegramKeyboard.None)
 {
-    public object ToSendMessage() => ButtonUrl is null || ButtonLabel is null
-        ? new { chat_id = ChatId, text = Html, parse_mode = "HTML", disable_web_page_preview = true }
-        : new
+    public const string SharePhoneLabel = "📱 Поделиться номером";
+
+    public object ToSendMessage() => Keyboard switch
+    {
+        // A reply keyboard: the button sends the person's own number, confirmed by Telegram.
+        TelegramKeyboard.RequestContact => new
+        {
+            chat_id = ChatId,
+            text = Html,
+            parse_mode = "HTML",
+            disable_web_page_preview = true,
+            reply_markup = new
+            {
+                keyboard = new[] { new[] { new { text = SharePhoneLabel, request_contact = true } } },
+                resize_keyboard = true,
+                one_time_keyboard = true,
+            },
+        },
+        TelegramKeyboard.Remove => new
+        {
+            chat_id = ChatId,
+            text = Html,
+            parse_mode = "HTML",
+            disable_web_page_preview = true,
+            reply_markup = new { remove_keyboard = true },
+        },
+        _ when ButtonUrl is null || ButtonLabel is null => new { chat_id = ChatId, text = Html, parse_mode = "HTML", disable_web_page_preview = true },
+        _ => new
         {
             chat_id = ChatId,
             text = Html,
             parse_mode = "HTML",
             disable_web_page_preview = true,
             reply_markup = new { inline_keyboard = new[] { new[] { new { text = ButtonLabel, url = ButtonUrl } } } },
-        };
+        },
+    };
 
     /// <summary>The webhook form: Telegram executes the method named in the response body.</summary>
     public JsonObject ToWebhookResponse()
@@ -138,6 +170,17 @@ public sealed record TelegramReply(string ChatId, string Html, string? ButtonLab
         node["method"] = "sendMessage";
         return node;
     }
+}
+
+/// <summary>
+/// The keyboard under a reply. One message carries one kind: a link button, the «share my number»
+/// button, or an instruction to take that button away once it has done its job.
+/// </summary>
+public enum TelegramKeyboard
+{
+    None,
+    RequestContact,
+    Remove,
 }
 
 /// <summary>

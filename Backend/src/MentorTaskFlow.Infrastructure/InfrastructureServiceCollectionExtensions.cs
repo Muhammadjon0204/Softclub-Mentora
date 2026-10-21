@@ -356,7 +356,10 @@ public static class InfrastructureServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(crm.TimeoutSeconds);
         });
         services.AddSingleton<OmuzCrmClient>();
+        services.AddScoped<CrmAccessResolver>();
         services.AddScoped<ICrmIntegrationService, CrmIntegrationService>();
+        services.AddScoped<ICrmLinkService, CrmLinkService>();
+        services.AddScoped<CrmPhoneLinkService>();
     }
 
     /// <summary>Object storage and the file limits of TZ 17.</summary>

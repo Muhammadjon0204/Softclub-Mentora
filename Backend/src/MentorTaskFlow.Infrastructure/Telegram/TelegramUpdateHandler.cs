@@ -1,6 +1,7 @@
 using System.Text.Json;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Domain.Tenancy;
+using MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
@@ -20,18 +21,24 @@ namespace MentorTaskFlow.Infrastructure.Telegram;
 public sealed class TelegramUpdateHandler(
     ITelegramService telegram,
     MentorTaskFlowDbContext dbContext,
+    CrmPhoneLinkService crmPhoneLinks,
     IOptions<NotificationOptions> notificationOptions)
 {
     private const string OpenLabel = "Открыть Mentora";
 
     public async Task<TelegramReply?> HandleAsync(JsonElement update, CancellationToken cancellationToken)
     {
-        var (chatId, text, firstName) = ReadMessage(update);
+        var (chatId, text, firstName, contact) = ReadMessage(update);
 
         if (chatId is null)
         {
             // An update we do not handle — an edited message, a channel post.
             return null;
+        }
+
+        if (contact is not null)
+        {
+            return await ContactAsync(chatId, contact, cancellationToken);
         }
 
         var command = Command(text);
@@ -41,8 +48,77 @@ public sealed class TelegramUpdateHandler(
             ("/start", { Length: > 0 } token) => await BindAsync(chatId, token, cancellationToken),
             ("/start", _) => await WelcomeAsync(chatId, firstName, cancellationToken),
             ("/status", _) => await StatusAsync(chatId, cancellationToken),
+            ("/crm", _) => await CrmPromptAsync(chatId, cancellationToken),
             _ => Help(chatId),
         };
+    }
+
+    private const string CrmOffer =
+        "📚 <b>Группы из CRM</b>\n"
+        + "Чтобы видеть в Mentora свои группы, студентов и журнал из CRM, нажмите кнопку "
+        + "«Поделиться номером» внизу. Номер должен быть тем же, с которым вы входите в CRM.";
+
+    private async Task<TelegramReply> CrmPromptAsync(string chatId, CancellationToken cancellationToken)
+    {
+        var account = await FindAccountAsync(u => u.TelegramChatId == chatId, cancellationToken);
+        if (account is null)
+        {
+            return Reply(chatId, "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».", ProfileUrl());
+        }
+
+        if (!await crmPhoneLinks.CanOfferAsync(chatId, cancellationToken))
+        {
+            return account.Role is UserRole.Admin
+                ? Reply(chatId, "Связь с CRM по номеру нужна только менторам и тимлидам.", DashboardUrl(account))
+                : Reply(chatId, "✅ Ваш аккаунт уже связан с CRM — группы открыты в разделе «Группы в CRM».", CrmUrl(account));
+        }
+
+        return new TelegramReply(chatId, CrmOffer, Keyboard: TelegramKeyboard.RequestContact);
+    }
+
+    /// <summary>
+    /// A shared contact. Accepted only when it is the sender's own: a contact forwarded from the
+    /// address book carries someone else's <c>user_id</c> (or none) and would link to their groups.
+    /// </summary>
+    private async Task<TelegramReply> ContactAsync(string chatId, SharedContact contact, CancellationToken cancellationToken)
+    {
+        if (contact.UserId is null || contact.UserId != contact.FromId)
+        {
+            return new TelegramReply(
+                chatId,
+                "⚠️ Это чужой контакт. Нажмите кнопку «Поделиться номером» — она отправит именно ваш номер.",
+                Keyboard: TelegramKeyboard.RequestContact);
+        }
+
+        var outcome = await crmPhoneLinks.LinkAsync(chatId, contact.Phone, cancellationToken);
+        var account = await FindAccountAsync(u => u.TelegramChatId == chatId, cancellationToken);
+        var appUrl = account is null ? ProfileUrl() : CrmUrl(account);
+
+        var html = outcome.Result switch
+        {
+            CrmPhoneLinkResult.Linked =>
+                $"✅ <b>Готово! Аккаунт связан с CRM</b>\n\nВ CRM вы — <b>{Escape(outcome.MentorName ?? string.Empty)}</b>, групп сейчас: {outcome.CurrentGroups}.\n"
+                + "Группы, студенты и журнал открыты в Mentora в разделе «Группы в CRM».",
+            CrmPhoneLinkResult.AlreadyLinked =>
+                $"✅ Аккаунт уже связан с CRM: <b>{Escape(outcome.MentorName ?? string.Empty)}</b>.",
+            CrmPhoneLinkResult.ChatNotBound =>
+                "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».",
+            CrmPhoneLinkResult.NotMentorOrLead =>
+                "Связь с CRM по номеру нужна только менторам и тимлидам.",
+            CrmPhoneLinkResult.NotFound =>
+                "😕 Среди менторов CRM нет такого номера. Если в CRM у вас другой рабочий номер — попросите администратора связать аккаунт вручную.",
+            CrmPhoneLinkResult.Ambiguous =>
+                "😕 В CRM этот номер записан у нескольких менторов. Попросите администратора связать аккаунт вручную.",
+            CrmPhoneLinkResult.TakenByAnother =>
+                "⚠️ Этот ментор CRM уже связан с другим аккаунтом Mentora. Если это ошибка — обратитесь к администратору.",
+            _ =>
+                "⚠️ CRM сейчас недоступна. Попробуйте ещё раз чуть позже — /crm.",
+        };
+
+        // The share button has done its job — unless trying again later may help.
+        return outcome.Result is CrmPhoneLinkResult.CrmUnavailable
+            ? Reply(chatId, html, appUrl)
+            : new TelegramReply(chatId, $"{html}\n\n{OpenLabel}: {Escape(appUrl)}", Keyboard: TelegramKeyboard.Remove);
     }
 
     private async Task<TelegramReply> BindAsync(string chatId, string token, CancellationToken cancellationToken)
@@ -64,6 +140,13 @@ public sealed class TelegramUpdateHandler(
             + "• напоминания о приближающихся дедлайнах\n"
             + "• сданные работы и решения по проверке\n\n"
             + "Письма на почту никуда не денутся. Отключить Telegram можно в профиле в любой момент.";
+
+        // A mentor or Lead not yet linked to the CRM gets the share button right away: one tap and
+        // their CRM groups open in Mentora.
+        if (await crmPhoneLinks.CanOfferAsync(chatId, cancellationToken))
+        {
+            return new TelegramReply(chatId, $"{html}\n\n{CrmOffer}", Keyboard: TelegramKeyboard.RequestContact);
+        }
 
         return Reply(chatId, html, DashboardUrl(account));
     }
@@ -106,6 +189,7 @@ public sealed class TelegramUpdateHandler(
         chatId,
         "Этот бот доставляет уведомления Mentora. Действия по задачам выполняются в приложении.\n\n"
         + "/status — к какому аккаунту подключён чат\n"
+        + "/crm — связать аккаунт с CRM по номеру телефона\n"
         + "/start — подключение и приветствие",
         AppBaseUrl());
 
@@ -162,6 +246,9 @@ public sealed class TelegramUpdateHandler(
 
     private string AppBaseUrl() => notificationOptions.Value.AppBaseUrl.TrimEnd('/');
 
+    private string CrmUrl(Account account) =>
+        account.Role is UserRole.Admin ? DashboardUrl(account) : $"{AppBaseUrl()}/{RolePath(account)}/crm";
+
     private string DashboardUrl(Account? account) =>
         account is null ? AppBaseUrl() : $"{AppBaseUrl()}/{RolePath(account)}/dashboard";
 
@@ -200,11 +287,14 @@ public sealed class TelegramUpdateHandler(
         return (name, parts.Length is 2 ? parts[1] : string.Empty);
     }
 
-    private static (string? ChatId, string? Text, string? FirstName) ReadMessage(JsonElement update)
+    /// <summary>A contact in a message: its phone, whose Telegram account it is, and who sent it.</summary>
+    private sealed record SharedContact(string Phone, long? UserId, long? FromId);
+
+    private static (string? ChatId, string? Text, string? FirstName, SharedContact? Contact) ReadMessage(JsonElement update)
     {
         if (!update.TryGetProperty("message", out var message))
         {
-            return (null, null, null);
+            return (null, null, null, null);
         }
 
         var chatId = message.TryGetProperty("chat", out var chat) && chat.TryGetProperty("id", out var id)
@@ -213,12 +303,25 @@ public sealed class TelegramUpdateHandler(
 
         var text = message.TryGetProperty("text", out var value) && value.ValueKind is JsonValueKind.String ? value.GetString() : null;
 
-        var firstName = message.TryGetProperty("from", out var from)
+        var hasFrom = message.TryGetProperty("from", out var from) && from.ValueKind is JsonValueKind.Object;
+        var firstName = hasFrom
                         && from.TryGetProperty("first_name", out var first)
                         && first.ValueKind is JsonValueKind.String
             ? first.GetString()
             : null;
 
-        return (chatId, text, firstName);
+        SharedContact? contact = null;
+        if (message.TryGetProperty("contact", out var shared)
+            && shared.ValueKind is JsonValueKind.Object
+            && shared.TryGetProperty("phone_number", out var phone)
+            && phone.ValueKind is JsonValueKind.String)
+        {
+            contact = new SharedContact(
+                phone.GetString() ?? string.Empty,
+                shared.TryGetProperty("user_id", out var owner) && owner.ValueKind is JsonValueKind.Number ? owner.GetInt64() : null,
+                hasFrom && from.TryGetProperty("id", out var sender) && sender.ValueKind is JsonValueKind.Number ? sender.GetInt64() : null);
+        }
+
+        return (chatId, text, firstName, contact);
     }
 }

@@ -20,6 +20,9 @@ public sealed class CrmIntegrationService(
     IMemoryCache cache,
     IOptions<OmuzCrmOptions> options,
     IClock clock,
+    CrmAccessResolver accessResolver,
+    Telegram.TelegramBotIdentity botIdentity,
+    IOptions<TelegramOptions> telegramOptions,
     ILogger<CrmIntegrationService> logger) : ICrmIntegrationService
 {
     private static readonly TimeSpan CacheFor = TimeSpan.FromSeconds(30);
@@ -60,14 +63,54 @@ public sealed class CrmIntegrationService(
         }
     }
 
-    public Task<CrmGroupListDto> ListGroupsAsync(string status, CancellationToken cancellationToken)
+    public async Task<CrmAccessDto> GetAccessAsync(CancellationToken cancellationToken)
+    {
+        var access = await accessResolver.ResolveAsync(cancellationToken);
+        var (canSelfLink, telegramBound) = await accessResolver.SelfLinkAsync(cancellationToken);
+        var bot = botIdentity.Username ?? telegramOptions.Value.BotUsername;
+
+        return new CrmAccessDto(
+            access.Scope,
+            access.Ready,
+            access.Missing,
+            access.MentorIds.Count,
+            canSelfLink && client.IsConfigured && !string.IsNullOrWhiteSpace(bot),
+            telegramBound,
+            string.IsNullOrWhiteSpace(bot) ? null : $"https://t.me/{bot}");
+    }
+
+    public async Task<CrmGroupListDto> ListGroupsAsync(string status, CancellationToken cancellationToken)
     {
         if (!StatusIds.TryGetValue(status, out var statusId))
         {
             throw new ValidationAppException("status", "Статус группы: Preparing, Started или Finished.");
         }
 
-        return Cached($"crm:groups:{statusId}", async () =>
+        var access = await accessResolver.ResolveAsync(cancellationToken);
+        if (!access.Ready)
+        {
+            return new CrmGroupListDto([]);
+        }
+
+        var all = await AllGroupsAsync(statusId, cancellationToken);
+        if (access.Scope is CrmAccess.Organization or CrmAccess.Branch)
+        {
+            return new CrmGroupListDto(all.Groups.Where(g => access.Sees(g.Branch.Id, [])).ToList());
+        }
+
+        // Every group the person's mentors have ever taught: a mentor who was taken off a group still
+        // wrote its earlier weeks.
+        var taught = (await MentorsAsync(cancellationToken))
+            .Where(m => access.MentorIds.Contains(m.Id))
+            .SelectMany(m => m.Groups ?? [])
+            .Select(g => g.Id)
+            .ToHashSet();
+
+        return new CrmGroupListDto(all.Groups.Where(g => taught.Contains(g.Id)).ToList());
+    }
+
+    private Task<CrmGroupListDto> AllGroupsAsync(int statusId, CancellationToken cancellationToken) =>
+        Cached($"crm:groups:{statusId}", async () =>
         {
             var groups = await Call(() => client.ListGroupsAsync(statusId, cancellationToken));
 
@@ -79,12 +122,14 @@ public sealed class CrmIntegrationService(
                 .Select(g => ToDto(g) with { CurrentMentors = current.TryGetValue(g.Id, out var names) ? names : [] })
                 .ToList());
         });
-    }
+
+    private Task<IReadOnlyList<CrmMentor>> MentorsAsync(CancellationToken cancellationToken) =>
+        Cached("crm:mentors:all", () => Call(() => client.ListMentorsAsync(cancellationToken)));
 
     private Task<Dictionary<int, IReadOnlyList<string>>> CurrentMentorsAsync(CancellationToken cancellationToken) =>
         Cached("crm:mentors:current", async () =>
         {
-            var mentors = await Call(() => client.ListMentorsAsync(cancellationToken));
+            var mentors = await MentorsAsync(cancellationToken);
             return mentors
                 .SelectMany(m => (m.Groups ?? [])
                     .Where(g => g.IsCurrent && g.MentorStatus.Id != CrmValues.MentorRemoved)
@@ -93,7 +138,23 @@ public sealed class CrmIntegrationService(
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)g.Select(x => x.Name).ToList());
         });
 
-    public Task<CrmGroupPreviewDto> GetGroupPreviewAsync(int groupId, CancellationToken cancellationToken) =>
+    public async Task<CrmGroupPreviewDto> GetGroupPreviewAsync(int groupId, CancellationToken cancellationToken)
+    {
+        var access = await accessResolver.ResolveAsync(cancellationToken);
+        if (!access.Ready)
+        {
+            throw new NotFoundException("Группа в CRM не найдена.");
+        }
+
+        var preview = await PreviewAsync(groupId, cancellationToken);
+
+        // Out of scope reads as «not found»: «forbidden» would confirm the group exists.
+        return access.Sees(preview.Group.Branch.Id, preview.Mentors.Select(m => m.Id))
+            ? preview
+            : throw new NotFoundException("Группа в CRM не найдена.");
+    }
+
+    private Task<CrmGroupPreviewDto> PreviewAsync(int groupId, CancellationToken cancellationToken) =>
         Cached($"crm:group:{groupId}", async () =>
         {
             var group = await Call(() => client.GetGroupAsync(groupId, cancellationToken))
@@ -311,26 +372,5 @@ public sealed class CrmIntegrationService(
         return value;
     }
 
-    /// <summary>Turns the client's failures into the API's: 503 with a reason the admin can act on.</summary>
-    private async Task<T> Call<T>(Func<Task<T>> action)
-    {
-        if (!client.IsConfigured)
-        {
-            throw new ServiceUnavailableException(ErrorCodes.IntegrationNotConfigured, "Интеграция с CRM не настроена: нет ключа API.");
-        }
-
-        try
-        {
-            return await action();
-        }
-        catch (CrmUnauthorizedException exception)
-        {
-            throw new ServiceUnavailableException(ErrorCodes.IntegrationUnavailable, $"CRM не принимает ключ: {exception.Message}");
-        }
-        catch (Exception exception) when (exception is CrmUnavailableException or CrmRequestException)
-        {
-            logger.LogWarning(exception, "CRM call failed.");
-            throw new ServiceUnavailableException(ErrorCodes.IntegrationUnavailable, exception.Message);
-        }
-    }
+    private Task<T> Call<T>(Func<Task<T>> action) => CrmCall.RunAsync(client, logger, action);
 }

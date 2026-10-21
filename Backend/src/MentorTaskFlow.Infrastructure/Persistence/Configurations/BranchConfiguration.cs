@@ -47,6 +47,12 @@ public sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
             .IsUnique()
             .HasDatabaseName("ux_branches_organization_normalized_name");
 
+        // One CRM branch is one of ours: two linked to it would both show its groups.
+        builder.HasIndex(x => new { x.OrganizationId, x.CrmBranchId })
+            .IsUnique()
+            .HasFilter("crm_branch_id IS NOT NULL")
+            .HasDatabaseName("ux_branches_organization_crm_branch");
+
         // Exactly one head office per organization. A partial unique index, not a service check:
         // two concurrent transactions would both pass a service check and leave the organization
         // with two head offices (BRN-021, TEST-TEN-032).

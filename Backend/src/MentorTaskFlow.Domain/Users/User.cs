@@ -71,6 +71,25 @@ public sealed class User : AuditableEntity
     public string? TelegramChatId { get; private set; }
 
     /// <summary>
+    /// The mentor in Omuz CRM who is this person, or null while not linked.
+    /// </summary>
+    /// <remarks>
+    /// The CRM's own id, not its phone or name: those change, the id does not. It decides which CRM
+    /// groups the person sees — a mentor their own, a Lead their team's — so only an Organization Admin
+    /// sets it; a link a person could set on themselves would open someone else's groups.
+    /// </remarks>
+    public int? CrmMentorId { get; private set; }
+
+    /// <summary>
+    /// The person's phone as Telegram confirmed it — digits only, with the country code
+    /// (<c>992931234567</c>) — or null. Only ever set from a contact the person shared about
+    /// themselves in the bot, never typed in, so it can be trusted to find them in the CRM.
+    /// </summary>
+    public string? PhoneNumber { get; private set; }
+
+    public const int PhoneNumberMaxLength = 20;
+
+    /// <summary>
     /// File name of the profile photo in storage, or null for the initials avatar.
     /// </summary>
     /// <remarks>
@@ -398,6 +417,35 @@ public sealed class User : AuditableEntity
     public void UnbindTelegram(DateTimeOffset now)
     {
         TelegramChatId = null;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Links the person to a CRM mentor, or unlinks them with <c>null</c>.</summary>
+    public void LinkCrmMentor(int? crmMentorId, DateTimeOffset now)
+    {
+        if (crmMentorId is <= 0)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Неверный id ментора в CRM.");
+        }
+
+        if (Role is UserRole.Admin && crmMentorId is not null)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "С ментором CRM связываются только ментор и тимлид.");
+        }
+
+        CrmMentorId = crmMentorId;
+        UpdatedAt = now;
+    }
+
+    /// <summary>Stores a phone confirmed by Telegram (see <see cref="PhoneNumber"/>).</summary>
+    public void SetVerifiedPhone(string digits, DateTimeOffset now)
+    {
+        if (string.IsNullOrEmpty(digits) || digits.Length is < 7 or > PhoneNumberMaxLength || !digits.All(char.IsAsciiDigit))
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Неверный номер телефона.");
+        }
+
+        PhoneNumber = digits;
         UpdatedAt = now;
     }
 

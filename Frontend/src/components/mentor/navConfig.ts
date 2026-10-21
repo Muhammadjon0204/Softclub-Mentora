@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, ClipboardList, History, LayoutDashboard, TrendingUp } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, History, LayoutDashboard, School, TrendingUp } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 /**
@@ -24,4 +24,5 @@ export const MENTOR_NAV_ITEMS: MentorNavItem[] = [
   { key: 'history', label: 'История', path: '/mentor/history', icon: History },
   { key: 'reports', label: 'Отчёты', path: '/mentor/reports', icon: TrendingUp },
   { key: 'notifications', label: 'Уведомления', path: '/mentor/notifications', icon: Bell },
+  { key: 'crm', label: 'Группы в CRM', path: '/mentor/crm', icon: School },
 ];

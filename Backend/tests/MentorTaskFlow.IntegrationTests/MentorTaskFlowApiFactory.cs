@@ -82,6 +82,12 @@ public sealed class MentorTaskFlowApiFactory : WebApplicationFactory<Program>
     /// </remarks>
     public IAiSummaryProvider? AiProvider { get; init; }
 
+    /// <summary>
+    /// Answers the Omuz CRM calls in place of the CRM. When set, the integration is configured with a
+    /// test key and every request goes to this handler — no test reaches the real CRM.
+    /// </summary>
+    public HttpMessageHandler? CrmHandler { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -93,6 +99,13 @@ public sealed class MentorTaskFlowApiFactory : WebApplicationFactory<Program>
                 services.RemoveAll<IAiSummaryProvider>();
                 services.AddScoped(_ => provider);
             });
+        }
+
+        if (CrmHandler is { } crm)
+        {
+            builder.ConfigureTestServices(services =>
+                services.AddHttpClient(Infrastructure.Integrations.OmuzCrm.OmuzCrmClient.HttpClientName)
+                    .ConfigurePrimaryHttpMessageHandler(() => crm));
         }
 
         builder.ConfigureAppConfiguration((_, configuration) =>
@@ -124,6 +137,10 @@ public sealed class MentorTaskFlowApiFactory : WebApplicationFactory<Program>
                 ["Ai:PromptVersion"] = "v1.0",
                 ["Ai:Provider"] = "Anthropic",
                 ["Ai:ModelId"] = "claude-sonnet-5",
+
+                ["OmuzCrm:BaseUrl"] = "https://crm.test/api/integration/v1",
+                ["OmuzCrm:ApiKey"] = CrmHandler is null ? null : "crm_test_key",
+                ["OmuzCrm:MinRequestIntervalMs"] = "0",
             });
         });
     }
