@@ -137,7 +137,10 @@ jobs:
           fi
 
       # git pull нужен ради compose-файлов и скрипта ролей БД. .env.api и .env.web на
-      # сервере помечены skip-worktree (см. DEPLOY.md), поэтому pull их не трогает.
+      # сервере помечены skip-worktree (см. DEPLOY.md), но если их шаблон поменялся в
+      # репозитории, pull отказывается обновляться («would be overwritten»). Поэтому
+      # серверные файлы откладываются в сторону, git обновляет шаблон, и свои файлы
+      # возвращаются на место — при любом исходе pull.
       #
       # IMAGE_TAG из окружения перекрывает значение из .env-файлов: разворачивается
       # ровно проверенный коммит, а не «какой-то latest».
@@ -168,7 +171,20 @@ jobs:
             fi
             echo "Разворачиваю: $IMAGE_TAG"
 
-            git pull --ff-only
+            env_backup=$(mktemp -d)
+            cp .env.api .env.web "$env_backup/"
+            restore_env() {
+              cp "$env_backup/.env.api" "$env_backup/.env.web" .
+              git update-index --skip-worktree .env.api .env.web
+            }
+            git update-index --no-skip-worktree .env.api .env.web
+            git checkout -- .env.api .env.web
+            if ! git pull --ff-only; then
+              restore_env
+              echo "git pull не прошёл — .env-файлы возвращены, деплой остановлен"
+              exit 1
+            fi
+            restore_env
 
             # Логин снимает rate-limit Docker Hub для анонимных pull с подсетей хостингов.
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin

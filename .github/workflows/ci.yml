@@ -193,7 +193,7 @@ jobs:
       # дальше. Версия закреплена точно: сканер, молча меняющий поведение, —
       # худшее место для сюрприза в цепочке поставки.
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: mentora-${{ matrix.name }}:${{ github.sha }}
           severity: CRITICAL,HIGH
