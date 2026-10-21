@@ -22,10 +22,13 @@ ENV VITE_USE_MOCKS=${VITE_USE_MOCKS}
 RUN npm run build
 
 # ---- runtime stage ----------------------------------------------------------
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.30-alpine AS runtime
 
-# Remove default site.
-RUN rm /etc/nginx/conf.d/default.conf
+# The stable nginx line, plus the Alpine fixes published since the base image was cut: the image
+# scan in CI (Trivy, HIGH/CRITICAL) fails on a known-vulnerable OpenSSL or curl, and 1.27 had
+# stopped receiving them. Then remove the default site.
+RUN apk upgrade --no-cache \
+    && rm /etc/nginx/conf.d/default.conf
 
 # Our SPA config — a COPY target, not a bind mount, so it travels with the image.
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
