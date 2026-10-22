@@ -3,7 +3,6 @@ import { ChevronRight, Link2Off, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import { CRM_QUERY_KEYS, getCrmAccess, getCrmGroups, type CrmGroupStatus } from '../../api/admin/crm';
-import { Badge } from '../../shared/ui/Badge';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
@@ -115,8 +114,8 @@ export function CrmGroupsView(): JSX.Element {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate text-[14.5px] font-semibold text-ink">{g.name}</span>
-                      <Badge tone="brand">{g.course.name}</Badge>
-                      {g.biWeekly ? <Badge tone="info">детская · 2 недели</Badge> : null}
+                      <span className="rounded border border-line px-1.5 py-px text-[11.5px] font-medium text-ink-secondary">{g.course.name}</span>
+                      {g.biWeekly ? <span className="text-[12px] text-ink-muted">детская · 2 недели</span> : null}
                     </div>
                     <p className="mt-0.5 text-[12.5px] text-ink-muted">
                       {g.branch.name} · {formatRange(g.startsOn, g.finishesOn)} · студентов {g.enrolledStudents}
