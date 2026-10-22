@@ -43,6 +43,7 @@ public static class ChannelPolicies
             [NotificationEventTypes.SubmissionReceipt] = ChannelPolicy.TelegramOnly,
             [NotificationEventTypes.ReviewApproved] = ChannelPolicy.Both,
             [NotificationEventTypes.ReviewNeedsRework] = ChannelPolicy.Both,
+            [NotificationEventTypes.CrmReportSent] = ChannelPolicy.Both,
             [NotificationEventTypes.DeadlineReminder] = ChannelPolicy.TelegramPreferred,
             [NotificationEventTypes.AssignmentOverdue] = ChannelPolicy.Both,
             [NotificationEventTypes.AssignmentCancelled] = ChannelPolicy.Both,

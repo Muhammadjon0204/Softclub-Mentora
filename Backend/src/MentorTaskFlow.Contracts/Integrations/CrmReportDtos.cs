@@ -4,7 +4,8 @@ namespace MentorTaskFlow.Contracts.Integrations;
 /// A mentor's report on one CRM group for one period.
 /// </summary>
 /// <remarks>
-/// <c>Period</c> is the snapshot the report was made from — the figures the Lead reads.
+/// <c>Period</c> is the snapshot the report was made from — the figures the Lead reads;
+/// <c>PreviousPeriod</c> — the period before it, for «было → стало» (null for the first one).
 /// <c>DataChanged</c>: the journal was corrected in the CRM after that, and the report can be refreshed
 /// (while it is a draft). <c>CanEdit</c>: the caller is the author and the report is still a draft.
 /// </remarks>
@@ -28,7 +29,8 @@ public sealed record CrmGroupReportDto(
     DateTimeOffset UpdatedAt,
     DateTimeOffset? SentAt,
     bool DataChanged,
-    CrmPeriodDto Period);
+    CrmPeriodDto Period,
+    CrmPeriodDto? PreviousPeriod = null);
 
 /// <summary>
 /// <c>GET /integrations/crm/groups/{id}/weeks/{week}/report</c> — the report of a period, or why there

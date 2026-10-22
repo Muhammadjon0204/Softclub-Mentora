@@ -7,6 +7,7 @@ using MentorTaskFlow.Contracts.Auth;
 using MentorTaskFlow.Contracts.Integrations;
 using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Categories;
+using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Reports;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
@@ -212,6 +213,17 @@ public sealed class CrmReportTests(PostgresFixture postgres) : IAsyncLifetime
 
         await using var context = postgres.CreateContext(suppressTenantFilter: true);
         (await context.CrmGroupReports.SingleAsync()).Status.ShouldBe(CrmGroupReportStatus.Sent);
+
+        // The Lead is told — by email (and Telegram once bound) — with the figures and a link to the report.
+        var stored = await context.CrmGroupReports.SingleAsync();
+        var leadUser = await context.Users.SingleAsync(u => u.Email == "lead@mentortaskflow.test");
+        var notices = await context.NotificationOutbox.Where(n => n.EventType == NotificationEventTypes.CrmReportSent).ToListAsync();
+        var notice = notices.ShouldHaveSingleItem();
+        notice.UserId.ShouldBe(leadUser.Id);
+        var body = notice.Payload.RootElement;
+        body.GetProperty("mentorFullName").GetString().ShouldBe("Ментор А");
+        body.GetProperty("actionPath").GetString().ShouldBe($"/lead/crm?report={stored.Id:D}");
+        body.GetProperty("summaryLines").EnumerateArray().Select(x => x.GetString()).ShouldContain(l => l!.StartsWith("Средний балл группы:"));
     }
 
     private static string ReportUrl(int week) => $"/api/v1/integrations/crm/groups/{GroupId}/weeks/{week}/report";

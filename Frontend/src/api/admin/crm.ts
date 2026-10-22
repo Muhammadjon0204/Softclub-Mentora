@@ -261,6 +261,8 @@ export interface CrmGroupReport {
   /** После отчёта журнал в CRM поправили — черновик можно обновить. */
   dataChanged: boolean;
   period: CrmPeriod;
+  /** Предыдущая неделя — для «было → стало»; null у первой недели группы. */
+  previousPeriod?: CrmPeriod | null;
 }
 
 export interface CrmReportState {

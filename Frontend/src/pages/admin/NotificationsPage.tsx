@@ -40,6 +40,7 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
   SubmissionReceipt: 'Подтверждение отправки ментору',
   ReviewApproved: 'Решение одобрено',
   ReviewNeedsRework: 'Решение отправлено на доработку',
+  CrmReportSent: 'Отчёт по группе отправлен',
   DeadlineReminder: 'Напоминание о дедлайне',
   AssignmentOverdue: 'Задание просрочено',
   AssignmentCancelled: 'Задание отменено',

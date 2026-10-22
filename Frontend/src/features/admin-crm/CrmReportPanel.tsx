@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, RefreshCw, Send, Sparkles } from 'lucide-react';
+import { Eye, FileText, RefreshCw, Send, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
@@ -18,6 +18,7 @@ import { Button } from '../../shared/ui/Button';
 import { FormTextarea } from '../../shared/ui/FormField';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmReportText } from './CrmReportText';
+import { CrmReportDrawer } from './CrmReportsView';
 
 const DATE_TIME = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -38,6 +39,7 @@ export function CrmReportPanel({ groupId, week }: { groupId: number; week: numbe
   const report = state.data?.report ?? null;
 
   const [text, setText] = useState('');
+  const [viewing, setViewing] = useState(false);
   useEffect(() => { setText(report?.conclusions ?? ''); }, [report?.id, report?.updatedAt, report?.conclusions]);
   const dirty = report !== null && text !== report.conclusions;
 
@@ -114,8 +116,20 @@ export function CrmReportPanel({ groupId, week }: { groupId: number; week: numbe
           {sent && report.sentAt ? `отправлен ${when(report.sentAt)}` : 'черновик'}
         </span>
         <span className="text-ink-muted">{report.isMine ? 'ваш' : report.authorName}</span>
-        {report.aiModel ? <span className="ml-auto text-[11.5px] text-ink-muted">черновик выводов — ИИ</span> : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto"
+          leadingIcon={<Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+          onClick={() => {
+            if (dirty) save.mutate();
+            setViewing(true);
+          }}
+        >
+          {sent ? 'Открыть отчёт' : 'Как увидит тимлид'}
+        </Button>
       </div>
+      <CrmReportDrawer id={viewing ? report.id : null} onClose={() => { setViewing(false); }} />
 
       {report.dataChanged ? (
         <div className="flex flex-wrap items-center gap-3 border-b border-divider bg-warning-soft px-4 py-2 text-[12.5px] text-warning">

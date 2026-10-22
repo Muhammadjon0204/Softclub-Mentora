@@ -30,6 +30,7 @@ public sealed class CrmGroupReportConfiguration : IEntityTypeConfiguration<CrmGr
         builder.Property(x => x.PeriodLabel).HasMaxLength(CrmGroupReport.LabelMaxLength).IsRequired();
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(12).IsRequired();
         builder.Property(x => x.SnapshotJson).HasColumnType("jsonb").IsRequired();
+        builder.Property(x => x.PreviousSnapshotJson).HasColumnType("jsonb");
         builder.Property(x => x.DataHash).HasMaxLength(64).IsRequired();
         builder.Property(x => x.Conclusions).HasColumnType("text").IsRequired();
         builder.Property(x => x.AiModel).HasMaxLength(64);

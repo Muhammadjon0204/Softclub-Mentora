@@ -1082,6 +1082,10 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("period_to");
 
+                    b.Property<string>("PreviousSnapshotJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("previous_snapshot_json");
+
                     b.Property<DateTimeOffset?>("SentAt")
                         .HasColumnType("timestamptz")
                         .HasColumnName("sent_at");

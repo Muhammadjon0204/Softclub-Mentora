@@ -40,6 +40,7 @@ public sealed class CrmReportService(
     IOptions<AiOptions> aiOptions,
     IClock clock,
     IAuditWriter auditWriter,
+    IOutboxWriter outboxWriter,
     ILogger<CrmReportService> logger) : ICrmReportService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -78,6 +79,7 @@ public sealed class CrmReportService(
             period.From,
             period.To,
             snapshot,
+            PreviousSnapshot(preview, period),
             Hash(snapshot),
             now);
 
@@ -98,7 +100,7 @@ public sealed class CrmReportService(
             throw new ConflictException(ErrorCodes.ResourceAlreadyExists, "Отчёт за эту неделю уже составляет другой ментор.");
         }
 
-        var aiError = AiAvailable ? await DraftAsync(report, preview, period, cancellationToken) : null;
+        var aiError = AiAvailable ? await DraftAsync(report, preview, period, Previous(report), cancellationToken) : null;
         return await StateAsync(preview, period, aiError, cancellationToken);
     }
 
@@ -122,7 +124,7 @@ public sealed class CrmReportService(
 
         var (preview, period) = await PeriodAsync(groupId, week, cancellationToken);
         var report = await OwnDraftAsync(groupId, week, cancellationToken);
-        var aiError = await DraftAsync(report, preview, Snapshot(report), cancellationToken);
+        var aiError = await DraftAsync(report, preview, Snapshot(report), Previous(report), cancellationToken);
 
         return await StateAsync(preview, period, aiError, cancellationToken);
     }
@@ -133,7 +135,7 @@ public sealed class CrmReportService(
         var report = await OwnDraftAsync(groupId, week, cancellationToken);
 
         var snapshot = JsonSerializer.Serialize(period, Json);
-        report.Refresh(snapshot, Hash(snapshot), clock.UtcNow);
+        report.Refresh(snapshot, PreviousSnapshot(preview, period), Hash(snapshot), clock.UtcNow);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return await StateAsync(preview, period, null, cancellationToken);
@@ -146,6 +148,7 @@ public sealed class CrmReportService(
 
         report.Send(clock.UtcNow);
         Audit(AuditActions.CrmReportSend, report);
+        await NotifyLeadsAsync(report, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return await StateAsync(preview, period, null, cancellationToken);
@@ -295,10 +298,19 @@ public sealed class CrmReportService(
         r.Id, r.CrmGroupId, r.GroupName, r.CourseName, r.Week, r.PeriodLabel, r.PeriodFrom, r.PeriodTo,
         r.Status.ToString(), r.AuthorId, author, r.AuthorId == actor.UserId,
         r.AuthorId == actor.UserId && r.Status is CrmGroupReportStatus.Draft,
-        r.Conclusions, r.AiModel, r.CreatedAt, r.UpdatedAt, r.SentAt, dataChanged, Snapshot(r));
+        r.Conclusions, r.AiModel, r.CreatedAt, r.UpdatedAt, r.SentAt, dataChanged, Snapshot(r), Previous(r));
 
     private static CrmPeriodDto Snapshot(CrmGroupReport report) =>
         JsonSerializer.Deserialize<CrmPeriodDto>(report.SnapshotJson, Json)!;
+
+    private static CrmPeriodDto? Previous(CrmGroupReport report) =>
+        report.PreviousSnapshotJson is { } json ? JsonSerializer.Deserialize<CrmPeriodDto>(json, Json) : null;
+
+    /// <summary>The period right before <paramref name="period"/>, as it is now — the «было» of the report.</summary>
+    private static string? PreviousSnapshot(CrmGroupPreviewDto preview, CrmPeriodDto period) =>
+        preview.Periods.Where(p => p.Week < period.Week).MaxBy(p => p.Week) is { } previous
+            ? JsonSerializer.Serialize(previous, Json)
+            : null;
 
     private async Task<Dictionary<Guid, string>> AuthorNamesAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
     {
@@ -321,6 +333,58 @@ public sealed class CrmReportService(
             Metadata = JsonSerializer.SerializeToDocument(new { crmGroupId = report.CrmGroupId, week = report.Week }),
         });
 
+    /// <summary>
+    /// Tells the Lead of the author's category — in Telegram and by email, as their settings allow —
+    /// that the report is in: the group, the week, the main figures and the start of the conclusions.
+    /// Staged in the same save as the sending itself, so a report is never «sent» without its notice.
+    /// </summary>
+    private async Task NotifyLeadsAsync(CrmGroupReport report, CancellationToken cancellationToken)
+    {
+        var leads = await dbContext.Users.IgnoreQueryFilters()
+            .Where(u => u.OrganizationId == report.OrganizationId
+                        && u.CategoryId == report.CategoryId
+                        && u.Role == UserRole.Lead
+                        && u.IsActive
+                        && u.Id != report.AuthorId)
+            .Select(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+        if (leads.Count == 0)
+        {
+            return;
+        }
+
+        var author = (await AuthorNamesAsync([report.AuthorId], cancellationToken)).GetValueOrDefault(report.AuthorId);
+        var period = Snapshot(report);
+        var payload = JsonSerializer.SerializeToDocument(new
+        {
+            groupName = report.GroupName,
+            // «за неделю 6» / «за недели 13–14» — already in the case the sentence needs.
+            periodTitle = report.PeriodLabel.Contains('-') ? $"недели {report.PeriodLabel.Replace('-', '–')}" : $"неделю {report.PeriodLabel}",
+            periodRange = $"{report.PeriodFrom:dd.MM} — {report.PeriodTo:dd.MM.yyyy}",
+            mentorFullName = author,
+            summaryLines = CrmReportPrompt.SummaryLines(period, Previous(report)),
+            conclusionsExcerpt = Notifications.NotificationTemplates.ShortenForChat(CrmReportPrompt.PlainText(report.Conclusions)),
+            actionPath = $"/lead/crm?report={report.Id:D}",
+        });
+
+        foreach (var lead in leads)
+        {
+            await outboxWriter.EnqueueSystemAsync(
+                new OutboxEntry
+                {
+                    RecipientUserId = lead,
+                    EventType = Domain.Notifications.NotificationEventTypes.CrmReportSent,
+                    EntityId = report.Id,
+                    CategoryId = report.CategoryId,
+                    Payload = payload,
+                },
+                report.OrganizationId,
+                report.BranchId,
+                cancellationToken);
+        }
+    }
+
     private static string Hash(string snapshot) =>
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(snapshot)));
 
@@ -330,7 +394,7 @@ public sealed class CrmReportService(
     /// Asks the AI for the conclusions and stores them in the draft. Returns the reason when it could
     /// not: the report itself is kept either way, and the mentor can write the text by hand.
     /// </summary>
-    private async Task<string?> DraftAsync(CrmGroupReport report, CrmGroupPreviewDto preview, CrmPeriodDto period, CancellationToken cancellationToken)
+    private async Task<string?> DraftAsync(CrmGroupReport report, CrmGroupPreviewDto preview, CrmPeriodDto period, CrmPeriodDto? previous, CancellationToken cancellationToken)
     {
         var students = period.Students.Where(s => s.Fill != "Empty").ToList();
         var labels = students.Select((s, i) => (s.FullName, Label: $"Студент {i + 1}")).ToList();
@@ -338,7 +402,7 @@ public sealed class CrmReportService(
         try
         {
             var completion = await ai.GenerateAsync(
-                new AiSummaryPrompt(CrmReportPrompt.Instructions, CrmReportPrompt.Data(preview, period, students, labels, aiOptions.Value)),
+                new AiSummaryPrompt(CrmReportPrompt.Instructions, CrmReportPrompt.Data(preview, period, previous, students, labels, aiOptions.Value)),
                 cancellationToken);
 
             var text = CrmReportPrompt.Restore(completion.Content.Trim(), labels.Select(l => l.FullName).ToList());
@@ -366,10 +430,16 @@ public static class CrmReportPrompt
         Данные — посчитанные баллы журнала: за неделю студент набирает до 100 (посещение 1 балл за урок,
         задание 0–5 за урок, бонусы, экзамен). 80 и выше — проходит, 70–79 — нужна поддержка, ниже 70 — зона риска.
 
-        Напиши три раздела в Markdown:
-        **Общая картина** — 2–3 предложения о неделе группы.
-        **Зона риска** — кто из студентов в зоне риска или нуждается в поддержке и почему (пропуски, ноль за задания, экзамен, замечания).
-        **Рекомендации** — 3–5 конкретных шагов для ментора на следующую неделю.
+        Таблицу с баллами по студентам ментор и так видит — не пересказывай её строку за строкой.
+        Напиши три раздела в Markdown, заголовки ровно такие:
+        ### Общая картина
+        2–3 предложения: как прошла неделя у группы, и как она изменилась по сравнению с прошлой
+        (средний балл, посещаемость, зоны — если есть данные прошлой недели).
+        ### Зона риска
+        Кто в зоне риска или нуждается в поддержке и почему (пропуски, ноль за задания, экзамен, замечания,
+        падение баллов к прошлой неделе). Кратко, по пункту на студента; если таких нет — так и скажи.
+        ### Рекомендации
+        3–5 конкретных шагов для ментора на следующую неделю.
 
         Правила:
         - Используй только эти данные и не пересчитывай цифры.
@@ -384,6 +454,7 @@ public static class CrmReportPrompt
     public static string Data(
         CrmGroupPreviewDto preview,
         CrmPeriodDto period,
+        CrmPeriodDto? previous,
         IReadOnlyList<CrmStudentScoreDto> students,
         IReadOnlyList<(string FullName, string Label)> labels,
         AiOptions options)
@@ -394,12 +465,24 @@ public static class CrmReportPrompt
         b.AppendLine($"<group course=\"{Escape(preview.Group.Course.Name)}\" period=\"{Escape(period.Label)}\" from=\"{period.From:yyyy-MM-dd}\" to=\"{period.To:yyyy-MM-dd}\" exam_max=\"{period.ExamMax}\" has_exam=\"{period.HasExam.ToString().ToLowerInvariant()}\"/>");
         b.AppendLine($"<summary students=\"{s.Students}\" average=\"{s.AverageTotal?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "нет данных"}\" pass_80=\"{s.Passed}\" support_70_79=\"{s.Support}\" risk_below_70=\"{s.Risk}\" attendance_percent=\"{s.AttendanceRate?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "нет данных"}\"/>");
 
+        if (previous is not null)
+        {
+            var p = previous.Summary;
+            b.AppendLine($"<previous_week students=\"{p.Students}\" average=\"{p.AverageTotal?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "нет данных"}\" pass_80=\"{p.Passed}\" support_70_79=\"{p.Support}\" risk_below_70=\"{p.Risk}\" attendance_percent=\"{p.AttendanceRate?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "нет данных"}\"/>");
+        }
+
+        var previousTotals = previous?.Students.Where(x => x.Fill == "Full").ToDictionary(x => x.StudentId, x => x.Total) ?? [];
         var budget = options.MaxTotalChars;
         for (var i = 0; i < students.Count; i++)
         {
             var st = students[i];
             var label = labels[i].Label;
             b.Append($"<student label=\"{label}\" total=\"{st.Total}\" zone=\"{st.Zone}\" attendance=\"{st.AttendancePoints}\" homework=\"{st.HomeworkPoints}\" bonus=\"{st.BonusPoints}\" exam=\"{(st.ExamGrade?.ToString() ?? "нет")}\"");
+            if (previousTotals.TryGetValue(st.StudentId, out var before))
+            {
+                b.Append($" previous_week_total=\"{before}\"");
+            }
+
             b.Append($" absences=\"{st.AbsentDays.Count}\" absences_without_reason=\"{st.AbsentDays.Count(a => a.Kind is "NoReason" or "NoMark")}\" late=\"{st.LateDays.Count}\" zero_homework_days=\"{st.ZeroHomeworkDays.Count}\"");
             b.AppendLine(st.Fill == "Partial" ? " week_partially_marked=\"true\">" : ">");
 
@@ -458,6 +541,53 @@ public static class CrmReportPrompt
 
         return Single.Replace(text, m => Name(m.Groups[1].Value) is { Length: > 0 } name ? name : m.Value);
     }
+
+    /// <summary>
+    /// The report's figures as short lines for the Lead's notification: the average and its change,
+    /// the zones, attendance, and who is in the risk zone.
+    /// </summary>
+    public static IReadOnlyList<string> SummaryLines(CrmPeriodDto period, CrmPeriodDto? previous)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var s = period.Summary;
+        var p = previous?.Summary;
+        var lines = new List<string>();
+
+        static string Change(double now, double before, string suffix)
+        {
+            var diff = Math.Round(now - before, 1);
+            return diff switch
+            {
+                > 0 => $" (▲ +{diff.ToString(System.Globalization.CultureInfo.InvariantCulture)}{suffix})",
+                < 0 => $" (▼ −{Math.Abs(diff).ToString(System.Globalization.CultureInfo.InvariantCulture)}{suffix})",
+                _ => " (как на прошлой)",
+            };
+        }
+
+        if (s.AverageTotal is { } avg)
+        {
+            lines.Add($"Средний балл группы: {avg.ToString(inv)}" + (p?.AverageTotal is { } was ? Change(avg, was, string.Empty) : string.Empty));
+        }
+
+        lines.Add($"80+ · 70–79 · ниже 70: {s.Passed} · {s.Support} · {s.Risk}");
+
+        if (s.AttendanceRate is { } att)
+        {
+            lines.Add($"Посещаемость: {att.ToString(inv)}%" + (p?.AttendanceRate is { } was ? Change(att, was, "%") : string.Empty));
+        }
+
+        var risk = period.Students.Where(x => x.Fill == "Full" && x.Zone == "Risk").Select(x => x.FullName).ToList();
+        if (risk.Count > 0)
+        {
+            lines.Add($"В зоне риска: {string.Join(", ", risk.Take(5))}{(risk.Count > 5 ? $" и ещё {risk.Count - 5}" : string.Empty)}");
+        }
+
+        return lines;
+    }
+
+    /// <summary>The conclusions without their Markdown marks — for a chat message.</summary>
+    public static string PlainText(string conclusions) =>
+        Regex.Replace(Regex.Replace(conclusions ?? string.Empty, @"^#{1,6}\s*", string.Empty, RegexOptions.Multiline), @"\*\*", string.Empty).Trim();
 
     /// <summary>Removes the students' names from free text — a mentor may write one in a remark.</summary>
     public static string Anonymize(string text, IReadOnlyList<(string FullName, string Label)> labels)
