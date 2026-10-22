@@ -63,6 +63,12 @@ public sealed class CrmGroupReport : AuditableEntity
     /// <summary>The scored period as JSON — exactly what the report shows.</summary>
     public string SnapshotJson { get; private set; } = null!;
 
+    /// <summary>
+    /// The period before, scored the same way, or null for the group's first period — what the report
+    /// compares against («было → стало»).
+    /// </summary>
+    public string? PreviousSnapshotJson { get; private set; }
+
     /// <summary>SHA-256 of the figures, hex.</summary>
     public string DataHash { get; private set; } = null!;
 
@@ -91,6 +97,7 @@ public sealed class CrmGroupReport : AuditableEntity
         DateOnly from,
         DateOnly to,
         string snapshotJson,
+        string? previousSnapshotJson,
         string dataHash,
         DateTimeOffset now)
     {
@@ -119,6 +126,7 @@ public sealed class CrmGroupReport : AuditableEntity
             PeriodTo = to,
             Status = CrmGroupReportStatus.Draft,
             SnapshotJson = snapshotJson,
+            PreviousSnapshotJson = previousSnapshotJson,
             DataHash = dataHash,
             CreatedAt = now,
             UpdatedAt = now,
@@ -126,10 +134,11 @@ public sealed class CrmGroupReport : AuditableEntity
     }
 
     /// <summary>Takes the figures as they are now (after a correction in the CRM).</summary>
-    public void Refresh(string snapshotJson, string dataHash, DateTimeOffset now)
+    public void Refresh(string snapshotJson, string? previousSnapshotJson, string dataHash, DateTimeOffset now)
     {
         EnsureDraft();
         SnapshotJson = snapshotJson;
+        PreviousSnapshotJson = previousSnapshotJson;
         DataHash = dataHash;
         UpdatedAt = now;
     }

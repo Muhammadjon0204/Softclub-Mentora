@@ -24,6 +24,9 @@ public static class NotificationEventTypes
     public const string SubmissionReceipt = "SubmissionReceipt";
     public const string ReviewApproved = "ReviewApproved";
     public const string ReviewNeedsRework = "ReviewNeedsRework";
+
+    /// <summary>A mentor sent their weekly CRM group report: the Lead of the category is told.</summary>
+    public const string CrmReportSent = "CrmReportSent";
     public const string DeadlineReminder = "DeadlineReminder";
     public const string AssignmentOverdue = "AssignmentOverdue";
     public const string AssignmentCancelled = "AssignmentCancelled";

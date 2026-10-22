@@ -40,7 +40,8 @@ public static class NotificationTopics
             or NotificationEventTypes.LateSubmissionUploaded
             or NotificationEventTypes.SubmissionReceipt
             or NotificationEventTypes.ReviewApproved
-            or NotificationEventTypes.ReviewNeedsRework => NotificationTopic.Reviews,
+            or NotificationEventTypes.ReviewNeedsRework
+            or NotificationEventTypes.CrmReportSent => NotificationTopic.Reviews,
 
         NotificationEventTypes.SchedulerNoActiveMentor
             or NotificationEventTypes.CategoryWithoutLead

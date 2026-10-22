@@ -10,13 +10,15 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmPeriodView } from './CrmGroupDrawer';
+import { CrmReportSummary } from './CrmReportSummary';
 import { CrmReportText } from './CrmReportText';
 import { formatRange, periodTitle } from './crmPresentation';
 
 const DATE_TIME = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const when = (iso: string): string => DATE_TIME.format(new Date(iso)).replace(/\.(?=\s|,|$)/, '');
 
-function ReportDrawer({ id, onClose }: { id: string | null; onClose: () => void }): JSX.Element {
+/** Отчёт так, как его читает тимлид: сводка с динамикой, выводы ИИ и ментора, детали недели. */
+export function CrmReportDrawer({ id, onClose }: { id: string | null; onClose: () => void }): JSX.Element {
   const report = useQuery({ queryKey: CRM_REPORT_KEYS.one(id ?? ''), queryFn: () => getCrmReport(id ?? ''), enabled: id !== null });
   const r = report.data;
 
@@ -34,16 +36,23 @@ function ReportDrawer({ id, onClose }: { id: string | null; onClose: () => void 
         <ErrorState error={report.error} onRetry={() => { void report.refetch(); }} />
       ) : r ? (
         <div className="space-y-8">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-ink-muted">
+            <span className="font-medium text-ink-secondary">{r.authorName}</span>
+            <span className={`inline-flex items-center gap-1.5 font-medium ${r.status === 'Sent' ? 'text-success' : 'text-warning'}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+              {r.status === 'Sent' && r.sentAt ? `отправлен ${when(r.sentAt)}` : 'черновик — правится в карточке группы'}
+            </span>
+          </p>
           <section>
-            <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[12.5px] text-ink-muted">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em]">Выводы</span>
-              <span>{r.authorName}</span>
-              <span>{r.status === 'Sent' && r.sentAt ? `отправлен ${when(r.sentAt)}` : 'черновик — правится в карточке группы'}</span>
-            </div>
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Успеваемость группы</h3>
+            <CrmReportSummary period={r.period} previous={r.previousPeriod} />
+          </section>
+          <section>
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Выводы и рекомендации</h3>
             {r.conclusions.trim().length > 0 ? <CrmReportText text={r.conclusions} /> : <p className="text-[13px] text-ink-muted">Выводов нет.</p>}
           </section>
           <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Цифры недели</h3>
+            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Детали недели: пропуски, опоздания, замечания</h3>
             <CrmPeriodView period={r.period} />
           </section>
         </div>
@@ -56,9 +65,9 @@ function ReportDrawer({ id, onClose }: { id: string | null; onClose: () => void 
  * Отчёты, которые человек может прочитать: ментор — свои, тимлид — отправленные отчёты своих менторов,
  * админ — отправленные отчёты филиала или всей организации.
  */
-export function CrmReportsView(): JSX.Element {
+export function CrmReportsView({ initialOpenId = null, onClosed }: { initialOpenId?: string | null; onClosed?: () => void } = {}): JSX.Element {
   const { user } = useAuth();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const reports = useQuery({ queryKey: CRM_REPORT_KEYS.list, queryFn: listCrmReports, staleTime: 30_000 });
 
   const empty = user?.role === 'Mentor'
@@ -111,7 +120,7 @@ export function CrmReportsView(): JSX.Element {
           })}
         </ul>
       )}
-      <ReportDrawer id={openId} onClose={() => { setOpenId(null); }} />
+      <CrmReportDrawer id={openId} onClose={() => { setOpenId(null); onClosed?.(); }} />
     </Card>
   );
 }

@@ -119,10 +119,26 @@ public static class NotificationTemplates
                     "Вы запросили сброс пароля. Ссылка действует 30 минут и сработает один раз. Если это были не вы — просто проигнорируйте сообщение, пароль останется прежним.",
                     "Задать новый пароль"),
 
+            NotificationEventTypes.CrmReportSent =>
+                ($"Отчёт по группе {TryGetString(body, "groupName") ?? string.Empty}".Trim(),
+                    $"{mentor ?? "Ментор"} отправил(а) отчёт по группе «{TryGetString(body, "groupName")}» за {TryGetString(body, "periodTitle") ?? "неделю"}"
+                    + (TryGetString(body, "periodRange") is { } range ? $" ({range})." : "."),
+                    "Открыть отчёт"),
+
             _ => ("Уведомление Mentora", "Произошло событие в системе.", "Открыть приложение"),
         };
 
         var details = new List<string>();
+
+        // Lines the call site has already put into words — a report's figures, say.
+        if (body.TryGetProperty("summaryLines", out var summaryLines) && summaryLines.ValueKind is JsonValueKind.Array)
+        {
+            details.AddRange(summaryLines.EnumerateArray()
+                .Where(line => line.ValueKind is JsonValueKind.String)
+                .Select(line => line.GetString()!)
+                .Where(line => line.Length > 0)
+                .Take(8));
+        }
 
         if (TryGetString(body, "submittedAtLocal") is { } submittedAt)
         {
@@ -198,6 +214,7 @@ public static class NotificationTemplates
             NotificationEventTypes.SubmissionReceipt => ("Ваш комментарий", TryGetString(body, "comment")),
             NotificationEventTypes.ReviewApproved or NotificationEventTypes.ReviewNeedsRework
                 => ("Комментарий руководителя", TryGetString(body, "reviewComment")),
+            NotificationEventTypes.CrmReportSent => ("Выводы ментора", TryGetString(body, "conclusionsExcerpt")),
             _ => (null, null),
         };
 
@@ -212,6 +229,7 @@ public static class NotificationTemplates
             NotificationEventTypes.LateSubmissionUploaded => "⏰ ",
             NotificationEventTypes.ReviewApproved => "🎉 ",
             NotificationEventTypes.ReviewNeedsRework => "🔁 ",
+            NotificationEventTypes.CrmReportSent => "📊 ",
             NotificationEventTypes.AssignmentAssigned => "📌 ",
             NotificationEventTypes.PasswordReset or NotificationEventTypes.PasswordResetTelegram => "🔑 ",
             _ => string.Empty,

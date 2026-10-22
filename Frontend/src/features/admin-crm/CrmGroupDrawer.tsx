@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ChevronDown, Users } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { CRM_QUERY_KEYS, getCrmGroup, type CrmOverall, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
 import { Drawer } from '../../shared/overlays';
+import { Select } from '../../shared/select';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
@@ -279,6 +280,43 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
   );
 }
 
+/**
+ * Выбор недели журнала: стрелки «раньше / позже» и список с датами. Вместо полосы из тридцати вкладок
+ * с горизонтальной прокруткой — одна строка, которая не растёт с курсом.
+ */
+function WeekPicker({ periods, value, onChange }: { periods: CrmPeriod[]; value: number; onChange: (week: number) => void }): JSX.Element {
+  // Периоды приходят от новых к старым.
+  const index = periods.findIndex((p) => p.week === value);
+  const older = index >= 0 ? periods[index + 1] : undefined;
+  const newer = index > 0 ? periods[index - 1] : undefined;
+  const arrow = 'grid h-8 w-8 shrink-0 place-items-center rounded-control border border-line text-ink-secondary transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40';
+
+  return (
+    <div className="mb-4 flex items-center gap-2">
+      <button type="button" className={arrow} onClick={() => { if (older) onChange(older.week); }} disabled={!older} aria-label="Предыдущая неделя">
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <div className="w-full max-w-[280px]">
+        <Select
+          size="sm"
+          value={String(value)}
+          onValueChange={(v) => { onChange(Number(v)); }}
+          ariaLabel="Неделя журнала"
+          options={periods.map((p) => ({
+            value: String(p.week),
+            label: `${periodTitle(p.label)}${p.summary.issueCount > 0 ? ' · есть проблемы' : ''}`,
+            description: p.isComplete ? formatRange(p.from, p.to) : `${formatRange(p.from, p.to)} · идёт`,
+          }))}
+        />
+      </div>
+      <button type="button" className={arrow} onClick={() => { if (newer) onChange(newer.week); }} disabled={!newer} aria-label="Следующая неделя">
+        <ChevronRight className="h-4 w-4" aria-hidden="true" />
+      </button>
+      <span className="ml-auto hidden text-[12px] text-ink-muted sm:inline">недель в журнале: {periods.length}</span>
+    </div>
+  );
+}
+
 const ROLE_TONE: Record<string, Tone> = { 'Ведёт': 'brand', 'Помогает': 'info', 'Снят': 'neutral' };
 
 /** Группа из CRM: состав, менторы по датам и журнал, посчитанный по неделям так же, как считает CRM. */
@@ -343,26 +381,7 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
               <p className="rounded-control border border-warning-border bg-warning-soft px-3 py-2.5 text-[13px] text-warning">{data.journalUnavailable}</p>
             ) : (
               <>
-                <div className="mb-4 flex overflow-x-auto border-b border-divider" role="tablist" aria-label="Периоды журнала">
-                  {data.periods.map((p) => {
-                    const active = p.week === period?.week;
-                    return (
-                      <button
-                        key={p.week}
-                        type="button"
-                        role="tab"
-                        aria-selected={active}
-                        onClick={() => { setWeek(p.week); }}
-                        className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 pb-2 pt-1 text-[13px] font-medium transition-colors ${
-                          active ? 'border-brand text-ink' : 'border-transparent text-ink-muted hover:text-ink-secondary'
-                        }`}
-                      >
-                        {periodTitle(p.label)}
-                        {p.summary.issueCount > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-danger" title="Есть проблемы в данных" aria-label="есть проблемы в данных" /> : null}
-                      </button>
-                    );
-                  })}
-                </div>
+                {period ? <WeekPicker periods={data.periods} value={period.week} onChange={setWeek} /> : null}
                 {period ? <CrmPeriodView period={period} groupId={data.group.id} /> : <p className="text-[13px] text-ink-muted">Периодов пока нет.</p>}
               </>
             )}
