@@ -76,6 +76,8 @@ public static class AuditActions
     public const string TelegramUnbind = "telegram.unbind";
     public const string CrmMentorLink = "crm.mentor_link";
     public const string CrmBranchLink = "crm.branch_link";
+    public const string CrmReportCreate = "crm.report_create";
+    public const string CrmReportSend = "crm.report_send";
     public const string StorageOrphanCleanup = "storage.orphan_cleanup";
     public const string StorageCrossScopeInconsistency = "storage.cross_scope_inconsistency";
     public const string ReportOrganizationExport = "report.organization_export";

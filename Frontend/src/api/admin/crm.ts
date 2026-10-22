@@ -235,3 +235,109 @@ export async function getCrmGroup(id: number): Promise<CrmGroupPreview> {
   const { data } = await apiClient.get<CrmGroupPreview>(`/api/v1/integrations/crm/groups/${String(id)}`);
   return data;
 }
+
+/* ----------------------------- отчёты ментора ------------------------------ */
+
+/** Отчёт ментора по группе за период. `period` — цифры на момент отчёта (их и читает тимлид). */
+export interface CrmGroupReport {
+  id: string;
+  crmGroupId: number;
+  groupName: string;
+  courseName: string;
+  week: number;
+  periodLabel: string;
+  from: string;
+  to: string;
+  status: 'Draft' | 'Sent';
+  authorId: string;
+  authorName: string;
+  isMine: boolean;
+  canEdit: boolean;
+  conclusions: string;
+  aiModel?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  sentAt?: string | null;
+  /** После отчёта журнал в CRM поправили — черновик можно обновить. */
+  dataChanged: boolean;
+  period: CrmPeriod;
+}
+
+export interface CrmReportState {
+  report?: CrmGroupReport | null;
+  canCreate: boolean;
+  cannotCreate?: string | null;
+  /** Чужой черновик: кто его готовит. */
+  blocked?: string | null;
+  aiAvailable: boolean;
+  aiError?: string | null;
+}
+
+export interface CrmReportListItem {
+  id: string;
+  crmGroupId: number;
+  groupName: string;
+  courseName: string;
+  week: number;
+  periodLabel: string;
+  from: string;
+  to: string;
+  status: 'Draft' | 'Sent';
+  authorName: string;
+  isMine: boolean;
+  updatedAt: string;
+  sentAt?: string | null;
+  averageTotal?: number | null;
+  passed: number;
+  support: number;
+  risk: number;
+}
+
+export const CRM_REPORT_KEYS = {
+  state: (groupId: number, week: number) => ['crm', 'report', groupId, week] as const,
+  list: ['crm', 'reports'] as const,
+  one: (id: string) => ['crm', 'reports', id] as const,
+};
+
+const reportUrl = (groupId: number, week: number): string =>
+  `/api/v1/integrations/crm/groups/${String(groupId)}/weeks/${String(week)}/report`;
+
+export async function getCrmReportState(groupId: number, week: number): Promise<CrmReportState> {
+  const { data } = await apiClient.get<CrmReportState>(reportUrl(groupId, week));
+  return data;
+}
+
+export async function createCrmReport(groupId: number, week: number): Promise<CrmReportState> {
+  const { data } = await apiClient.post<CrmReportState>(reportUrl(groupId, week));
+  return data;
+}
+
+export async function saveCrmReport(groupId: number, week: number, conclusions: string): Promise<CrmReportState> {
+  const { data } = await apiClient.put<CrmReportState>(reportUrl(groupId, week), { conclusions });
+  return data;
+}
+
+export async function redraftCrmReport(groupId: number, week: number): Promise<CrmReportState> {
+  const { data } = await apiClient.post<CrmReportState>(`${reportUrl(groupId, week)}/redraft`);
+  return data;
+}
+
+export async function refreshCrmReport(groupId: number, week: number): Promise<CrmReportState> {
+  const { data } = await apiClient.post<CrmReportState>(`${reportUrl(groupId, week)}/refresh`);
+  return data;
+}
+
+export async function sendCrmReport(groupId: number, week: number): Promise<CrmReportState> {
+  const { data } = await apiClient.post<CrmReportState>(`${reportUrl(groupId, week)}/send`);
+  return data;
+}
+
+export async function listCrmReports(): Promise<CrmReportListItem[]> {
+  const { data } = await apiClient.get<{ reports: CrmReportListItem[] }>('/api/v1/integrations/crm/reports');
+  return data.reports;
+}
+
+export async function getCrmReport(id: string): Promise<CrmGroupReport> {
+  const { data } = await apiClient.get<CrmGroupReport>(`/api/v1/integrations/crm/reports/${id}`);
+  return data;
+}

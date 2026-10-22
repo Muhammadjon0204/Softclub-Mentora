@@ -47,7 +47,9 @@ FROM audit_logs al LEFT JOIN organizations o ON o.id = al.organization_id WHERE 
 UNION ALL SELECT 'notification_outbox', n.id, n.organization_id
 FROM notification_outbox n LEFT JOIN organizations o ON o.id = n.organization_id WHERE o.id IS NULL
 UNION ALL SELECT 'ai_summaries', ai.id, ai.organization_id
-FROM ai_summaries ai LEFT JOIN organizations o ON o.id = ai.organization_id WHERE o.id IS NULL;
+FROM ai_summaries ai LEFT JOIN organizations o ON o.id = ai.organization_id WHERE o.id IS NULL
+UNION ALL SELECT 'crm_group_reports', cr.id, cr.organization_id
+FROM crm_group_reports cr LEFT JOIN organizations o ON o.id = cr.organization_id WHERE o.id IS NULL;
 
 \echo '== TEN-095.3: no cross-scope row survived the restore =='
 
@@ -79,4 +81,7 @@ FROM reviews r JOIN submissions s ON s.id = r.submission_id
 WHERE s.organization_id <> r.organization_id OR s.branch_id <> r.branch_id
 UNION ALL SELECT 'ai_summaries.branch', ai.id
 FROM ai_summaries ai JOIN branches b ON b.id = ai.branch_id
-WHERE b.organization_id <> ai.organization_id;
+WHERE b.organization_id <> ai.organization_id
+UNION ALL SELECT 'crm_group_reports.branch', cr.id
+FROM crm_group_reports cr JOIN branches b ON b.id = cr.branch_id
+WHERE b.organization_id <> cr.organization_id;
