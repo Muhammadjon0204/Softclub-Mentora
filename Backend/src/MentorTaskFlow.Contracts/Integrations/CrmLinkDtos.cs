@@ -17,7 +17,8 @@ public sealed record CrmAccessDto(
     int LinkedMentors,
     bool CanSelfLink = false,
     bool TelegramBound = false,
-    string? BotUrl = null);
+    string? BotUrl = null,
+    bool Configured = true);
 
 /// <summary>A CRM mentor and the Mentora account linked to it, or the one that looks like it.</summary>
 public sealed record CrmMentorLinkDto(

@@ -119,6 +119,27 @@ public sealed class CrmPhoneLinkTests(PostgresFixture postgres) : IAsyncLifetime
         (await PostWebhookAsync(Message(text: "/crm"))).ShouldContain("request_contact");
     }
 
+    /// <summary>
+    /// Seen on the server: with no CRM key the bot said «already linked». It must say the integration
+    /// is not switched on, offer no button, and link nothing when a contact is shared anyway.
+    /// </summary>
+    [Fact]
+    public async Task Without_a_crm_key_the_bot_says_so_instead_of_already_linked()
+    {
+        using var unconfigured = new MentorTaskFlowApiFactory { ConnectionStringOverride = postgres.ConnectionString, TelegramEnabled = true };
+
+        var prompt = await PostWebhookAsync(Message(text: "/crm"), unconfigured);
+        prompt.ShouldContain("ещё не включена");
+        prompt.ShouldNotContain("уже связан");
+        prompt.ShouldNotContain("request_contact");
+
+        (await PostWebhookAsync(Message(contact: new { phone_number = "+992931234567", user_id = long.Parse(ChatId) }), unconfigured))
+            .ShouldContain("ещё не включена");
+
+        await using var context = postgres.CreateContext(suppressTenantFilter: true);
+        (await context.Users.SingleAsync(u => u.Id == _mentorId)).CrmMentorId.ShouldBeNull();
+    }
+
     /// <summary>Right after binding Telegram, an unlinked mentor is offered the button straight away.</summary>
     [Fact]
     public async Task Binding_telegram_offers_the_crm_link()
@@ -162,9 +183,9 @@ public sealed class CrmPhoneLinkTests(PostgresFixture postgres) : IAsyncLifetime
             },
         }));
 
-    private async Task<string> PostWebhookAsync(JsonElement update)
+    private async Task<string> PostWebhookAsync(JsonElement update, MentorTaskFlowApiFactory? factory = null)
     {
-        using var client = _factory.CreateClient();
+        using var client = (factory ?? _factory).CreateClient();
         client.DefaultRequestHeaders.Add("X-Telegram-Bot-Api-Secret-Token", MentorTaskFlowApiFactory.TelegramWebhookSecret);
 
         var response = await client.PostAsJsonAsync("/api/v1/telegram/webhook", update);

@@ -163,6 +163,8 @@ export interface CrmAccess {
   canSelfLink: boolean;
   telegramBound: boolean;
   botUrl?: string | null;
+  /** На сервере задан ключ CRM. Без него групп нет ни у кого. */
+  configured: boolean;
 }
 
 export interface CrmMentorLink {
