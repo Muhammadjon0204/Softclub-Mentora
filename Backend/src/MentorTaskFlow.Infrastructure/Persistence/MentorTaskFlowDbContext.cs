@@ -5,6 +5,7 @@ using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Identity;
 using MentorTaskFlow.Domain.Notifications;
+using MentorTaskFlow.Domain.Reports;
 using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Schedule;
 using MentorTaskFlow.Domain.Submissions;
@@ -72,6 +73,8 @@ public class MentorTaskFlowDbContext(
     public DbSet<NotificationOutbox> NotificationOutbox => Set<NotificationOutbox>();
 
     public DbSet<AiSummary> AiSummaries => Set<AiSummary>();
+
+    public DbSet<CrmGroupReport> CrmGroupReports => Set<CrmGroupReport>();
 
     // Referenced by the query-filter expressions below. EF Core re-evaluates these on every query,
     // so one compiled model serves every tenant without leaking a captured value between requests.
@@ -200,6 +203,12 @@ public class MentorTaskFlowDbContext(
             || (FilterOrganizationId != null
                 && e.OrganizationId == FilterOrganizationId
                 && (FilterBranchId == null || e.BranchId == FilterBranchId || e.BranchId == null)));
+
+        modelBuilder.Entity<CrmGroupReport>().HasQueryFilter(e =>
+            FilterSuppressed
+            || (FilterOrganizationId != null
+                && e.OrganizationId == FilterOrganizationId
+                && (FilterBranchId == null || e.BranchId == FilterBranchId)));
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

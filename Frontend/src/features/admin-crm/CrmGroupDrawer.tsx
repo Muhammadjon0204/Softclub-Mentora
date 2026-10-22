@@ -7,6 +7,7 @@ import { Drawer } from '../../shared/overlays';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
+import { CrmReportPanel } from './CrmReportPanel';
 import { ABSENCE_LABEL, REMARK_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'brand' | 'neutral';
@@ -193,7 +194,11 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
   );
 }
 
-function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
+/**
+ * Неделя журнала: даты, кто вёл, сводка и студенты. С `groupId` — ещё и блок отчёта за неделю; без
+ * него (просмотр отправленного отчёта) — только цифры.
+ */
+export function CrmPeriodView({ period, groupId }: { period: CrmPeriod; groupId?: number }): JSX.Element {
   const s = period.summary;
   return (
     <div className="space-y-4">
@@ -207,6 +212,7 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
       ) : (
         <p className="flex items-center gap-1.5 text-[13px] text-warning"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />В CRM у группы нет ментора за этот период — отчёт некому сдать</p>
       )}
+      {groupId !== undefined ? <CrmReportPanel groupId={groupId} week={period.week} /> : null}
       <Metrics
         items={[
           { label: 'Средний итог', value: s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal), hint: `по ${String(s.students)} студ.` },
@@ -357,7 +363,7 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
                     );
                   })}
                 </div>
-                {period ? <PeriodView period={period} /> : <p className="text-[13px] text-ink-muted">Периодов пока нет.</p>}
+                {period ? <CrmPeriodView period={period} groupId={data.group.id} /> : <p className="text-[13px] text-ink-muted">Периодов пока нет.</p>}
               </>
             )}
           </section>

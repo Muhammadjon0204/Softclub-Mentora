@@ -47,6 +47,8 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   'telegram.unbind': 'Telegram отключён',
   'crm.mentor_link': 'Связь с ментором CRM изменена',
   'crm.branch_link': 'Связь филиала с CRM изменена',
+  'crm.report_create': 'Создан отчёт по группе',
+  'crm.report_send': 'Отчёт по группе отправлен',
   'storage.orphan_cleanup': 'Очистка неиспользуемых файлов',
   'storage.cross_scope_inconsistency': 'Несоответствие в хранилище файлов',
   'report.organization_export': 'Экспорт отчёта организации',

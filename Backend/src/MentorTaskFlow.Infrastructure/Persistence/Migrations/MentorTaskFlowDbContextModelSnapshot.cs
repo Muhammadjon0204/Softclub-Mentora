@@ -1003,6 +1003,129 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MentorTaskFlow.Domain.Reports.CrmGroupReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AiModel")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ai_model");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<string>("Conclusions")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("conclusions");
+
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("CourseName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("course_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("CrmGroupId")
+                        .HasColumnType("integer")
+                        .HasColumnName("crm_group_id");
+
+                    b.Property<string>("DataHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("data_hash");
+
+                    b.Property<string>("GroupName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("group_name");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateOnly>("PeriodFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("period_from");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("period_label");
+
+                    b.Property<DateOnly>("PeriodTo")
+                        .HasColumnType("date")
+                        .HasColumnName("period_to");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("sent_at");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot_json");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Week")
+                        .HasColumnType("integer")
+                        .HasColumnName("week");
+
+                    b.HasKey("Id")
+                        .HasName("pk_crm_group_reports");
+
+                    b.HasIndex("AuthorId")
+                        .HasDatabaseName("ix_crm_group_reports_author_id");
+
+                    b.HasIndex("OrganizationId", "CrmGroupId", "Week")
+                        .IsUnique()
+                        .HasDatabaseName("ux_crm_group_reports_group_week");
+
+                    b.HasIndex("OrganizationId", "BranchId", "CategoryId", "Status")
+                        .HasDatabaseName("ix_crm_group_reports_scope_status");
+
+                    b.ToTable("crm_group_reports", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_crm_group_reports_sent_shape", "status <> 'Sent' OR sent_at IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_crm_group_reports_status_allowed", "status IN ('Draft','Sent')");
+                        });
+                });
+
             modelBuilder.Entity("MentorTaskFlow.Domain.Reviews.Review", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2049,6 +2172,23 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outbox_branch_scope");
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Reports.CrmGroupReport", b =>
+                {
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_crm_group_reports_author");
+
+                    b.HasOne("MentorTaskFlow.Domain.Tenancy.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_crm_group_reports_organization");
                 });
 
             modelBuilder.Entity("MentorTaskFlow.Domain.Reviews.Review", b =>

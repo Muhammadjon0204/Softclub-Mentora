@@ -6,6 +6,8 @@ import { CRM_QUERY_KEYS, getCrmStatus } from '../../api/admin/crm';
 import { useAuth } from '../../auth/useAuth';
 import { CrmGroupsView } from '../../features/admin-crm/CrmGroupsView';
 import { CrmLinksView } from '../../features/admin-crm/CrmLinksView';
+import { CrmReportsView } from '../../features/admin-crm/CrmReportsView';
+import { CrmSectionTabs } from '../../features/admin-crm/CrmSectionTabs';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
@@ -55,8 +57,19 @@ function StatusCard(): JSX.Element {
 
 const SECTIONS = [
   { value: 'groups', label: 'Группы' },
+  { value: 'reports', label: 'Отчёты' },
   { value: 'links', label: 'Связи с Mentora' },
 ] as const;
+
+const BRANCH_SECTIONS = SECTIONS.filter((s) => s.value !== 'links');
+
+type Section = (typeof SECTIONS)[number]['value'];
+
+function SectionBody({ section }: { section: Section }): JSX.Element {
+  if (section === 'reports') return <CrmReportsView />;
+  if (section === 'links') return <CrmLinksView />;
+  return <CrmGroupsView />;
+}
 
 /**
  * Интеграция с CRM в админке. Админ организации видит всё: подключение, все группы и связи «кто есть
@@ -65,13 +78,14 @@ const SECTIONS = [
 export function CrmIntegrationPage(): JSX.Element {
   const { user } = useAuth();
   const isOrgAdmin = user?.role === 'Admin' && user.adminScope === 'Organization';
-  const [section, setSection] = useState<'groups' | 'links'>('groups');
+  const [section, setSection] = useState<Section>('groups');
 
   if (!isOrgAdmin) {
     return (
       <div className="space-y-6">
-        <PreviewPageHeader title="Группы в CRM" subtitle="Группы вашего филиала, студенты и журнал из Omuz CRM" />
-        <CrmGroupsView />
+        <PreviewPageHeader title="Группы в CRM" subtitle="Группы вашего филиала, студенты, журнал и отчёты менторов из Omuz CRM" />
+        <CrmSectionTabs sections={BRANCH_SECTIONS} value={section === 'links' ? 'groups' : section} onChange={setSection} />
+        <SectionBody section={section === 'links' ? 'groups' : section} />
       </div>
     );
   }
@@ -80,21 +94,8 @@ export function CrmIntegrationPage(): JSX.Element {
     <div className="space-y-6">
       <PreviewPageHeader title="Интеграция с CRM" subtitle="Группы, студенты и журнал из Omuz CRM — основа отчётов по группам" />
       <StatusCard />
-      <div className="flex gap-1.5" role="tablist" aria-label="Раздел">
-        {SECTIONS.map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            role="tab"
-            aria-selected={section === s.value}
-            onClick={() => { setSection(s.value); }}
-            className={`rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition ${section === s.value ? 'border-brand bg-brand text-white' : 'border-line bg-surface text-ink-secondary hover:border-brand/40'}`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-      {section === 'groups' ? <CrmGroupsView /> : <CrmLinksView />}
+      <CrmSectionTabs sections={SECTIONS} value={section} onChange={setSection} />
+      <SectionBody section={section} />
     </div>
   );
 }
