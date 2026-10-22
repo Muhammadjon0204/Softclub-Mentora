@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, GraduationCap, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 
-import { CRM_QUERY_KEYS, getCrmLinks, linkCrmBranch, linkCrmMentor, type CrmLinks } from '../../api/admin/crm';
+import { CRM_QUERY_KEYS, getCrmAccess, getCrmLinks, linkCrmBranch, linkCrmMentor, type CrmLinks } from '../../api/admin/crm';
 import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useToast } from '../../shared/overlays';
 import { SearchSelect, type SelectOption } from '../../shared/select';
@@ -11,6 +11,7 @@ import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
+import { CrmNotConfigured } from './CrmNotConfigured';
 
 const ROLE_LABEL: Record<string, string> = { Mentor: 'ментор', Lead: 'тимлид' };
 const NONE = '';
@@ -189,7 +190,13 @@ function MentorLinks({ data }: { data: CrmLinks }): JSX.Element {
  * какие группы CRM видит каждый человек.
  */
 export function CrmLinksView(): JSX.Element {
-  const links = useQuery({ queryKey: CRM_QUERY_KEYS.links, queryFn: getCrmLinks, staleTime: 30_000 });
+  const access = useQuery({ queryKey: CRM_QUERY_KEYS.access, queryFn: getCrmAccess, staleTime: 60_000 });
+  const configured = access.data?.configured === true;
+  const links = useQuery({ queryKey: CRM_QUERY_KEYS.links, queryFn: getCrmLinks, staleTime: 30_000, enabled: configured });
+
+  if (access.data && !configured) {
+    return <CrmNotConfigured />;
+  }
 
   if (links.isPending) {
     return <div className="space-y-4"><Skeleton className="h-40" /><Skeleton className="h-72" /></div>;

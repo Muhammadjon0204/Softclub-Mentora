@@ -9,6 +9,7 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmGroupDrawer } from './CrmGroupDrawer';
+import { CrmNotConfigured } from './CrmNotConfigured';
 import { CrmSelfLinkCard } from './CrmSelfLinkCard';
 import { formatRange } from './crmPresentation';
 
@@ -44,7 +45,7 @@ export function CrmGroupsView(): JSX.Element {
     queryKey: CRM_QUERY_KEYS.groups(tab),
     queryFn: () => getCrmGroups(tab),
     staleTime: 60_000,
-    enabled: ready,
+    enabled: ready && access.data?.configured !== false,
   });
 
   if (access.isPending) {
@@ -53,6 +54,10 @@ export function CrmGroupsView(): JSX.Element {
 
   if (access.isError) {
     return <Card><ErrorState error={access.error} onRetry={() => { void access.refetch(); }} /></Card>;
+  }
+
+  if (!access.data.configured) {
+    return <CrmNotConfigured />;
   }
 
   if (!ready && access.data.canSelfLink) {

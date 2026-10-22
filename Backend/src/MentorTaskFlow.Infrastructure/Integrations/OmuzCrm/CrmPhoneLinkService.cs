@@ -20,6 +20,17 @@ public enum CrmPhoneLinkResult
     Ambiguous,
     TakenByAnother,
     CrmUnavailable,
+    CrmNotConfigured,
+}
+
+/// <summary>Whether the bot offers the «share my number» button, and if not, why.</summary>
+public enum CrmOfferState
+{
+    Offer,
+    ChatNotBound,
+    NotMentorOrLead,
+    AlreadyLinked,
+    CrmNotConfigured,
 }
 
 public sealed record CrmPhoneLinkOutcome(CrmPhoneLinkResult Result, string? MentorName = null, int CurrentGroups = 0);
@@ -50,10 +61,30 @@ public sealed class CrmPhoneLinkService(
 
     /// <summary>Whether the bot should offer the button to the person behind <paramref name="chatId"/>.</summary>
     public async Task<bool> CanOfferAsync(string chatId, CancellationToken cancellationToken) =>
-        client.IsConfigured
-        && await dbContext.Users
+        await OfferStateAsync(chatId, cancellationToken) is CrmOfferState.Offer;
+
+    /// <summary>
+    /// Why the button is or is not offered. «Not configured» is told apart from «already linked»: with
+    /// no CRM key on the server, nobody is linked, and saying otherwise sends the person looking for
+    /// groups that are not there.
+    /// </summary>
+    public async Task<CrmOfferState> OfferStateAsync(string chatId, CancellationToken cancellationToken)
+    {
+        var user = await dbContext.Users
             .IgnoreQueryFilters()
-            .AnyAsync(u => u.TelegramChatId == chatId && u.IsActive && u.Role != UserRole.Admin && u.CrmMentorId == null, cancellationToken);
+            .Where(u => u.TelegramChatId == chatId && u.IsActive)
+            .Select(u => new { u.Role, u.CrmMentorId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return user switch
+        {
+            null => CrmOfferState.ChatNotBound,
+            { Role: UserRole.Admin } => CrmOfferState.NotMentorOrLead,
+            { CrmMentorId: not null } => CrmOfferState.AlreadyLinked,
+            _ when !client.IsConfigured => CrmOfferState.CrmNotConfigured,
+            _ => CrmOfferState.Offer,
+        };
+    }
 
     public async Task<CrmPhoneLinkOutcome> LinkAsync(string chatId, string phone, CancellationToken cancellationToken)
     {
@@ -77,19 +108,19 @@ public sealed class CrmPhoneLinkService(
             return new(CrmPhoneLinkResult.NotFound);
         }
 
+        if (!client.IsConfigured)
+        {
+            return new(CrmPhoneLinkResult.CrmNotConfigured);
+        }
+
         IReadOnlyList<CrmMentor> mentors;
         try
         {
-            mentors = client.IsConfigured ? await client.ListMentorsAsync(cancellationToken) : [];
+            mentors = await client.ListMentorsAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is CrmUnauthorizedException or CrmUnavailableException or CrmRequestException)
         {
             logger.LogWarning(exception, "CRM unavailable while linking by phone.");
-            return new(CrmPhoneLinkResult.CrmUnavailable);
-        }
-
-        if (!client.IsConfigured)
-        {
             return new(CrmPhoneLinkResult.CrmUnavailable);
         }
 

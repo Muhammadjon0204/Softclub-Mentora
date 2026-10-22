@@ -66,14 +66,14 @@ public sealed class TelegramUpdateHandler(
             return Reply(chatId, "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».", ProfileUrl());
         }
 
-        if (!await crmPhoneLinks.CanOfferAsync(chatId, cancellationToken))
+        return await crmPhoneLinks.OfferStateAsync(chatId, cancellationToken) switch
         {
-            return account.Role is UserRole.Admin
-                ? Reply(chatId, "Связь с CRM по номеру нужна только менторам и тимлидам.", DashboardUrl(account))
-                : Reply(chatId, "✅ Ваш аккаунт уже связан с CRM — группы открыты в разделе «Группы в CRM».", CrmUrl(account));
-        }
-
-        return new TelegramReply(chatId, CrmOffer, Keyboard: TelegramKeyboard.RequestContact);
+            CrmOfferState.Offer => new TelegramReply(chatId, CrmOffer, Keyboard: TelegramKeyboard.RequestContact),
+            CrmOfferState.NotMentorOrLead => Reply(chatId, "Связь с CRM по номеру нужна только менторам и тимлидам.", DashboardUrl(account)),
+            CrmOfferState.AlreadyLinked => Reply(chatId, "✅ Ваш аккаунт уже связан с CRM — группы открыты в разделе «Группы в CRM».", CrmUrl(account)),
+            CrmOfferState.CrmNotConfigured => Reply(chatId, "⏳ Интеграция с CRM ещё не включена администратором. Как только её включат, отправьте /crm ещё раз.", DashboardUrl(account)),
+            _ => Reply(chatId, "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».", ProfileUrl()),
+        };
     }
 
     /// <summary>
@@ -109,6 +109,8 @@ public sealed class TelegramUpdateHandler(
                 "😕 Среди менторов CRM нет такого номера. Если в CRM у вас другой рабочий номер — попросите администратора связать аккаунт вручную.",
             CrmPhoneLinkResult.Ambiguous =>
                 "😕 В CRM этот номер записан у нескольких менторов. Попросите администратора связать аккаунт вручную.",
+            CrmPhoneLinkResult.CrmNotConfigured =>
+                "⏳ Интеграция с CRM ещё не включена администратором. Как только её включат, отправьте /crm ещё раз.",
             CrmPhoneLinkResult.TakenByAnother =>
                 "⚠️ Этот ментор CRM уже связан с другим аккаунтом Mentora. Если это ошибка — обратитесь к администратору.",
             _ =>
@@ -116,7 +118,7 @@ public sealed class TelegramUpdateHandler(
         };
 
         // The share button has done its job — unless trying again later may help.
-        return outcome.Result is CrmPhoneLinkResult.CrmUnavailable
+        return outcome.Result is CrmPhoneLinkResult.CrmUnavailable or CrmPhoneLinkResult.CrmNotConfigured
             ? Reply(chatId, html, appUrl)
             : new TelegramReply(chatId, $"{html}\n\n{OpenLabel}: {Escape(appUrl)}", Keyboard: TelegramKeyboard.Remove);
     }

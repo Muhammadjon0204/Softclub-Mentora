@@ -76,7 +76,8 @@ public sealed class CrmIntegrationService(
             access.MentorIds.Count,
             canSelfLink && client.IsConfigured && !string.IsNullOrWhiteSpace(bot),
             telegramBound,
-            string.IsNullOrWhiteSpace(bot) ? null : $"https://t.me/{bot}");
+            string.IsNullOrWhiteSpace(bot) ? null : $"https://t.me/{bot}",
+            client.IsConfigured);
     }
 
     public async Task<CrmGroupListDto> ListGroupsAsync(string status, CancellationToken cancellationToken)
