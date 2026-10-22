@@ -1,42 +1,122 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, CalendarRange, Clock3, GraduationCap, Sigma, UserMinus, Users } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { CRM_QUERY_KEYS, getCrmGroup, type CrmOverall, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
 import { Drawer } from '../../shared/overlays';
-import { Badge } from '../../shared/ui/Badge';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { ABSENCE_LABEL, REMARK_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }): JSX.Element {
+type Tone = 'success' | 'warning' | 'danger' | 'info' | 'brand' | 'neutral';
+
+const DOT: Record<Tone, string> = {
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
+  info: 'bg-info',
+  brand: 'bg-brand',
+  neutral: 'bg-ink-muted',
+};
+
+const DOT_TEXT: Record<Tone, string> = {
+  success: 'text-success',
+  warning: 'text-warning',
+  danger: 'text-danger',
+  info: 'text-info',
+  brand: 'text-brand',
+  neutral: 'text-ink-muted',
+};
+
+/** Статус — точка и подпись, без плашки: строка таблицы остаётся спокойной, цвет несёт только точка и текст. */
+function Status({ tone, children }: { tone: Tone; children: React.ReactNode }): JSX.Element {
   return (
-    <div className="rounded-control border border-line bg-surface px-3 py-2.5">
-      <p className="text-[11.5px] text-ink-muted">{label}</p>
-      <p className="mt-0.5 text-[17px] font-semibold tabular-nums text-ink">{value}</p>
-      {hint ? <p className="text-[11.5px] text-ink-muted">{hint}</p> : null}
+    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[12px] font-medium ${DOT_TEXT[tone]}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`} aria-hidden="true" />
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }): JSX.Element {
+  return (
+    <div className="mb-3 flex items-baseline justify-between gap-3">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">{children}</h3>
+      {aside ? <span className="text-[12px] text-ink-muted">{aside}</span> : null}
     </div>
   );
 }
 
-/** 80+ / 70–79 / ниже 70 — три цифры в одной плашке. */
-function Zones({ passed, support, risk }: { passed: number; support: number; risk: number }): JSX.Element {
+interface Metric {
+  label: string;
+  value: React.ReactNode;
+  hint?: string;
+}
+
+/** Сводка одной полосой с тонкими разделителями вместо отдельных карточек. */
+function Metrics({ items }: { items: Metric[] }): JSX.Element {
   return (
-    <div className="rounded-control border border-line bg-surface px-3 py-2.5">
-      <p className="text-[11.5px] text-ink-muted">80+ · 70–79 · ниже 70</p>
-      <p className="mt-0.5 text-[17px] font-semibold tabular-nums">
-        <span className="text-success">{passed}</span><span className="text-ink-muted"> · </span>
-        <span className="text-warning">{support}</span><span className="text-ink-muted"> · </span>
-        <span className="text-danger">{risk}</span>
-      </p>
-    </div>
+    <dl className="grid grid-cols-2 overflow-hidden rounded-control border border-line sm:grid-cols-4">
+      {items.map((m, index) => (
+        <div
+          key={m.label}
+          className={`px-4 py-3 ${index % 2 === 1 ? 'border-l border-divider' : ''} ${index >= 2 ? 'border-t border-divider sm:border-t-0' : ''} ${index === 2 ? 'sm:border-l' : ''}`}
+        >
+          <dt className="text-[11.5px] text-ink-muted">{m.label}</dt>
+          <dd className="mt-1 text-[18px] font-semibold leading-6 tabular-nums text-ink">{m.value}</dd>
+          {m.hint ? <dd className="mt-0.5 text-[11.5px] text-ink-muted">{m.hint}</dd> : null}
+        </div>
+      ))}
+    </dl>
   );
+}
+
+/** 80+ · 70–79 · ниже 70: цифры в цвете зоны, разделители нейтральные. */
+function zones(passed: number, support: number, risk: number): Metric {
+  return {
+    label: '80+ · 70–79 · ниже 70',
+    value: (
+      <>
+        <span className="text-success">{passed}</span>
+        <span className="px-1 text-ink-muted">·</span>
+        <span className="text-warning">{support}</span>
+        <span className="px-1 text-ink-muted">·</span>
+        <span className="text-danger">{risk}</span>
+      </>
+    ),
+  };
 }
 
 function scoreParts(student: CrmStudentScore, examMax: number): string {
   const bonus = student.bonusPoints > 0 ? ` · бонус ${String(student.bonusPoints)}` : '';
   return `посещение ${String(student.attendancePoints)} · задания ${String(student.homeworkPoints)}${bonus} · экзамен ${student.examGrade === null || student.examGrade === undefined ? '—' : String(student.examGrade)}/${String(examMax)}`;
+}
+
+/** Строка студента: [балл | имя и детали | статус и счётчики]. */
+const ROW = 'grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-x-4 py-2.5';
+
+function Counters({ student, className = '' }: { student: CrmStudentScore; className?: string }): JSX.Element | null {
+  const parts = [
+    student.absentDays.length > 0 ? `пропуск ${String(student.absentDays.length)}` : null,
+    student.lateDays.length > 0 ? `опозд. ${String(student.lateDays.length)}` : null,
+    student.remarks.length > 0 ? `замечаний ${String(student.remarks.length)}` : null,
+  ].filter(Boolean);
+
+  if (parts.length === 0 && student.issues.length === 0) {
+    return null;
+  }
+
+  return (
+    <span className={`items-center gap-2 whitespace-nowrap text-[12px] tabular-nums text-ink-muted ${className}`}>
+      {parts.length > 0 ? <span>{parts.join(' · ')}</span> : null}
+      {student.issues.length > 0 ? (
+        <span className="inline-flex items-center gap-1 text-danger" title="Проблемы в данных">
+          <AlertTriangle className="h-3 w-3" aria-hidden="true" />{student.issues.length}
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: number }): JSX.Element {
@@ -45,12 +125,13 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
 
   if (student.fill === 'Empty') {
     return (
-      <li className="flex items-center gap-3 py-3">
-        <span className="w-12 shrink-0 text-right text-[20px] font-semibold text-ink-muted">—</span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold text-ink-secondary">{student.fullName}</span>
-          <span className="block text-[12px] text-ink-muted">дни этой недели ещё не отмечены</span>
+      <li className={ROW}>
+        <span className="text-right text-[15px] font-semibold text-ink-muted">—</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[14px] font-medium text-ink-secondary">{student.fullName}</span>
+          <span className="block text-[12.5px] text-ink-muted">дни этой недели ещё не отмечены</span>
         </span>
+        <span />
       </li>
     );
   }
@@ -58,42 +139,44 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
   const partial = student.fill === 'Partial';
   const zone = ZONE[student.zone];
   return (
-    <li className="py-3">
+    <li>
       <button
         type="button"
         onClick={() => { setOpen((v) => !v); }}
         disabled={details === 0}
-        className="flex w-full items-center gap-3 text-left disabled:cursor-default"
+        className={`${ROW} w-full text-left disabled:cursor-default enabled:hover:bg-surface-hover/60`}
         aria-expanded={open}
       >
-        <span className={`w-12 shrink-0 text-right text-[20px] font-semibold tabular-nums ${partial ? 'text-ink-muted' : zoneText(student.zone)}`}>{student.total}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold text-ink">{student.fullName}</span>
-          <span className="block text-[12px] text-ink-muted">
+        <span className={`text-right text-[15px] font-semibold tabular-nums ${partial ? 'text-ink-muted' : zoneText(student.zone)}`}>{student.total}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[14px] font-medium text-ink">{student.fullName}</span>
+          <span className="block text-[12.5px] text-ink-muted sm:truncate">
             {partial
               ? `неделя идёт: отмечено ${String(student.filledDays)} из ${String(student.expectedDays)} дн.`
               : scoreParts(student, examMax)}
           </span>
+          {/* На узком экране счётчики уходят под имя — иначе съедают его. */}
+          <Counters student={student} className="mt-0.5 flex sm:hidden" />
         </span>
-        <span className="flex shrink-0 flex-wrap justify-end gap-1">
-          {!partial && zone ? <Badge tone={zone.tone}>{zone.label}</Badge> : null}
-          {student.lateDays.length > 0 ? <Badge tone="warning">опозд. {student.lateDays.length}</Badge> : null}
-          {student.absentDays.length > 0 ? <Badge tone="danger">пропуск {student.absentDays.length}</Badge> : null}
-          {student.remarks.length > 0 ? <Badge tone="info">замечаний {student.remarks.length}</Badge> : null}
-          {student.issues.length > 0 ? <Badge tone="danger">⚠ {student.issues.length}</Badge> : null}
+        <span className="flex items-center justify-end gap-3">
+          <Counters student={student} className="hidden sm:flex" />
+          {!partial && zone ? <Status tone={zone.tone}>{zone.label}</Status> : null}
+          {details > 0 ? (
+            <ChevronDown className={`h-3.5 w-3.5 text-ink-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+          ) : <span className="w-3.5" />}
         </span>
       </button>
       {open ? (
-        <div className="ml-[60px] mt-2 space-y-1.5 text-[12.5px] text-ink-secondary">
+        <div className="mb-3 ml-14 space-y-1 border-l border-divider pl-3 text-[12.5px] leading-5 text-ink-secondary">
           {partial ? <p>Пока посчитано: {scoreParts(student, examMax)}</p> : null}
           {student.lateDays.map((l) => (
             <p key={`l${l.date}`}><span className="font-medium text-warning">Опоздал {formatDay(l.date)}</span>{l.minutes > 0 ? ` на ${String(l.minutes)} мин` : ''}{l.note ? ` — ${l.note}` : ''}</p>
           ))}
           {student.absentDays.map((a) => (
-            <p key={`a${a.date}`}><span className="font-medium text-ink">{formatDay(a.date)}: {ABSENCE_LABEL[a.kind] ?? a.kind}</span>{a.note ? ` — ${a.note}` : ''}</p>
+            <p key={`a${a.date}`}><span className="font-medium text-ink">{formatDay(a.date)}:</span> {ABSENCE_LABEL[a.kind] ?? a.kind}{a.note ? ` — ${a.note}` : ''}</p>
           ))}
           {student.remarks.map((r, index) => (
-            <p key={`r${r.date}${String(index)}`}><span className="font-medium text-info">{formatDay(r.date)}: {REMARK_LABEL[r.kind] ?? r.kind}</span> — {r.text}{r.author ? <span className="text-ink-muted"> ({r.author})</span> : null}</p>
+            <p key={`r${r.date}${String(index)}`}><span className="font-medium text-ink">{formatDay(r.date)}:</span> <span className="text-info">{REMARK_LABEL[r.kind] ?? r.kind}</span> — {r.text}{r.author ? <span className="text-ink-muted"> ({r.author})</span> : null}</p>
           ))}
           {student.unfilledDays.length > 0 ? (
             <p><span className="font-medium text-ink">Ещё не отмечено:</span> {student.unfilledDays.map((d) => formatDay(d)).join(', ')}</p>
@@ -102,7 +185,7 @@ function StudentRow({ student, examMax }: { student: CrmStudentScore; examMax: n
             <p><span className="font-medium text-ink">Ноль за задание:</span> {student.zeroHomeworkDays.map((d) => formatDay(d)).join(', ')}</p>
           ) : null}
           {student.issues.map((i) => (
-            <p key={i.code + i.message} className="flex gap-1.5 text-danger"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />{i.message}</p>
+            <p key={i.code + i.message} className="flex gap-1.5 text-danger"><AlertTriangle className="mt-1 h-3 w-3 shrink-0" aria-hidden="true" />{i.message}</p>
           ))}
         </div>
       ) : null}
@@ -114,23 +197,24 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
   const s = period.summary;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink-secondary">
-        <CalendarRange className="h-4 w-4 text-ink-muted" aria-hidden="true" />
-        {formatRange(period.from, period.to)}
-        <Badge tone={period.isComplete ? 'success' : 'info'}>{period.isComplete ? 'неделя закрыта' : 'идёт сейчас'}</Badge>
-        {!period.hasExam ? <Badge tone="neutral">без экзамена</Badge> : null}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-secondary">
+        <span className="tabular-nums">{formatRange(period.from, period.to)}</span>
+        <Status tone={period.isComplete ? 'success' : 'info'}>{period.isComplete ? 'неделя закрыта' : 'идёт сейчас'}</Status>
+        {!period.hasExam ? <span className="text-[12px] text-ink-muted">без экзамена</span> : null}
       </div>
       {period.mentors.length > 0 ? (
         <p className="text-[13px] text-ink-secondary"><span className="text-ink-muted">Вели группу:</span> {period.mentors.join(', ')}</p>
       ) : (
         <p className="flex items-center gap-1.5 text-[13px] text-warning"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />В CRM у группы нет ментора за этот период — отчёт некому сдать</p>
       )}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Средний итог" value={s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal)} hint={`по ${String(s.students)} студ.`} />
-        <Zones passed={s.passed} support={s.support} risk={s.risk} />
-        <Stat label="Посещаемость" value={percent(s.attendanceRate)} hint="по прошедшим дням" />
-        <Stat label="Отмечено дней" value={percent(s.fillRate)} />
-      </div>
+      <Metrics
+        items={[
+          { label: 'Средний итог', value: s.averageTotal === null || s.averageTotal === undefined ? '—' : String(s.averageTotal), hint: `по ${String(s.students)} студ.` },
+          zones(s.passed, s.support, s.risk),
+          { label: 'Посещаемость', value: percent(s.attendanceRate), hint: 'по прошедшим дням' },
+          { label: 'Отмечено дней', value: percent(s.fillRate) },
+        ]}
+      />
       {s.partialStudents + s.emptyStudents > 0 ? (
         <p className="text-[12.5px] text-ink-muted">
           Неделя ещё идёт — средний и зоны появятся, когда пройдут все дни.
@@ -140,7 +224,7 @@ function PeriodView({ period }: { period: CrmPeriod }): JSX.Element {
       {period.students.length === 0 ? (
         <EmptyState icon={<Users className="h-5 w-5" aria-hidden="true" />} title="Нет студентов" description="В эту неделю в группе никого не было." />
       ) : (
-        <ul className="divide-y divide-divider">
+        <ul className="divide-y divide-divider border-y border-divider">
           {period.students.map((student) => <StudentRow key={student.studentId} student={student} examMax={period.examMax} />)}
         </ul>
       )}
@@ -155,22 +239,24 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
   }
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Средний балл" value={overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal)} hint="средний из недельных итогов" />
-        <Zones passed={overall.passed} support={overall.support} risk={overall.risk} />
-        <Stat label="Посещаемость" value={percent(overall.attendanceRate)} hint="по прошедшим дням" />
-        <Stat label="Закрытых недель" value={String(overall.periods)} />
-      </div>
-      <ul className="divide-y divide-divider">
+      <Metrics
+        items={[
+          { label: 'Средний балл', value: overall.averageTotal === null || overall.averageTotal === undefined ? '—' : String(overall.averageTotal), hint: 'средний из недельных итогов' },
+          zones(overall.passed, overall.support, overall.risk),
+          { label: 'Посещаемость', value: percent(overall.attendanceRate), hint: 'по прошедшим дням' },
+          { label: 'Закрытых недель', value: String(overall.periods) },
+        ]}
+      />
+      <ul className="divide-y divide-divider border-y border-divider">
         {overall.studentResults.map((s) => {
           const zone = s.zone ? ZONE[s.zone] : undefined;
           const notFull = s.partialWeeks + s.emptyWeeks;
           return (
-            <li key={s.studentId} className="flex items-center gap-3 py-2.5">
-              <span className={`w-14 shrink-0 text-right text-[18px] font-semibold tabular-nums ${zoneText(s.zone)}`}>{s.averageTotal ?? '—'}</span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold text-ink">{s.fullName}</span>
-                <span className="block text-[12px] text-ink-muted">
+            <li key={s.studentId} className={ROW}>
+              <span className={`text-right text-[15px] font-semibold tabular-nums ${zoneText(s.zone)}`}>{s.averageTotal ?? '—'}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-[14px] font-medium text-ink">{s.fullName}</span>
+                <span className="block text-[12.5px] text-ink-muted sm:truncate">
                   недель в группе {s.weeks}
                   {notFull > 0 ? ` · не отмечено ${String(notFull)}` : ''}
                   {s.fullWeeks > 1 ? ` · от ${String(s.minTotal)} до ${String(s.maxTotal)}` : ''}
@@ -178,7 +264,7 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
                   {s.late > 0 ? ` · опозданий ${String(s.late)}` : ''}
                 </span>
               </span>
-              {zone ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">нет полных недель</Badge>}
+              {zone ? <Status tone={zone.tone}>{zone.label}</Status> : <Status tone="neutral">нет полных недель</Status>}
             </li>
           );
         })}
@@ -186,6 +272,8 @@ function OverallView({ overall }: { overall: CrmOverall }): JSX.Element {
     </div>
   );
 }
+
+const ROLE_TONE: Record<string, Tone> = { 'Ведёт': 'brand', 'Помогает': 'info', 'Снят': 'neutral' };
 
 /** Группа из CRM: состав, менторы по датам и журнал, посчитанный по неделям так же, как считает CRM. */
 export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; onClose: () => void }): JSX.Element {
@@ -216,18 +304,20 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
       ) : query.isError ? (
         <ErrorState error={query.error} onRetry={() => { void query.refetch(); }} />
       ) : data ? (
-        <div className="space-y-6">
+        <div className="space-y-9">
           <section>
-            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><GraduationCap className="h-4 w-4" aria-hidden="true" />Менторы по датам</h3>
+            <SectionTitle>Менторы по датам</SectionTitle>
             {data.mentors.length === 0 ? (
               <p className="text-[13px] text-warning">В CRM у группы нет ни одного ментора.</p>
             ) : (
-              <ul className="space-y-1 text-[13.5px]">
+              <ul className="divide-y divide-divider border-y border-divider">
                 {data.mentors.map((m) => (
-                  <li key={`${String(m.id)}-${m.from}`} className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-ink">{m.fullName}</span>
-                    <Badge tone={m.role === 'Снят' ? 'neutral' : m.role === 'Помогает' ? 'info' : 'brand'}>{m.role}</Badge>
-                    <span className="text-ink-muted">{formatDay(m.from, true)} — {m.to ? formatDay(m.to, true) : '…'}</span>
+                  <li key={`${String(m.id)}-${m.from}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 py-2.5 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                    <span className="truncate text-[14px] font-medium text-ink">{m.fullName}</span>
+                    <Status tone={ROLE_TONE[m.role] ?? 'neutral'}>{m.role}</Status>
+                    <span className="col-span-2 text-[12.5px] tabular-nums text-ink-muted sm:col-span-1 sm:text-right">
+                      {formatDay(m.from, true)} — {m.to ? formatDay(m.to, true) : '…'}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -236,18 +326,18 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
 
           {data.journalUnavailable ? null : (
             <section>
-              <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><Sigma className="h-4 w-4" aria-hidden="true" />Итог по закрытым неделям</h3>
+              <SectionTitle>Итог по закрытым неделям</SectionTitle>
               <OverallView overall={data.overall} />
             </section>
           )}
 
           <section>
-            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><Clock3 className="h-4 w-4" aria-hidden="true" />Журнал по неделям</h3>
+            <SectionTitle>Журнал по неделям</SectionTitle>
             {data.journalUnavailable ? (
               <p className="rounded-control border border-warning-border bg-warning-soft px-3 py-2.5 text-[13px] text-warning">{data.journalUnavailable}</p>
             ) : (
               <>
-                <div className="-mx-1 mb-4 flex gap-1.5 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Периоды журнала">
+                <div className="mb-4 flex overflow-x-auto border-b border-divider" role="tablist" aria-label="Периоды журнала">
                   {data.periods.map((p) => {
                     const active = p.week === period?.week;
                     return (
@@ -257,11 +347,12 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
                         role="tab"
                         aria-selected={active}
                         onClick={() => { setWeek(p.week); }}
-                        className={`shrink-0 rounded-full border px-3 py-1 text-[12.5px] font-medium transition ${
-                          active ? 'border-brand bg-brand text-white' : 'border-line bg-surface text-ink-secondary hover:border-brand/40'
+                        className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 pb-2 pt-1 text-[13px] font-medium transition-colors ${
+                          active ? 'border-brand text-ink' : 'border-transparent text-ink-muted hover:text-ink-secondary'
                         }`}
                       >
-                        {periodTitle(p.label)}{p.summary.issueCount > 0 ? ' ⚠' : ''}
+                        {periodTitle(p.label)}
+                        {p.summary.issueCount > 0 ? <span className="h-1.5 w-1.5 rounded-full bg-danger" title="Есть проблемы в данных" aria-label="есть проблемы в данных" /> : null}
                       </button>
                     );
                   })}
@@ -272,16 +363,20 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
           </section>
 
           <section>
-            <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-ink-muted"><UserMinus className="h-4 w-4" aria-hidden="true" />Состав группы</h3>
-            <ul className="divide-y divide-divider text-[13.5px]">
+            <SectionTitle aside={`${String(data.students.length)} студ.`}>Состав группы</SectionTitle>
+            <ul className="divide-y divide-divider border-y border-divider">
               {data.students.map((s) => {
                 const status = STUDENT_STATUS[s.status] ?? { label: s.status, tone: 'neutral' as const };
                 return (
-                  <li key={s.id} className="flex flex-wrap items-center gap-2 py-2">
-                    <span className="min-w-0 flex-1 truncate font-medium text-ink">{s.fullName}</span>
-                    <Badge tone={status.tone}>{status.label}</Badge>
-                    <span className="text-[12px] text-ink-muted">с {formatDay(s.joinedOn, true)}{s.leftOn ? ` по ${formatDay(s.leftOn, true)}` : ''}</span>
-                    {s.note ? <span className="w-full text-[12px] text-ink-secondary">{s.note}</span> : null}
+                  <li key={s.id} className="py-2.5">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                      <span className="truncate text-[14px] font-medium text-ink">{s.fullName}</span>
+                      <Status tone={status.tone}>{status.label}</Status>
+                      <span className="col-span-2 text-[12.5px] tabular-nums text-ink-muted sm:col-span-1 sm:text-right">
+                        с {formatDay(s.joinedOn, true)}{s.leftOn ? ` по ${formatDay(s.leftOn, true)}` : ''}
+                      </span>
+                    </div>
+                    {s.note ? <p className="mt-1 max-w-[72ch] text-[12.5px] leading-5 text-ink-muted">{s.note}</p> : null}
                   </li>
                 );
               })}
