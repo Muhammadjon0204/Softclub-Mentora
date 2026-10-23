@@ -25,8 +25,8 @@ namespace MentorTaskFlow.Infrastructure.Analytics;
 /// Two things differ from the Anthropic provider. Thinking cannot be switched off on the current
 /// flash models, only lowered, and its tokens count against the output cap — hence
 /// <see cref="AiOptions.ThinkingLevel"/> and the larger <see cref="AiOptions.MaxOutputTokens"/>. And
-/// quotas are per model, so an overloaded or exhausted model is retried on
-/// <see cref="AiOptions.FallbackModelId"/> rather than on itself.
+/// quotas and capacity are per model, so an overloaded, exhausted or silent model hands over at once to
+/// the next one of <see cref="AiOptions.ModelChain"/>; only when every model has failed does it wait.
 /// </para>
 /// </remarks>
 public sealed class GeminiSummaryProvider(
@@ -60,11 +60,16 @@ public sealed class GeminiSummaryProvider(
         using var budgetSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         budgetSource.CancelAfter(budget);
 
-        var model = _options.ModelId;
-        var primaryRetired = false;
+        var chain = _options.ModelChain();
+        var retired = new HashSet<string>(StringComparer.Ordinal);
+        var index = 0;
+        var attempts = 0;
 
-        for (var attempt = 0; ; attempt++)
+        for (var round = 0; ; )
         {
+            var model = chain[index];
+            attempts++;
+
             try
             {
                 await AcquireSlotAsync(elapsed, budget, budgetSource.Token);
@@ -77,37 +82,46 @@ public sealed class GeminiSummaryProvider(
                 return completion;
             }
             catch (GeminiApiException exception)
-                when (exception.StatusCode == HttpStatusCode.NotFound
-                    && model == _options.ModelId
-                    && Fallback(model, primaryRetired) is { } fallback)
+                when (exception.StatusCode == HttpStatusCode.NotFound && Next(chain, index, retired) is { } next)
             {
                 // The model was retired — Google withdraws flash versions for new keys with little
-                // notice. The fallback keeps reports working until the setting is updated.
-                logger.LogError("Gemini model {Model} is not available; switching to {Fallback}.", model, fallback);
-                primaryRetired = true;
-                model = fallback;
+                // notice. The next one keeps reports working until the setting is updated.
+                logger.LogError("Gemini model {Model} is not available; switching to {Next}.", model, chain[next]);
+                retired.Add(model);
+                index = next;
             }
             catch (Exception exception) when (IsRetryable(exception, cancellationToken))
             {
-                var isLastAttempt = attempt >= _options.MaxRetries;
-                var delay = AiOptions.RetryDelays[Math.Min(attempt, AiOptions.RetryDelays.Count - 1)];
-
-                if (isLastAttempt || elapsed.Elapsed + delay >= budget)
+                if (elapsed.Elapsed >= budget)
                 {
-                    throw Unavailable(exception, attempt + 1);
+                    throw Unavailable(exception, attempts);
                 }
 
-                // Overloaded or out of quota: the other model has its own capacity and allowance.
-                if (exception is GeminiApiException { IsCapacity: true } && Fallback(model, primaryRetired) is { } other)
+                // Overloaded, out of quota or silent: the next model has its own capacity and
+                // allowance, so it is asked at once rather than after a pause.
+                if (Next(chain, index, retired) is { } next)
                 {
-                    model = other;
+                    logger.LogWarning(exception, "Gemini model {Model} failed; trying {Next}.", model, chain[next]);
+                    index = next;
+                    continue;
                 }
+
+                // Every model failed: wait, then go through them again from the start.
+                var delay = AiOptions.RetryDelays[Math.Min(round, AiOptions.RetryDelays.Count - 1)];
+
+                if (round >= _options.MaxRetries || elapsed.Elapsed + delay >= budget)
+                {
+                    throw Unavailable(exception, attempts);
+                }
+
+                round++;
+                index = chain.Select((name, i) => (name, i)).First(m => !retired.Contains(m.name)).i;
 
                 logger.LogWarning(
                     exception,
-                    "AI provider attempt {Attempt} failed; retrying on {Model} in {Delay}.",
-                    attempt + 1,
-                    model,
+                    "Every Gemini model failed; round {Round} on {Model} in {Delay}.",
+                    round + 1,
+                    chain[index],
                     delay);
 
                 await Task.Delay(delay, budgetSource.Token);
@@ -116,30 +130,23 @@ public sealed class GeminiSummaryProvider(
             {
                 // A permanent error — a malformed request, a rejected key, a blocked prompt. Retrying
                 // cannot change the answer (AI-003).
-                throw Unavailable(exception, attempt + 1);
+                throw Unavailable(exception, attempts);
             }
         }
     }
 
-    /// <summary>
-    /// The model to switch to from <paramref name="current"/>, or null when there is none — including
-    /// back to a primary model that has already answered 404.
-    /// </summary>
-    private string? Fallback(string current, bool primaryRetired)
+    /// <summary>The next model of the chain after <paramref name="index"/> that has not been retired, or null.</summary>
+    private static int? Next(IReadOnlyList<string> chain, int index, HashSet<string> retired)
     {
-        var fallback = _options.FallbackModelId;
-
-        if (string.IsNullOrWhiteSpace(fallback) || string.Equals(fallback, _options.ModelId, StringComparison.Ordinal))
+        for (var i = index + 1; i < chain.Count; i++)
         {
-            return null;
+            if (!retired.Contains(chain[i]))
+            {
+                return i;
+            }
         }
 
-        if (string.Equals(current, fallback, StringComparison.Ordinal))
-        {
-            return primaryRetired ? null : _options.ModelId;
-        }
-
-        return fallback;
+        return null;
     }
 
     /// <summary>

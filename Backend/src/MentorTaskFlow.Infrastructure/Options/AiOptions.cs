@@ -47,13 +47,26 @@ public sealed class AiOptions
     public string ModelId { get; init; } = "gemini-3.8-flash";
 
     /// <summary>
-    /// Gemini only: tried when <see cref="ModelId"/> is overloaded (503) or out of quota (429).
+    /// Gemini only: models tried in order, comma-separated, when the previous one is overloaded (503),
+    /// out of quota (429), retired (404) or does not answer in time.
     /// </summary>
     /// <remarks>
-    /// Quotas are per model, so a second model is a second allowance — the cheapest way to keep a
-    /// report working through a busy hour. Empty disables the fallback.
+    /// Quotas and capacity are per model, so each one is a separate allowance — the cheapest way to
+    /// keep a report working through a busy hour. One model was not enough: on 2026-10-23 both
+    /// 3.8 and 3.5 answered 503 for hours while 3.6 and the lite models worked. Empty disables the
+    /// fallback.
     /// </remarks>
-    public string? FallbackModelId { get; init; } = "gemini-3.5-flash";
+    public string? FallbackModelId { get; init; } = "gemini-3.6-flash,gemini-3.5-flash,gemini-3.5-flash-lite";
+
+    /// <summary><see cref="ModelId"/> followed by the fallbacks, without repeats.</summary>
+    public IReadOnlyList<string> ModelChain() =>
+        [
+            ModelId,
+            .. (FallbackModelId ?? string.Empty)
+                .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Where(model => !string.Equals(model, ModelId, StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal),
+        ];
 
     /// <summary>
     /// Gemini only: how much the model reasons before answering.
