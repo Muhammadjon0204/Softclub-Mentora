@@ -96,6 +96,34 @@ public sealed class GeminiSummaryProviderTests
     }
 
     [Fact]
+    public async Task Overloaded_models_hand_over_down_the_chain_without_waiting()
+    {
+        var api = new FakeGemini(call => call.Path.Contains("lite")
+            ? Ok(Answer("С третьей модели."))
+            : Error(HttpStatusCode.ServiceUnavailable, "UNAVAILABLE"));
+        var options = new AiOptions
+        {
+            Enabled = true,
+            ApiKey = "test-key",
+            ModelId = Primary,
+            FallbackModelId = $"{Fallback}, gemini-3.5-flash-lite",
+        };
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        var completion = await Provider(api, options).GenerateAsync(Prompt, CancellationToken.None);
+
+        completion.Model.ShouldBe("gemini-3.5-flash-lite");
+        api.Calls.Count.ShouldBe(3);
+        clock.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void The_chain_starts_with_the_primary_and_skips_repeats() =>
+        new AiOptions { ModelId = Primary, FallbackModelId = $" {Fallback},{Primary},,{Fallback}, gemini-3.5-flash-lite " }
+            .ModelChain()
+            .ShouldBe([Primary, Fallback, "gemini-3.5-flash-lite"]);
+
+    [Fact]
     public async Task A_rejected_request_is_not_retried()
     {
         var api = new FakeGemini(_ => Error(HttpStatusCode.BadRequest, "INVALID_ARGUMENT"));
