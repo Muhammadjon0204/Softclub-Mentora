@@ -9,6 +9,7 @@
     <PackageReference Include="Minio" />
     <PackageReference Include="Anthropic" />
     <PackageReference Include="MailKit" />
+    <PackageReference Include="QuestPDF" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Hangfire.AspNetCore" />
@@ -29,6 +30,12 @@
   <ItemGroup>
     <!-- Fixtures build storage clients and keys the same way production does. -->
     <InternalsVisibleTo Include="MentorTaskFlow.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Noto Sans (SIL OFL 1.1, see Reports/Fonts/OFL.txt): the container has no font with Cyrillic. -->
+    <EmbeddedResource Include="Reports/Fonts/NotoSans-Regular.ttf" LogicalName="Mentora.Fonts.NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Reports/Fonts/NotoSans-Bold.ttf" LogicalName="Mentora.Fonts.NotoSans-Bold.ttf" />
   </ItemGroup>
 
 </Project>

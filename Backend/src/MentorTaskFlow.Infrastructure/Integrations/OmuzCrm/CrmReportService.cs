@@ -187,6 +187,24 @@ public sealed class CrmReportService(
         return ToDto(report, authors.GetValueOrDefault(report.AuthorId, "—"), actor, dataChanged: false);
     }
 
+    public async Task<ReportFile> GetPdfAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var actor = Actor();
+        var report = await Readable(actor).FirstOrDefaultAsync(r => r.Id == id, cancellationToken)
+                     ?? throw new NotFoundException("Отчёт не найден.");
+        var author = (await AuthorNamesAsync([report.AuthorId], cancellationToken)).GetValueOrDefault(report.AuthorId, "—");
+        return Pdf(report, author);
+    }
+
+    /// <summary>The PDF of a report — shared with the notification attachments.</summary>
+    public static ReportFile Pdf(CrmGroupReport report, string authorName)
+    {
+        var model = new Reports.CrmReportPdfModel(
+            report.GroupName, report.CourseName, report.PeriodLabel, report.PeriodFrom, report.PeriodTo,
+            authorName, report.SentAt, Snapshot(report), Previous(report), report.Conclusions);
+        return new ReportFile(Reports.CrmReportPdf.FileName(model), "application/pdf", Reports.CrmReportPdf.Render(model));
+    }
+
     // -----------------------------------------------------------------
 
     /// <summary>
@@ -346,24 +364,29 @@ public sealed class CrmReportService(
                         && u.Role == UserRole.Lead
                         && u.IsActive
                         && u.Id != report.AuthorId)
-            .Select(u => u.Id)
+            .Select(u => new { u.Id, u.FullName })
             .ToListAsync(cancellationToken);
 
-        if (leads.Count == 0)
-        {
-            return;
-        }
+        var author = await dbContext.Users.IgnoreQueryFilters()
+            .Where(u => u.Id == report.AuthorId)
+            .Select(u => new { u.FullName, u.Role })
+            .FirstAsync(cancellationToken);
 
-        var author = (await AuthorNamesAsync([report.AuthorId], cancellationToken)).GetValueOrDefault(report.AuthorId);
         var period = Snapshot(report);
-        var payload = JsonSerializer.SerializeToDocument(new
+        var common = new
         {
+            reportId = report.Id.ToString("D"),
             groupName = report.GroupName,
             // «за неделю 6» / «за недели 13–14» — already in the case the sentence needs.
             periodTitle = report.PeriodLabel.Contains('-') ? $"недели {report.PeriodLabel.Replace('-', '–')}" : $"неделю {report.PeriodLabel}",
             periodRange = $"{report.PeriodFrom:dd.MM} — {report.PeriodTo:dd.MM.yyyy}",
-            mentorFullName = author,
             summaryLines = CrmReportPrompt.SummaryLines(period, Previous(report)),
+        };
+
+        var toLead = JsonSerializer.SerializeToDocument(new
+        {
+            common.reportId, common.groupName, common.periodTitle, common.periodRange, common.summaryLines,
+            mentorFullName = author.FullName,
             conclusionsExcerpt = Notifications.NotificationTemplates.ShortenForChat(CrmReportPrompt.PlainText(report.Conclusions)),
             actionPath = $"/lead/crm?report={report.Id:D}",
         });
@@ -373,16 +396,35 @@ public sealed class CrmReportService(
             await outboxWriter.EnqueueSystemAsync(
                 new OutboxEntry
                 {
-                    RecipientUserId = lead,
+                    RecipientUserId = lead.Id,
                     EventType = Domain.Notifications.NotificationEventTypes.CrmReportSent,
                     EntityId = report.Id,
                     CategoryId = report.CategoryId,
-                    Payload = payload,
+                    Payload = toLead,
                 },
                 report.OrganizationId,
                 report.BranchId,
                 cancellationToken);
         }
+
+        // The author's own copy, in their Telegram: what went out, to whom, and the PDF to keep.
+        await outboxWriter.EnqueueSystemAsync(
+            new OutboxEntry
+            {
+                RecipientUserId = report.AuthorId,
+                EventType = Domain.Notifications.NotificationEventTypes.CrmReportReceipt,
+                EntityId = report.Id,
+                CategoryId = report.CategoryId,
+                Payload = JsonSerializer.SerializeToDocument(new
+                {
+                    common.reportId, common.groupName, common.periodTitle, common.periodRange, common.summaryLines,
+                    leadNames = string.Join(", ", leads.Select(l => l.FullName)),
+                    actionPath = $"/{(author.Role is UserRole.Lead ? "lead" : "mentor")}/crm?report={report.Id:D}",
+                }),
+            },
+            report.OrganizationId,
+            report.BranchId,
+            cancellationToken);
     }
 
     private static string Hash(string snapshot) =>

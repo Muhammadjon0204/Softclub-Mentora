@@ -1,6 +1,8 @@
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
 
+import type { AiSummaryRequest } from '../../api/aiSummary';
+import { AiTeamReportModal } from '../../features/lead-reports/AiTeamReportModal';
 import { PreviewMetricCard } from '../../features/admin-preview/PreviewMetricCard';
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
@@ -8,7 +10,6 @@ import { useLeadReports } from '../../features/lead-reports/useLeadReports';
 import type { ReportsFilters } from '../../features/lead-reports/useLeadReports';
 import { useActiveLeadMentors } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
-import { Modal } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { FormCheckbox } from '../../shared/ui/FormField';
@@ -21,6 +22,13 @@ const PERIOD_OPTIONS = [
   { value: '90', label: '90 дней' },
   { value: 'all', label: 'Всё время' },
 ];
+
+/** Сегодня + `offset` дней, календарным днём `YYYY-MM-DD` по часам пользователя. */
+function isoDay(offset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function formatPercent(value: number | null): string {
   return value === null ? '—' : `${value.toFixed(1)}%`;
@@ -51,12 +59,13 @@ export function ReportsPage(): JSX.Element {
 
   const mentorOptions = [{ value: 'all', label: 'Все менторы' }, ...mentors.map((m) => ({ value: m.id, label: m.fullName }))];
 
-  const aiSummaryText =
-    report.totalAssignments === 0
-      ? 'Недостаточно данных за выбранный период для формирования резюме.'
-      : `За выбранный период направление «${scope.categoryName}» завершило ${String(report.approvedAssignments)} из ${String(report.totalAssignments)} назначенных заданий` +
-        `${report.firstPassApprovalRate !== null ? ` (${formatPercent(report.firstPassApprovalRate)} — с первой попытки)` : ''}. ` +
-        `${report.overdueRate !== null && report.overdueRate > 0 ? `Доля просроченных заданий — ${formatPercent(report.overdueRate)}, стоит обратить внимание на распределение нагрузки.` : 'Просроченных заданий за период не зафиксировано.'}`;
+  // Период страницы → запрос к ИИ: те же дни, тот же ментор, те же отменённые.
+  const aiRequest: AiSummaryRequest = {
+    scope: mentorId === 'all' ? 'Team' : 'Personal',
+    ...(mentorId === 'all' ? {} : { mentorId }),
+    ...(periodDays === 'all' ? {} : { from: isoDay(-(Number(periodDays) - 1)), to: isoDay(0) }),
+    includeCancelled,
+  };
 
   return (
     <div className="space-y-6">
@@ -65,7 +74,7 @@ export function ReportsPage(): JSX.Element {
         subtitle={`${scope.categoryName} · ${scope.branchDisplayName}`}
         action={
           <Button variant="secondary" leadingIcon={<Sparkles className="h-4 w-4" aria-hidden="true" />} onClick={() => { setAiSummaryOpen(true); }}>
-            ИИ-резюме
+            ИИ-отчёт команды
           </Button>
         }
       />
@@ -163,14 +172,12 @@ export function ReportsPage(): JSX.Element {
         )}
       </Card>
 
-      <Modal open={aiSummaryOpen} onOpenChange={setAiSummaryOpen} title="ИИ-резюме направления" size="md" icon={<Sparkles className="h-5 w-5 text-brand" aria-hidden="true" />}>
-        <div className="space-y-3">
-          <p className="text-[13.5px] leading-[20px] text-ink-secondary">{aiSummaryText}</p>
-          <p className="rounded-control-sm border border-line bg-surface-muted px-3 py-2.5 text-[12px] text-ink-muted">
-            Preview-режим: реальная генерация ИИ-резюме подключится вместе с backend (раздел 22 ТЗ). Текст выше рассчитан из тех же значений, что показаны на странице.
-          </p>
-        </div>
-      </Modal>
+      <AiTeamReportModal
+        open={aiSummaryOpen}
+        onOpenChange={setAiSummaryOpen}
+        request={aiRequest}
+        title={mentorId === 'all' ? `ИИ-отчёт команды · ${scope.categoryName}` : `ИИ-отчёт · ${mentorOptions.find((m) => m.value === mentorId)?.label ?? 'ментор'}`}
+      />
     </div>
   );
 }

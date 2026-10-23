@@ -230,6 +230,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<INotificationAdminService, NotificationAdminService>();
         services.AddScoped<OutboxDispatcher>();
         services.AddScoped<INotificationSender, SmtpNotificationSender>();
+        services.AddScoped<INotificationAttachmentProvider, CrmReportAttachmentProvider>();
 
         // The loop is registered unconditionally and stops itself when the process is not the worker:
         // whether background processing belongs here is configuration, not composition (DEPLOY-013).

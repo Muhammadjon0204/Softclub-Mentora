@@ -14,6 +14,7 @@ namespace MentorTaskFlow.Infrastructure.Notifications;
 /// <inheritdoc />
 public sealed class SmtpNotificationSender(
     IOptions<NotificationOptions> options,
+    INotificationAttachmentProvider attachments,
     ILogger<SmtpNotificationSender> logger) : INotificationSender
 {
     private readonly NotificationOptions _options = options.Value;
@@ -41,10 +42,16 @@ public sealed class SmtpNotificationSender(
 
         var rendered = NotificationTemplates.Render(message.EventType, message.Payload, _options.AppBaseUrl, message.ActionUrl);
 
+        var builder = new BodyBuilder { TextBody = rendered.PlainText, HtmlBody = rendered.Html };
+        if (await attachments.GetAsync(message.EventType, message.Payload, cancellationToken) is { } file)
+        {
+            builder.Attachments.Add(file.FileName, file.Content, ContentType.Parse(file.ContentType));
+        }
+
         var mail = new MimeMessage
         {
             Subject = rendered.Subject,
-            Body = new BodyBuilder { TextBody = rendered.PlainText, HtmlBody = rendered.Html }.ToMessageBody(),
+            Body = builder.ToMessageBody(),
         };
 
         mail.From.Add(new MailboxAddress(_options.FromName, _options.FromAddress));

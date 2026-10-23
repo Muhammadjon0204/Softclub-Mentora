@@ -31,4 +31,10 @@ public interface ICrmReportService
     Task<CrmReportListDto> ListAsync(CancellationToken cancellationToken);
 
     Task<CrmGroupReportDto> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The report as a PDF, for whoever may read it.</summary>
+    Task<ReportFile> GetPdfAsync(Guid id, CancellationToken cancellationToken);
 }
+
+/// <summary>A generated document: its file name, media type and bytes.</summary>
+public sealed record ReportFile(string FileName, string ContentType, byte[] Content);

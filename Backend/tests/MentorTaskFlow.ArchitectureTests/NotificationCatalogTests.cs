@@ -36,7 +36,7 @@ public sealed class NotificationCatalogTests
     /// the submission receipt and the two password-reset deliveries.
     /// </summary>
     [Fact]
-    public void The_catalog_holds_the_nineteen_events_and_the_additions() => EventTypes.Length.ShouldBe(23);
+    public void The_catalog_holds_the_nineteen_events_and_the_additions() => EventTypes.Length.ShouldBe(24);
 
     [Fact]
     public void The_submission_receipt_never_becomes_an_email() =>

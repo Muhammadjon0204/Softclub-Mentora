@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, FileText } from 'lucide-react';
+import { ChevronRight, Download, FileText } from 'lucide-react';
 import { useState } from 'react';
 
-import { CRM_REPORT_KEYS, getCrmReport, listCrmReports } from '../../api/admin/crm';
+import { CRM_REPORT_KEYS, downloadCrmReportPdf, getCrmReport, listCrmReports } from '../../api/admin/crm';
+import { getGenericErrorMessage } from '../../api/problemDetails';
 import { useAuth } from '../../auth/useAuth';
-import { Drawer } from '../../shared/overlays';
+import { Drawer, useToast } from '../../shared/overlays';
+import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
@@ -21,6 +23,19 @@ const when = (iso: string): string => DATE_TIME.format(new Date(iso)).replace(/\
 export function CrmReportDrawer({ id, onClose }: { id: string | null; onClose: () => void }): JSX.Element {
   const report = useQuery({ queryKey: CRM_REPORT_KEYS.one(id ?? ''), queryFn: () => getCrmReport(id ?? ''), enabled: id !== null });
   const r = report.data;
+  const toast = useToast();
+  const [downloading, setDownloading] = useState(false);
+  const download = async (): Promise<void> => {
+    if (!r) return;
+    setDownloading(true);
+    try {
+      await downloadCrmReportPdf(r.id, `Отчёт ${r.groupName} ${periodTitle(r.periodLabel)}.pdf`);
+    } catch (error) {
+      toast.error(getGenericErrorMessage(error));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <Drawer
@@ -42,6 +57,16 @@ export function CrmReportDrawer({ id, onClose }: { id: string | null; onClose: (
               <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
               {r.status === 'Sent' && r.sentAt ? `отправлен ${when(r.sentAt)}` : 'черновик — правится в карточке группы'}
             </span>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="ml-auto"
+              leadingIcon={<Download className="h-3.5 w-3.5" aria-hidden="true" />}
+              onClick={() => { void download(); }}
+              isLoading={downloading}
+            >
+              Скачать PDF
+            </Button>
           </p>
           <section>
             <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Успеваемость группы</h3>

@@ -41,7 +41,8 @@ public static class NotificationTopics
             or NotificationEventTypes.SubmissionReceipt
             or NotificationEventTypes.ReviewApproved
             or NotificationEventTypes.ReviewNeedsRework
-            or NotificationEventTypes.CrmReportSent => NotificationTopic.Reviews,
+            or NotificationEventTypes.CrmReportSent
+            or NotificationEventTypes.CrmReportReceipt => NotificationTopic.Reviews,
 
         NotificationEventTypes.SchedulerNoActiveMentor
             or NotificationEventTypes.CategoryWithoutLead
