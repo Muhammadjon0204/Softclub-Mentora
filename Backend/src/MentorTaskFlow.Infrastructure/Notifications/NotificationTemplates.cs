@@ -125,6 +125,13 @@ public static class NotificationTemplates
                     + (TryGetString(body, "periodRange") is { } range ? $" ({range})." : "."),
                     "Открыть отчёт"),
 
+            NotificationEventTypes.CrmReportReceipt =>
+                ("Отчёт отправлен",
+                    $"Ваш отчёт по группе «{TryGetString(body, "groupName")}» за {TryGetString(body, "periodTitle") ?? "неделю"}"
+                    + (TryGetString(body, "periodRange") is { } receiptRange ? $" ({receiptRange})" : string.Empty)
+                    + (TryGetString(body, "leadNames") is { Length: > 0 } leads ? $" отправлен тимлиду: {leads}." : " сохранён как отправленный."),
+                    "Открыть отчёт"),
+
             _ => ("Уведомление Mentora", "Произошло событие в системе.", "Открыть приложение"),
         };
 
@@ -230,6 +237,7 @@ public static class NotificationTemplates
             NotificationEventTypes.ReviewApproved => "🎉 ",
             NotificationEventTypes.ReviewNeedsRework => "🔁 ",
             NotificationEventTypes.CrmReportSent => "📊 ",
+            NotificationEventTypes.CrmReportReceipt => "📨 ",
             NotificationEventTypes.AssignmentAssigned => "📌 ",
             NotificationEventTypes.PasswordReset or NotificationEventTypes.PasswordResetTelegram => "🔑 ",
             _ => string.Empty,

@@ -205,6 +205,16 @@ public sealed class CrmReportTests(PostgresFixture postgres) : IAsyncLifetime
         row.AuthorName.ShouldBe("Ментор А");
 
         var report = await ReadAsync<CrmGroupReportDto>(await lead.GetAsync($"/api/v1/integrations/crm/reports/{row.Id}"));
+
+        // The PDF the Lead downloads (and gets in Telegram / by email).
+        var pdf = await lead.GetAsync($"/api/v1/integrations/crm/reports/{row.Id}/pdf");
+        pdf.StatusCode.ShouldBe(HttpStatusCode.OK);
+        pdf.Content.Headers.ContentType!.MediaType.ShouldBe("application/pdf");
+        var bytes = await pdf.Content.ReadAsByteArrayAsync();
+        Encoding.ASCII.GetString(bytes, 0, 4).ShouldBe("%PDF");
+
+        using var stranger = await SignInAsync("mentor-c@mentortaskflow.test");
+        (await stranger.GetAsync($"/api/v1/integrations/crm/reports/{row.Id}/pdf")).StatusCode.ShouldBe(HttpStatusCode.NotFound);
         report.Conclusions.ShouldBe("Мои выводы по неделе.");
         report.CanEdit.ShouldBeFalse();
 

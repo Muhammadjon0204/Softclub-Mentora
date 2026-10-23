@@ -343,3 +343,18 @@ export async function getCrmReport(id: string): Promise<CrmGroupReport> {
   const { data } = await apiClient.get<CrmGroupReport>(`/api/v1/integrations/crm/reports/${id}`);
   return data;
 }
+
+/** PDF отчёта — тот же файл, что приходит в Telegram и на почту. */
+export async function downloadCrmReportPdf(id: string, fallbackName: string): Promise<void> {
+  const response = await apiClient.get<Blob>(`/api/v1/integrations/crm/reports/${id}/pdf`, { responseType: 'blob' });
+  const disposition = String(response.headers['content-disposition'] ?? '');
+  const name = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1] ?? /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+  const url = URL.createObjectURL(response.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name ? decodeURIComponent(name) : fallbackName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => { URL.revokeObjectURL(url); }, 10_000);
+}

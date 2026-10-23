@@ -123,7 +123,8 @@ builder.Services.AddCors(options =>
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()
-            .WithExposedHeaders(CorrelationIdMiddleware.HeaderName);
+            // Content-Disposition: the file name of a downloaded report PDF, read across subdomains.
+            .WithExposedHeaders(CorrelationIdMiddleware.HeaderName, "Content-Disposition");
     });
 });
 

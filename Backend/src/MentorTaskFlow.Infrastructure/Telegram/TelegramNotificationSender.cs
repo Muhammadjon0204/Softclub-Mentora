@@ -22,6 +22,7 @@ public sealed class TelegramNotificationSender(
     IHttpClientFactory httpClientFactory,
     IOptions<TelegramOptions> telegramOptions,
     IOptions<NotificationOptions> notificationOptions,
+    INotificationAttachmentProvider attachments,
     ILogger<TelegramNotificationSender> logger) : INotificationSender
 {
     public const string HttpClientName = "telegram";
@@ -52,7 +53,43 @@ public sealed class TelegramNotificationSender(
             notificationOptions.Value.AppBaseUrl,
             message.ActionUrl);
 
-        return await SendRenderedAsync(message.RecipientTelegramChatId, rendered, cancellationToken);
+        var result = await SendRenderedAsync(message.RecipientTelegramChatId, rendered, cancellationToken);
+
+        // The file goes right under its message. The message is what counts as delivered: a failed
+        // document is logged, not retried — a retry would send the text a second time.
+        if (result.Succeeded
+            && await attachments.GetAsync(message.EventType, message.Payload, cancellationToken) is { } file)
+        {
+            await SendDocumentAsync(message.RecipientTelegramChatId, file, cancellationToken);
+        }
+
+        return result;
+    }
+
+    private async Task SendDocumentAsync(string chatId, ReportFile file, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var form = new MultipartFormDataContent
+            {
+                { new StringContent(chatId), "chat_id" },
+                { new StringContent("📎 Отчёт в PDF — откройте или сохраните"), "caption" },
+            };
+            var document = new ByteArrayContent(file.Content);
+            document.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            form.Add(document, "document", file.FileName);
+
+            var response = await httpClientFactory.CreateClient(HttpClientName)
+                .PostAsync($"/bot{_options.BotToken}/sendDocument", form, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("Telegram refused the document {File}: {Status}.", file.FileName, (int)response.StatusCode);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogWarning(exception, "Telegram document {File} was not sent.", file.FileName);
+        }
     }
 
     /// <summary>

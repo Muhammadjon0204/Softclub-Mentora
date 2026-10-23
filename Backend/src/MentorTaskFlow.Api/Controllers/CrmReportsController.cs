@@ -65,6 +65,17 @@ public sealed class CrmReportsController(ICrmReportService reports) : Controller
     public async Task<ActionResult<CrmReportListDto>> ListAsync(CancellationToken cancellationToken) =>
         Ok(await reports.ListAsync(cancellationToken));
 
+    /// <summary><c>GET /integrations/crm/reports/{id}/pdf</c> — the report as an A4 PDF.</summary>
+    [HttpGet("reports/{id:guid}/pdf")]
+    [Produces("application/pdf")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> PdfAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var file = await reports.GetPdfAsync(id, cancellationToken);
+        return File(file.Content, file.ContentType, file.FileName);
+    }
+
     /// <summary><c>GET /integrations/crm/reports/{id}</c>.</summary>
     [HttpGet("reports/{id:guid}")]
     [ProducesResponseType<CrmGroupReportDto>(StatusCodes.Status200OK)]

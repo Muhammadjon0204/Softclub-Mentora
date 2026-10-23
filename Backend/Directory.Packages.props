@@ -15,6 +15,12 @@
     <PackageVersion Include="Microsoft.Extensions.Diagnostics" Version="10.0.10" />
   </ItemGroup>
 
+  <ItemGroup Label="Reports">
+    <!-- PDF of the weekly CRM group report (Telegram and email attachments, «Скачать PDF»).
+         Community license: free for organizations under USD 1M annual revenue. -->
+    <PackageVersion Include="QuestPDF" Version="2026.9.1" />
+  </ItemGroup>
+
   <ItemGroup Label="Identity">
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.10" />
     <!-- Must not trail what JwtBearer 10.0.10 pulls in transitively, or central pinning reports NU1109. -->
