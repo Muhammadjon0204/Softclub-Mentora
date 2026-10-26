@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { CRM_QUERY_KEYS, getCrmGroup, type CrmOverall, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
+import { CRM_QUERY_KEYS, getCrmGroup, type CrmGroupStudent, type CrmOverall, type CrmPeriod, type CrmStudentScore } from '../../api/admin/crm';
 import { Drawer } from '../../shared/overlays';
 import { Select } from '../../shared/select';
 import { EmptyState } from '../../shared/ui/EmptyState';
@@ -319,6 +319,17 @@ function WeekPicker({ periods, value, onChange }: { periods: CrmPeriod[]; value:
 
 const ROLE_TONE: Record<string, Tone> = { 'Ведёт': 'brand', 'Помогает': 'info', 'Снят': 'neutral' };
 
+/** «8 учится · 1 ушёл» — состояние роли без разворачивания списка: порядок статусов фиксирован, а не алфавитный. */
+function rosterSummary(students: CrmGroupStudent[]): string {
+  const order = ['Active', 'Left', 'Transferred', 'Finished', 'Unknown'];
+  const counts = new Map<string, number>();
+  for (const s of students) counts.set(s.status, (counts.get(s.status) ?? 0) + 1);
+  return order
+    .filter((status) => counts.has(status))
+    .map((status) => `${(STUDENT_STATUS[status]?.label ?? status).toLowerCase()} ${String(counts.get(status))}`)
+    .join(' · ');
+}
+
 /** Группа из CRM: состав, менторы по датам и журнал, посчитанный по неделям так же, как считает CRM. */
 export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; onClose: () => void }): JSX.Element {
   const query = useQuery({
@@ -327,8 +338,9 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
     enabled: groupId !== null,
   });
   const [week, setWeek] = useState<number | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(false);
 
-  useEffect(() => { setWeek(null); }, [groupId]);
+  useEffect(() => { setWeek(null); setRosterOpen(false); }, [groupId]);
 
   const data = query.data;
   // По умолчанию — последний закрытый период: текущий ещё не заполнен до конца.
@@ -388,24 +400,37 @@ export function CrmGroupDrawer({ groupId, onClose }: { groupId: number | null; o
           </section>
 
           <section>
-            <SectionTitle aside={`${String(data.students.length)} студ.`}>Состав группы</SectionTitle>
-            <ul className="divide-y divide-divider border-y border-divider">
-              {data.students.map((s) => {
-                const status = STUDENT_STATUS[s.status] ?? { label: s.status, tone: 'neutral' as const };
-                return (
-                  <li key={s.id} className="py-2.5">
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
-                      <span className="truncate text-[14px] font-medium text-ink">{s.fullName}</span>
-                      <Status tone={status.tone}>{status.label}</Status>
-                      <span className="col-span-2 text-[12.5px] tabular-nums text-ink-muted sm:col-span-1 sm:text-right">
-                        с {formatDay(s.joinedOn, true)}{s.leftOn ? ` по ${formatDay(s.leftOn, true)}` : ''}
-                      </span>
-                    </div>
-                    {s.note ? <p className="mt-1 max-w-[72ch] text-[12.5px] leading-5 text-ink-muted">{s.note}</p> : null}
-                  </li>
-                );
-              })}
-            </ul>
+            <button
+              type="button"
+              onClick={() => { setRosterOpen((v) => !v); }}
+              className="flex w-full items-baseline justify-between gap-3 text-left"
+              aria-expanded={rosterOpen}
+            >
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">Состав группы</h3>
+              <span className="flex items-center gap-2 text-[12px] text-ink-muted">
+                {rosterSummary(data.students)}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${rosterOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+              </span>
+            </button>
+            {rosterOpen ? (
+              <ul className="mt-3 divide-y divide-divider border-y border-divider">
+                {data.students.map((s) => {
+                  const status = STUDENT_STATUS[s.status] ?? { label: s.status, tone: 'neutral' as const };
+                  return (
+                    <li key={s.id} className="py-2.5">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                        <span className="truncate text-[14px] font-medium text-ink">{s.fullName}</span>
+                        <Status tone={status.tone}>{status.label}</Status>
+                        <span className="col-span-2 text-[12.5px] tabular-nums text-ink-muted sm:col-span-1 sm:text-right">
+                          с {formatDay(s.joinedOn, true)}{s.leftOn ? ` по ${formatDay(s.leftOn, true)}` : ''}
+                        </span>
+                      </div>
+                      {s.note ? <p className="mt-1 max-w-[72ch] text-[12.5px] leading-5 text-ink-muted">{s.note}</p> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
           </section>
         </div>
       ) : null}
