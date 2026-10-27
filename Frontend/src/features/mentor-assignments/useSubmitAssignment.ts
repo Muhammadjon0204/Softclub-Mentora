@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { getAssignment } from '../../api/lead/assignments';
 import { uploadSubmission } from '../../api/lead/submissions';
 import { getGenericErrorMessage } from '../../api/problemDetails';
+import { patchAssignmentListCache } from '../lead/assignments/assignmentAdapter';
 import { SUBMISSIONS_ROOT_KEY } from '../lead/assignments/useSubmissions';
 import { mentorAssignmentHistoryQueryKey, mentorAssignmentsListQueryKey } from '../mentor/scope/useScopedMentorAssignments';
 import { useMentorScope } from '../mentor/scope/useMentorScope';
@@ -64,10 +66,21 @@ export function useSubmitAssignment(): UseSubmitAssignmentResult {
 
   const invalidate = useCallback(
     (assignmentId: string): void => {
-      void queryClient.invalidateQueries({ queryKey: mentorAssignmentsListQueryKey(scope.organizationId, scope.mentorId) });
       void queryClient.invalidateQueries({ queryKey: mentorAssignmentHistoryQueryKey(assignmentId) });
       // Root, not this assignment's key: list views read submissions through a batch entry.
       void queryClient.invalidateQueries({ queryKey: SUBMISSIONS_ROOT_KEY });
+    },
+    [queryClient],
+  );
+
+  // `uploadSubmission` only hands back the new `SubmissionDto`, not the assignment (its status just
+  // flipped to Submitted server-side) — one lightweight `GET /assignments/{id}` to patch the list cache
+  // directly beats invalidating the list and waiting for a `GET /assignments?pageSize=100` refetch to
+  // notice the same write, which was the delay between "sent" and the card actually leaving this lane.
+  const applyAssignmentUpdate = useCallback(
+    async (assignmentId: string): Promise<void> => {
+      const updated = await getAssignment(assignmentId);
+      patchAssignmentListCache(queryClient, mentorAssignmentsListQueryKey(scope.organizationId, scope.mentorId), updated);
     },
     [queryClient, scope.organizationId, scope.mentorId],
   );
@@ -112,12 +125,15 @@ export function useSubmitAssignment(): UseSubmitAssignmentResult {
         }
       } finally {
         setIsSubmitting(false);
-        if (anySucceeded) invalidate(assignmentId);
+        if (anySucceeded) {
+          await applyAssignmentUpdate(assignmentId);
+          invalidate(assignmentId);
+        }
       }
 
       return results;
     },
-    [invalidate],
+    [invalidate, applyAssignmentUpdate],
   );
 
   return { isSubmitting, submitFiles };

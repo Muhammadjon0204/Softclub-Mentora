@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import type { AssignmentDto } from '../../../api/lead/assignments';
 import {
   acceptAssignmentSuggestion,
   cancelAssignment,
@@ -14,7 +15,7 @@ import { getGenericErrorMessage } from '../../../api/problemDetails';
 import type { LeadAssignmentRecord } from '../../../mocks/ui-preview/leadAssignments.preview';
 import { assignmentHistoryQueryKey, leadAssignmentsListQueryKey } from '../scope/useScopedLeadAssignments';
 import { useLeadScope } from '../scope/useLeadScope';
-import { toAssignmentRecord } from './assignmentAdapter';
+import { patchAssignmentListCache, toAssignmentRecord } from './assignmentAdapter';
 
 /**
  * LA4–LA10 real mutations — replaces `leadAssignmentPreviewStore.ts`'s create/edit/transition
@@ -58,16 +59,28 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const invalidateList = useCallback((): void => {
-    void queryClient.invalidateQueries({ queryKey: leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId) });
-  }, [queryClient, scope.organizationId, scope.categoryId]);
+  const listQueryKey = useMemo(
+    () => leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId),
+    [scope.organizationId, scope.categoryId],
+  );
 
-  const invalidateOne = useCallback(
-    (id: string): void => {
-      invalidateList();
-      void queryClient.invalidateQueries({ queryKey: assignmentHistoryQueryKey(id) });
+  const invalidateList = useCallback((): void => {
+    void queryClient.invalidateQueries({ queryKey: listQueryKey });
+  }, [queryClient, listQueryKey]);
+
+  // Every action below already gets the updated row back from the server — patch it straight into the
+  // list cache instead of invalidating and waiting for a second `GET /assignments?pageSize=100` just to
+  // see our own write. That round trip was the whole delay: the Kanban lane is derived from
+  // `assignment.status`, so once `listQueryKey`'s cache has the new status the card moves on this same
+  // render, not whenever the refetch happens to land. History is a secondary view (the drawer's event
+  // timeline) — still invalidated normally, no one is staring at it waiting for a card to move.
+  const applyUpdate = useCallback(
+    (updated: AssignmentDto): LeadAssignmentRecord => {
+      patchAssignmentListCache(queryClient, listQueryKey, updated);
+      void queryClient.invalidateQueries({ queryKey: assignmentHistoryQueryKey(updated.id) });
+      return toAssignmentRecord(updated);
     },
-    [invalidateList, queryClient],
+    [queryClient, listQueryKey],
   );
 
   const run = useCallback(async <T,>(action: () => Promise<T>): Promise<T> => {
@@ -113,55 +126,49 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
           concurrencyToken,
         }),
       );
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   const publish = useCallback(
     async (id: string, concurrencyToken: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => publishAssignment(id, { concurrencyToken }));
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   const acceptSuggestion = useCallback(
     async (id: string, concurrencyToken: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => acceptAssignmentSuggestion(id, { concurrencyToken }));
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   const reassign = useCallback(
     async (id: string, concurrencyToken: string, mentorId: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => reassignAssignment(id, { assignedToId: mentorId, concurrencyToken }));
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   const startReview = useCallback(
     async (id: string, concurrencyToken: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => startAssignmentReview(id, { concurrencyToken }));
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   const cancel = useCallback(
     async (id: string, concurrencyToken: string, reason: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => cancelAssignment(id, { cancelReason: reason, concurrencyToken }));
-      invalidateOne(id);
-      return toAssignmentRecord(updated);
+      return applyUpdate(updated);
     },
-    [run, invalidateOne],
+    [run, applyUpdate],
   );
 
   return { isSubmitting, createDraft, updateAssignment, publish, acceptSuggestion, reassign, startReview, cancel };

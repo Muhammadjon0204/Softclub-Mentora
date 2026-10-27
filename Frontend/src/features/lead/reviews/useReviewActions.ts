@@ -1,10 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { createReview } from '../../../api/lead/reviews';
 import { getGenericErrorMessage } from '../../../api/problemDetails';
 import type { LeadAssignmentRecord } from '../../../mocks/ui-preview/leadAssignments.preview';
-import { toAssignmentRecord } from '../assignments/assignmentAdapter';
+import { patchAssignmentListCache, toAssignmentRecord } from '../assignments/assignmentAdapter';
 import { getAssignment } from '../../../api/lead/assignments';
 import { assignmentHistoryQueryKey, leadAssignmentsListQueryKey } from '../scope/useScopedLeadAssignments';
 import { useLeadScope } from '../scope/useLeadScope';
@@ -38,15 +38,24 @@ export function useReviewActions(): UseReviewActionsResult {
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const listQueryKey = useMemo(
+    () => leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId),
+    [scope.organizationId, scope.categoryId],
+  );
+
+  // The list itself is patched directly in `decide()` below (we already fetch the updated assignment
+  // there) instead of invalidated — a decision is the exact "feels slow" complaint: the old
+  // invalidate-the-list call meant the card sat in Review until a full `GET /assignments` refetch
+  // landed, on top of the POST /reviews + GET /assignments already spent getting that data in the
+  // first place.
   const invalidateAfterDecision = useCallback(
     (assignment: LeadAssignmentRecord, submissionId: string): void => {
-      void queryClient.invalidateQueries({ queryKey: leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId) });
       void queryClient.invalidateQueries({ queryKey: assignmentHistoryQueryKey(assignment.id) });
       // Root, not this assignment's key: list views read submissions through a batch entry.
       void queryClient.invalidateQueries({ queryKey: SUBMISSIONS_ROOT_KEY });
       void queryClient.invalidateQueries({ queryKey: reviewQueryKey(submissionId) });
     },
-    [queryClient, scope.organizationId, scope.categoryId],
+    [queryClient],
   );
 
   const latestSubmissionId = useCallback((assignment: LeadAssignmentRecord): string => {
@@ -75,6 +84,7 @@ export function useReviewActions(): UseReviewActionsResult {
         // CreateReviewRequest's response is the ReviewDto, not the updated assignment — the assignment's
         // new status/concurrencyToken come from a follow-up read.
         const updatedAssignment = await getAssignment(assignment.id);
+        patchAssignmentListCache(queryClient, listQueryKey, updatedAssignment);
         invalidateAfterDecision(assignment, submissionId);
         return toAssignmentRecord(updatedAssignment);
       } catch (error) {
@@ -84,7 +94,7 @@ export function useReviewActions(): UseReviewActionsResult {
         setIsSubmitting(false);
       }
     },
-    [invalidateAfterDecision, latestSubmissionId],
+    [invalidateAfterDecision, latestSubmissionId, queryClient, listQueryKey],
   );
 
   const approve = useCallback(
