@@ -1,4 +1,6 @@
-import type { AssignmentDto, TaskEventDto } from '../../../api/lead/assignments';
+import type { QueryClient } from '@tanstack/react-query';
+
+import type { AssignmentDto, PagedResult, TaskEventDto } from '../../../api/lead/assignments';
 import type { ReviewDto } from '../../../api/lead/reviews';
 import type { SubmissionDto } from '../../../api/lead/submissions';
 import type {
@@ -39,6 +41,29 @@ function toMsRequired(iso: string): number {
  * Overdue assignments. Logged as a new gap in `docs/INTEGRATION_UI_ISSUES.md`.
  */
 const ALLOW_LATE_SUBMISSION_DEFAULT = true;
+
+/**
+ * Splices a just-returned `AssignmentDto` straight into a cached assignment list, instead of the
+ * caller invalidating the list and waiting for a full refetch (`GET /assignments?pageSize=100`) to see
+ * its own write. Every mutation already gets the authoritative updated row back from the server — this
+ * is not a guess, just not throwing that response away. A no-op if the list isn't cached (not yet
+ * fetched) or the row isn't in it (e.g. a different Lead's category page is cached from a previous
+ * session) — `setQueryData`'s updater returning the same reference changes nothing.
+ */
+export function patchAssignmentListCache(
+  queryClient: QueryClient,
+  listQueryKey: readonly unknown[],
+  updated: AssignmentDto,
+): void {
+  queryClient.setQueryData<PagedResult<AssignmentDto>>(listQueryKey, (prev) => {
+    if (prev === undefined) return prev;
+    const index = prev.items.findIndex((item) => item.id === updated.id);
+    if (index === -1) return prev;
+    const items = [...prev.items];
+    items[index] = updated;
+    return { ...prev, items };
+  });
+}
 
 /** Base assignment fields only — `submissions`/`events` are populated separately (see `useSubmissions.ts`/history merging in the scope hooks), never eagerly for every row in a list. */
 export function toAssignmentRecord(dto: AssignmentDto): LeadAssignmentRecord {
