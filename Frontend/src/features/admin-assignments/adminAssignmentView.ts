@@ -1,5 +1,6 @@
 import type { BadgeTone } from '../../shared/ui/Badge';
 import { TASK_EVENT_LABEL, formatDaysRu, pluralizeRu } from './assignmentPresentation';
+import { intlLocale } from '../../shared/i18n/intl';
 
 /** Русские названия статусов `AssignmentStatus` (backend) — те же, что у руководителя. */
 export const ASSIGNMENT_STATUS_LABEL: Record<string, string> = {
@@ -71,14 +72,14 @@ export function deadlineHint(status: string, dueAtMs: number, nowMs: number): { 
 }
 
 export function formatDateTimeRu(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleString(intlLocale(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 export function formatShortDateTimeRu(iso: string): { date: string; time: string } {
   const value = new Date(iso);
   return {
-    date: value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', ''),
-    time: value.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false }),
+    date: value.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', ''),
+    time: value.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false }),
   };
 }
 

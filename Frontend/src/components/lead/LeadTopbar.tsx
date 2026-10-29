@@ -8,17 +8,14 @@ import { useTranslation } from '../../shared/i18n/useTranslation';
 import { ThemeToggle } from '../../shared/theme/ThemeToggle';
 import { IconButton } from '../../shared/ui/Button';
 import { LeadBreadcrumbs } from './LeadBreadcrumbs';
-import { LeadWorkspaceBadge } from './LeadWorkspaceBadge';
 
 interface LeadTopbarProps {
   onOpenMobileSidebar: () => void;
 }
 
 /**
- * Аналог `AdminTopbar`, но вместо `BranchContextSelector`/`BranchContextBadge`
- * (те относятся к Branch-уровню изоляции и доступны только Organization/Branch
- * Admin) — read-only `LeadWorkspaceBadge` со вторым уровнем изоляции (Category).
- * `ProfileMenu` переиспользуется как есть — он уже role-aware для Lead.
+ * Аналог `AdminTopbar` без селектора филиала: Lead не выбирает ни филиал, ни направление.
+ * Где человек работает (филиал · направление) — в `ProfileMenu`, отдельной плашки в шапке нет.
  */
 export function LeadTopbar({ onOpenMobileSidebar }: LeadTopbarProps): JSX.Element {
   const { user } = useAuth();
@@ -34,10 +31,7 @@ export function LeadTopbar({ onOpenMobileSidebar }: LeadTopbarProps): JSX.Elemen
       <div className="hidden min-w-0 flex-1 lg:block">
         <LeadBreadcrumbs />
       </div>
-      {/* На телефоне правая группа может сжиматься: бейдж обрезается, а не выталкивает аватар за край. */}
       <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
-        <LeadWorkspaceBadge />
-
         {!isOnline ? (
           <span className="hidden items-center gap-1.5 rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 text-[12px] font-medium text-warning sm:flex">
             <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />

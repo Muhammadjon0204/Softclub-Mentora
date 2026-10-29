@@ -19,8 +19,10 @@ import { FormTextarea } from '../../shared/ui/FormField';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmReportText } from './CrmReportText';
 import { CrmReportDrawer } from './CrmReportsView';
+import { lazyDateTimeFormat } from '../../shared/i18n/intl';
+import { tr } from '../../shared/i18n/catalog';
 
-const DATE_TIME = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const DATE_TIME = lazyDateTimeFormat({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function when(iso: string): string {
   return DATE_TIME.format(new Date(iso)).replace(/\.(?=\s|,|$)/, '');
@@ -158,7 +160,7 @@ export function CrmReportPanel({ groupId, week }: { groupId: number; week: numbe
                 size="sm"
                 leadingIcon={<Send className="h-3.5 w-3.5" aria-hidden="true" />}
                 onClick={() => {
-                  if (window.confirm('Отправить отчёт тимлиду? После отправки его нельзя будет изменить.')) send.mutate();
+                  if (window.confirm(tr('Отправить отчёт тимлиду? После отправки его нельзя будет изменить.'))) send.mutate();
                 }}
                 isLoading={send.isPending}
                 disabled={busy || text.trim().length === 0}
@@ -174,7 +176,7 @@ export function CrmReportPanel({ groupId, week }: { groupId: number; week: numbe
                   variant="ghost"
                   leadingIcon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
                   onClick={() => {
-                    if (text.trim().length === 0 || window.confirm('ИИ напишет выводы заново — текущий текст будет заменён.')) redraft.mutate();
+                    if (text.trim().length === 0 || window.confirm(tr('ИИ напишет выводы заново — текущий текст будет заменён.'))) redraft.mutate();
                   }}
                   isLoading={redraft.isPending}
                   disabled={busy}

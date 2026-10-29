@@ -7,6 +7,7 @@ import { MONTH_NAMES_GENITIVE_RU, WEEKDAY_SHORT_RU, countdownParts, dayKeyOf, fo
 import { useCalendarDeadlines } from '../deadline-calendar/useCalendarDeadlines';
 import { useNow } from '../deadline-calendar/useNow';
 import { useMentorScope } from '../mentor/scope/useMentorScope';
+import { tr } from '../../shared/i18n/catalog';
 
 const DAY_MS = 86_400_000;
 
@@ -28,7 +29,7 @@ function dueLabel(ms: number, nowMs: number, timeZoneId: string): string {
   if (key === dayKeyOf(nowMs + DAY_MS, timeZoneId)) return `Завтра в ${time}`;
   if (key === dayKeyOf(nowMs - DAY_MS, timeZoneId)) return `Вчера в ${time}`;
   const { year, month, day } = zonedParts(ms, timeZoneId);
-  return `${WEEKDAY_SHORT_RU[weekdayOf(year, month, day)]}, ${day} ${MONTH_NAMES_GENITIVE_RU[month - 1]} · ${time}`;
+  return `${tr(WEEKDAY_SHORT_RU[weekdayOf(year, month, day)])}, ${day} ${tr(MONTH_NAMES_GENITIVE_RU[month - 1])} · ${time}`;
 }
 
 function shortIn(diffMs: number): string {
@@ -242,7 +243,7 @@ export function DeadlineCountdownCard(): JSX.Element {
                 <li key={dto.id}>
                   <Link to={`/mentor/tasks?assignmentId=${dto.id}`} className="flex min-w-0 items-center gap-2.5 rounded-control px-2 py-1.5 transition hover:bg-white/10">
                     <span className="w-14 shrink-0 text-[11.5px] font-semibold tabular-nums text-white/80">
-                      {day} {MONTH_NAMES_GENITIVE_RU[month - 1].slice(0, 3)}
+                      {day} {tr(MONTH_NAMES_GENITIVE_RU[month - 1]).slice(0, 3)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">{dto.title}</span>
                     <span className="shrink-0 text-[11px] text-white/55">{shortIn(ms - now)}</span>

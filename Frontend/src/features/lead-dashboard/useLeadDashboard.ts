@@ -5,6 +5,7 @@ import type { LeadAssignmentRecord, LeadAssignmentStatus } from '../../mocks/ui-
 import { formatRelative, leadNow } from '../lead/scope/leadDateFormat';
 import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useScopedLeadAssignments } from '../lead/scope/useScopedLeadAssignments';
+import { dateTimeFormat } from '../../shared/i18n/intl';
 
 export interface LeadDashboardKpis {
   active: number;
@@ -54,7 +55,7 @@ function buildActivitySeries(assignments: LeadAssignmentRecord[], now: number): 
   const days = 14;
   const buckets: ActivityPoint[] = Array.from({ length: days }, (_, index) => {
     const dayStart = now - (days - 1 - index) * DAY_MS;
-    const label = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(dayStart);
+    const label = dateTimeFormat({ day: '2-digit', month: '2-digit' }).format(dayStart);
     return { dateLabel: label, assigned: 0, submitted: 0, approved: 0 };
   });
 

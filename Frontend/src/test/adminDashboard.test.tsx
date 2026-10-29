@@ -32,15 +32,16 @@ describe('Admin UI: фундамент и Dashboard', () => {
   });
 
   // 2
-  it('Branch Admin не видит пункт «Филиалы»; вместо selector — фиксированный badge', async () => {
+  it('Branch Admin не видит пункт «Филиалы»; свой филиал — в меню профиля, без selector', async () => {
     await loginAs(TEST_ACCOUNTS.branchAdminHead);
-    renderApp('/admin/dashboard');
+    const { user } = renderApp('/admin/dashboard');
 
     expect(await screen.findByRole('heading', { name: 'Обзор филиала' })).toBeInTheDocument();
     expect(screen.queryByText('Филиалы')).toBeNull();
 
-    // Badge виден (несколько вхождений имени филиала допустимы — sidebar + topbar).
-    expect(screen.getAllByText('Главный офис').length).toBeGreaterThan(0);
+    // Отдельной плашки филиала в topbar больше нет — филиал показан в меню профиля.
+    await user.click(screen.getByRole('button', { name: 'Открыть меню профиля' }));
+    expect(within(screen.getByTestId('profile-menu-panel')).getByText('Главный офис')).toBeInTheDocument();
     // У Branch Admin нет интерактивного селектора филиала — ищем только в
     // topbar (`aria-haspopup="listbox"` глобально уже не уникален: тот же
     // атрибут теперь и у несвязанного «Период аналитики» в теле дашборда).
@@ -79,10 +80,12 @@ describe('Admin UI: фундамент и Dashboard', () => {
   // 8
   it('Branch Admin филиала Худжанд не получает данные другого филиала', async () => {
     await loginAs(TEST_ACCOUNTS.branchAdminKhujand);
-    renderApp('/admin/dashboard');
+    const { user } = renderApp('/admin/dashboard');
 
     expect(await screen.findByRole('heading', { name: 'Обзор филиала' })).toBeInTheDocument();
-    expect(screen.getAllByText('Филиал Худжанд').length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Открыть меню профиля' }));
+    expect(within(screen.getByTestId('profile-menu-panel')).getByText('Филиал Худжанд')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
 
     // Категория Design существует только в Худжанде — присутствует.
     expect(await screen.findByText('Design')).toBeInTheDocument();

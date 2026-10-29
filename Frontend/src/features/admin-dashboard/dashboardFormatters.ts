@@ -6,6 +6,7 @@ import type {
 } from '../../api/admin/dashboard';
 import { auditActionLabel } from '../admin-preview/auditPresentation';
 import type { DeltaTone, SemanticTone } from './dashboard.types';
+import { lazyRelativeTimeFormat } from '../../shared/i18n/intl';
 
 /**
  * Раньше подменяла три конкретных preview-фикстуры на более "живые" названия городов для демо.
@@ -33,7 +34,7 @@ export function deltaTone(deltaPct: number, moreIsBetter: boolean): DeltaTone {
   return isUp === moreIsBetter ? 'positive' : 'negative';
 }
 
-const RELATIVE_FORMATTER = new Intl.RelativeTimeFormat('ru-RU', { numeric: 'auto' });
+const RELATIVE_FORMATTER = lazyRelativeTimeFormat({ numeric: 'auto' });
 
 export function relativeTimeLabel(iso: string, nowMs = Date.now()): string {
   const diffMs = new Date(iso).getTime() - nowMs;

@@ -10,11 +10,12 @@ import { Badge, StatusDot } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { TELEGRAM_STATUS_QUERY_KEY } from './profilePresentation';
+import { intlLocale } from '../../shared/i18n/intl';
 
 const POLL_INTERVAL_MS = 3000;
 
 function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleString(intlLocale(), { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**
@@ -144,7 +145,7 @@ export function ProfileTelegramCard(): JSX.Element {
                     <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </span>
-                <span className="mt-1 block text-[11.5px] text-ink-muted">Код действует до {new Date(pendingBind.expiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                <span className="mt-1 block text-[11.5px] text-ink-muted">Код действует до {new Date(pendingBind.expiresAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
               </span>
             </li>
             <li className="flex gap-2.5">

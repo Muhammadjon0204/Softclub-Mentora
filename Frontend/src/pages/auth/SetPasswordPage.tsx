@@ -13,7 +13,7 @@ const TITLES = {
 
 const DESCRIPTIONS = {
   // Никаких email и имён: до успешной отправки страница ничего не знает о пользователе.
-  form: 'Придумайте пароль для входа в MentorTaskFlow. Это последний шаг активации аккаунта.',
+  form: 'Придумайте пароль для входа в RAVAND. Это последний шаг активации аккаунта.',
   success: undefined,
   'invalid-link': undefined,
 } as const;

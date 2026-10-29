@@ -6,7 +6,7 @@ import { useBranchContext } from './useBranchContext';
 
 /**
  * Branch selector в topbar — виден только Organization Admin (ТЗ 2.2, раздел 24.8).
- * Branch Admin/Lead/Mentor вместо него видят `BranchContextBadge` без возможности
+ * Branch Admin/Lead/Mentor видят свой филиал только в `ProfileMenu`, без возможности
  * выбора: сам факт присутствия selector'а определяется `canOverrideBranch`,
  * а не ролевой проверкой в этом компоненте — источник истины один.
  */

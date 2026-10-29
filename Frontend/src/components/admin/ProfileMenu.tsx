@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { Building2, ChevronDown, LogOut, Settings, Tags, User } from 'lucide-react';
 
 import type { AuthUser } from '../../api/auth';
 import { useAuth } from '../../auth/useAuth';
@@ -96,13 +96,25 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
             </div>
           </div>
 
-          {/* 5.2 — контекст организации/филиала, без технических ID. */}
-          <div className="flex items-center gap-2.5 rounded-control bg-surface-muted px-3 py-3">
-            <Building2 className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium text-ink">{user.organization.name}</p>
-              <p className="truncate text-[12px] text-ink-secondary">{organizationContextLine}</p>
+          {/* 5.2 — контекст: организация → филиал → направление. Раньше филиал и направление
+              Lead/Mentor дублировались отдельной плашкой в topbar — теперь живут только здесь. */}
+          <div className="flex flex-col gap-2.5 rounded-control bg-surface-muted px-3 py-3">
+            <div className="flex items-center gap-2.5">
+              <Building2 className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-ink">{user.organization.name}</p>
+                <p className="truncate text-[12px] text-ink-secondary">{organizationContextLine}</p>
+              </div>
             </div>
+            {user.category !== null ? (
+              <div className="flex items-center gap-2.5 border-t border-divider pt-2.5">
+                <Tags className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] leading-4 text-ink-muted">Направление</p>
+                  <p className="truncate text-[13px] font-medium text-ink">{user.category.name}</p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* 5.3 — действия. */}

@@ -4,6 +4,7 @@ import { DAY_MS, HOUR_MS } from '../../mocks/domain/reference';
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
 import { mentorNow } from '../mentor/scope/mentorDateFormat';
 import { useScopedMentorAssignments } from '../mentor/scope/useScopedMentorAssignments';
+import { dateTimeFormat } from '../../shared/i18n/intl';
 
 /**
  * Личная аналитика Mentor — те же формулы раздела 21 ТЗ (`ANA-001`…`ANA-009`),
@@ -63,7 +64,7 @@ function buildActivitySeries(assignments: LeadAssignmentRecord[], now: number): 
   const days = 14;
   const buckets: ActivityPoint[] = Array.from({ length: days }, (_, index) => {
     const dayStart = now - (days - 1 - index) * DAY_MS;
-    const label = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(dayStart);
+    const label = dateTimeFormat({ day: '2-digit', month: '2-digit' }).format(dayStart);
     return { dateLabel: label, assigned: 0, submitted: 0, approved: 0 };
   });
 

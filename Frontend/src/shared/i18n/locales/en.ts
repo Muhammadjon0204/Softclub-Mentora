@@ -64,7 +64,7 @@ export const en: TranslationTree = {
     openMenu: 'Open profile menu',
     role: {
       admin: 'Administrator',
-      lead: 'Department head',
+      lead: 'Category lead',
       mentor: 'Mentor',
       orgAdmin: 'Organization admin',
       branchAdmin: 'Branch admin',

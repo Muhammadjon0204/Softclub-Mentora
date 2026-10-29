@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../shared/overlays';
 import { FormCheckbox, FormField, FormSelect, FormTextarea } from '../../shared/ui/FormField';
 import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
 import type { PreviewUserDetails } from './userPresentation';
+import { intlLocale } from '../../shared/i18n/intl';
 
 export interface ChangeCategoryInput {
   newCategoryId: string;
@@ -36,7 +37,7 @@ const REASON_MAX = 500;
 const FINISHED = new Set(['Approved', 'Cancelled']);
 
 function formatDue(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return new Date(iso).toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 /**

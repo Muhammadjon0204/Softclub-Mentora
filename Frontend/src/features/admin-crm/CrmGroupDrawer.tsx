@@ -10,6 +10,7 @@ import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmReportPanel } from './CrmReportPanel';
 import { ABSENCE_LABEL, REMARK_LABEL, STUDENT_STATUS, ZONE, formatDay, formatRange, percent, periodTitle, zoneText } from './crmPresentation';
+import { tr } from '../../shared/i18n/catalog';
 
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'brand' | 'neutral';
 
@@ -326,7 +327,7 @@ function rosterSummary(students: CrmGroupStudent[]): string {
   for (const s of students) counts.set(s.status, (counts.get(s.status) ?? 0) + 1);
   return order
     .filter((status) => counts.has(status))
-    .map((status) => `${(STUDENT_STATUS[status]?.label ?? status).toLowerCase()} ${String(counts.get(status))}`)
+    .map((status) => `${tr(STUDENT_STATUS[status]?.label ?? status).toLowerCase()} ${String(counts.get(status))}`)
     .join(' · ');
 }
 

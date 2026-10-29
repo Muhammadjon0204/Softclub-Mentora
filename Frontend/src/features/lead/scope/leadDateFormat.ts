@@ -1,5 +1,6 @@
 import { pluralizeRu } from '../../admin-assignments/assignmentPresentation';
 import { DAY_MS, HOUR_MS, MINUTE_MS, MOCK_NOW } from '../../../mocks/domain/reference';
+import { dateTimeFormat } from '../../../shared/i18n/intl';
 
 /**
  * ТЗ 2.2, раздел 14.6 (`UX-001`…`UX-003`): дедлайны и любые даты показываются
@@ -8,7 +9,7 @@ import { DAY_MS, HOUR_MS, MINUTE_MS, MOCK_NOW } from '../../../mocks/domain/refe
  * (не просто текстовый суффикс), а не только в отображаемой метке.
  */
 export function formatCategoryDateTime(timestampMs: number, timeZoneId: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', {
+  const parts = dateTimeFormat({
     timeZone: timeZoneId,
     day: '2-digit',
     month: '2-digit',
@@ -23,7 +24,7 @@ export function formatCategoryDateTime(timestampMs: number, timeZoneId: string):
 }
 
 export function formatCategoryDate(timestampMs: number, timeZoneId: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', {
+  const parts = dateTimeFormat({
     timeZone: timeZoneId,
     day: '2-digit',
     month: '2-digit',

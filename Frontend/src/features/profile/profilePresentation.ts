@@ -1,5 +1,6 @@
 import type { AuthUser } from '../../api/auth';
 import { readPreference, writePreference } from '../../lib/preferenceStorage';
+import { tr } from '../../shared/i18n/catalog';
 
 /** Общий ключ статуса Telegram — его читают и карточка Telegram, и настройки уведомлений. */
 export const TELEGRAM_STATUS_QUERY_KEY = ['telegram-status'] as const;
@@ -68,7 +69,7 @@ export function timeZoneLabel(timeZoneId: string): string {
   } catch {
     offset = '';
   }
-  return offset === '' ? city : `${city} (${offset})`;
+  return offset === '' ? tr(city) : `${tr(city)} (${offset})`;
 }
 
 /** «Chrome · Windows» — грубо, но достаточно, чтобы узнать своё устройство. */

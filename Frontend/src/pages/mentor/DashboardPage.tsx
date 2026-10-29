@@ -8,6 +8,7 @@ import { RecentActivityCard } from '../../features/mentor-dashboard/RecentActivi
 import { useMentorDashboard } from '../../features/mentor-dashboard/useMentorDashboard';
 import { useMentorScope } from '../../features/mentor/scope/useMentorScope';
 import { StaggerContainer } from '../../shared/ui/motion';
+import { tr } from '../../shared/i18n/catalog';
 
 function currentHourInTimeZone(timeZoneId: string): number {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: timeZoneId, hour: 'numeric', hour12: false }).formatToParts(new Date());
@@ -39,7 +40,7 @@ export function DashboardPage(): JSX.Element {
   const scope = useMentorScope();
   const { kpis, attentionItems, recentActivity } = useMentorDashboard();
 
-  const greeting = `${greetingForHour(currentHourInTimeZone(scope.timeZoneId))}, ${firstNameOf(scope.mentorName)}`;
+  const greeting = `${tr(greetingForHour(currentHourInTimeZone(scope.timeZoneId)))}, ${firstNameOf(scope.mentorName)}`;
 
   return (
     <div className="space-y-5">

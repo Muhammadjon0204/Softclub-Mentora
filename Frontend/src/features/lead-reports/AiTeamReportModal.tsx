@@ -8,9 +8,10 @@ import { Modal } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
 import { Skeleton } from '../../shared/ui/Skeleton';
 import { CrmReportText } from '../admin-crm/CrmReportText';
+import { lazyDateTimeFormat } from '../../shared/i18n/intl';
 
-const DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
-const TIME = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const DATE = lazyDateTimeFormat({ day: 'numeric', month: 'short', year: 'numeric' });
+const TIME = lazyDateTimeFormat({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 function day(value: string): string {
   const [y, m, d] = value.split('-').map(Number);
