@@ -10,7 +10,7 @@ namespace MentorTaskFlow.Api.Controllers;
 /// Omuz CRM integration, read-only.
 /// </summary>
 /// <remarks>
-/// The CRM key reads every branch, so isolation is Mentora's: the groups and journals are open to every
+/// The CRM key reads every branch, so isolation is RAVAND's: the groups and journals are open to every
 /// role, each within its scope (<see cref="ICrmIntegrationService.GetAccessAsync"/>) — a mentor their
 /// own groups, a Lead their team's, a Branch Admin their branch's. The connection status and the links
 /// that decide those scopes are the Organization Admin's alone.
@@ -47,14 +47,14 @@ public sealed class CrmIntegrationController(ICrmIntegrationService crm, ICrmLin
     public async Task<ActionResult<CrmGroupPreviewDto>> GroupAsync(int groupId, CancellationToken cancellationToken) =>
         Ok(await crm.GetGroupPreviewAsync(groupId, cancellationToken));
 
-    /// <summary><c>GET /integrations/crm/links</c> — CRM mentors and branches with their Mentora counterparts.</summary>
+    /// <summary><c>GET /integrations/crm/links</c> — CRM mentors and branches with their RAVAND counterparts.</summary>
     [HttpGet("links")]
     [Authorize(Policy = MtfPolicies.OrganizationAdmin)]
     [ProducesResponseType<CrmLinksDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CrmLinksDto>> LinksAsync(CancellationToken cancellationToken) =>
         Ok(await links.GetLinksAsync(cancellationToken));
 
-    /// <summary><c>PUT /integrations/crm/links/mentors/{crmMentorId}</c> — link or unlink a Mentora account.</summary>
+    /// <summary><c>PUT /integrations/crm/links/mentors/{crmMentorId}</c> — link or unlink a RAVAND account.</summary>
     [HttpPut("links/mentors/{crmMentorId:int}")]
     [Authorize(Policy = MtfPolicies.OrganizationAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -64,7 +64,7 @@ public sealed class CrmIntegrationController(ICrmIntegrationService crm, ICrmLin
         return NoContent();
     }
 
-    /// <summary><c>PUT /integrations/crm/links/branches/{crmBranchId}</c> — link or unlink a Mentora branch.</summary>
+    /// <summary><c>PUT /integrations/crm/links/branches/{crmBranchId}</c> — link or unlink a RAVAND branch.</summary>
     [HttpPut("links/branches/{crmBranchId:int}")]
     [Authorize(Policy = MtfPolicies.OrganizationAdmin)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

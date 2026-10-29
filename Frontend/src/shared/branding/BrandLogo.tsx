@@ -1,14 +1,16 @@
+import logoFullDarkUrl from '../../icons/Logo.dark.png';
+import logoFullLightUrl from '../../icons/Logo.optimized.png';
 import logoMarkUrl from '../../icons/LogoMark.png';
-import logoFullUrl from '../../icons/Logo.optimized.png';
+import { useTheme } from '../theme/useTheme';
 
 export interface BrandLogoProps {
-  /** `full` — знак + название «Mentora» одной картинкой; `mark` — только знак (collapsed sidebar). */
+  /** `full` — знак + название «RAVAND» одной картинкой; `mark` — только знак (collapsed sidebar). */
   variant?: 'full' | 'mark';
   className?: string;
   /**
-   * По умолчанию `alt="Mentora"`. Передайте `alt=""`, если логотип уже обёрнут
+   * По умолчанию `alt="RAVAND"`. Передайте `alt=""`, если логотип уже обёрнут
    * в ссылку/кнопку с собственным доступным именем — иначе скринридер
-   * озвучит «Mentora» дважды.
+   * озвучит «RAVAND» дважды.
    */
   alt?: string;
 }
@@ -18,20 +20,24 @@ const VARIANT_CLASSES: Record<NonNullable<BrandLogoProps['variant']>, string> = 
   mark: 'h-10 w-10 object-contain object-center',
 };
 
-const VARIANT_SRC: Record<NonNullable<BrandLogoProps['variant']>, string> = {
-  full: logoFullUrl,
-  mark: logoMarkUrl,
-};
-
 /**
- * Единственное место, где растеризованный логотип Mentora превращается в
- * `<img>` (раздел 9 задачи ребрендинга) — размеры и `object-fit` не
- * дублируются по потребителям компонента.
+ * Единственное место, где растеризованный логотип RAVAND превращается в
+ * `<img>` — размеры и `object-fit` не дублируются по потребителям компонента.
+ *
+ * `full` переключает картинку по теме: словесный знак перекрашивается в
+ * исходном арте (brand kit, `logo-light.svg`/`logo-dark.svg`) — тёмно-синий
+ * на светлом фоне становится почти белым на тёмном, иначе на `data-theme=
+ * 'dark'` текст сливался бы с фоном. Сама эмблема (градиентные столбики с
+ * галочкой) в обеих версиях одна и та же, поэтому у `mark` второго варианта
+ * нет вообще — один файл на обе темы (см. `README.md` бренд-кита).
  */
-export function BrandLogo({ variant = 'full', className = '', alt = 'Mentora' }: BrandLogoProps): JSX.Element {
+export function BrandLogo({ variant = 'full', className = '', alt = 'RAVAND' }: BrandLogoProps): JSX.Element {
+  const { theme } = useTheme();
+  const src = variant === 'mark' ? logoMarkUrl : theme === 'dark' ? logoFullDarkUrl : logoFullLightUrl;
+
   return (
     <img
-      src={VARIANT_SRC[variant]}
+      src={src}
       alt={alt}
       draggable={false}
       className={`${VARIANT_CLASSES[variant]} ${className}`}

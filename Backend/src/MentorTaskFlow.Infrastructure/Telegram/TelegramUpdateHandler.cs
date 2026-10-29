@@ -16,7 +16,7 @@ namespace MentorTaskFlow.Infrastructure.Telegram;
 /// </summary>
 /// <remarks>
 /// The bot only binds accounts and explains itself; work on tasks happens in the application. Every
-/// reply ends with a button back to Mentora so the next step is always one tap away.
+/// reply ends with a button back to RAVAND so the next step is always one tap away.
 /// </remarks>
 public sealed class TelegramUpdateHandler(
     ITelegramService telegram,
@@ -24,7 +24,7 @@ public sealed class TelegramUpdateHandler(
     CrmPhoneLinkService crmPhoneLinks,
     IOptions<NotificationOptions> notificationOptions)
 {
-    private const string OpenLabel = "Открыть Mentora";
+    private const string OpenLabel = "Открыть RAVAND";
 
     public async Task<TelegramReply?> HandleAsync(JsonElement update, CancellationToken cancellationToken)
     {
@@ -55,7 +55,7 @@ public sealed class TelegramUpdateHandler(
 
     private const string CrmOffer =
         "📚 <b>Группы из CRM</b>\n"
-        + "Чтобы видеть в Mentora свои группы, студентов и журнал из CRM, нажмите кнопку "
+        + "Чтобы видеть в RAVAND свои группы, студентов и журнал из CRM, нажмите кнопку "
         + "«Поделиться номером» внизу. Номер должен быть тем же, с которым вы входите в CRM.";
 
     private async Task<TelegramReply> CrmPromptAsync(string chatId, CancellationToken cancellationToken)
@@ -63,7 +63,7 @@ public sealed class TelegramUpdateHandler(
         var account = await FindAccountAsync(u => u.TelegramChatId == chatId, cancellationToken);
         if (account is null)
         {
-            return Reply(chatId, "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».", ProfileUrl());
+            return Reply(chatId, "Сначала подключите этот чат к RAVAND: профиль → «Подключить Telegram».", ProfileUrl());
         }
 
         return await crmPhoneLinks.OfferStateAsync(chatId, cancellationToken) switch
@@ -72,7 +72,7 @@ public sealed class TelegramUpdateHandler(
             CrmOfferState.NotMentorOrLead => Reply(chatId, "Связь с CRM по номеру нужна только менторам и тимлидам.", DashboardUrl(account)),
             CrmOfferState.AlreadyLinked => Reply(chatId, "✅ Ваш аккаунт уже связан с CRM — группы открыты в разделе «Группы в CRM».", CrmUrl(account)),
             CrmOfferState.CrmNotConfigured => Reply(chatId, "⏳ Интеграция с CRM ещё не включена администратором. Как только её включат, отправьте /crm ещё раз.", DashboardUrl(account)),
-            _ => Reply(chatId, "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».", ProfileUrl()),
+            _ => Reply(chatId, "Сначала подключите этот чат к RAVAND: профиль → «Подключить Telegram».", ProfileUrl()),
         };
     }
 
@@ -98,11 +98,11 @@ public sealed class TelegramUpdateHandler(
         {
             CrmPhoneLinkResult.Linked =>
                 $"✅ <b>Готово! Аккаунт связан с CRM</b>\n\nВ CRM вы — <b>{Escape(outcome.MentorName ?? string.Empty)}</b>, групп сейчас: {outcome.CurrentGroups}.\n"
-                + "Группы, студенты и журнал открыты в Mentora в разделе «Группы в CRM».",
+                + "Группы, студенты и журнал открыты в RAVAND в разделе «Группы в CRM».",
             CrmPhoneLinkResult.AlreadyLinked =>
                 $"✅ Аккаунт уже связан с CRM: <b>{Escape(outcome.MentorName ?? string.Empty)}</b>.",
             CrmPhoneLinkResult.ChatNotBound =>
-                "Сначала подключите этот чат к Mentora: профиль → «Подключить Telegram».",
+                "Сначала подключите этот чат к RAVAND: профиль → «Подключить Telegram».",
             CrmPhoneLinkResult.NotMentorOrLead =>
                 "Связь с CRM по номеру нужна только менторам и тимлидам.",
             CrmPhoneLinkResult.NotFound =>
@@ -112,7 +112,7 @@ public sealed class TelegramUpdateHandler(
             CrmPhoneLinkResult.CrmNotConfigured =>
                 "⏳ Интеграция с CRM ещё не включена администратором. Как только её включат, отправьте /crm ещё раз.",
             CrmPhoneLinkResult.TakenByAnother =>
-                "⚠️ Этот ментор CRM уже связан с другим аккаунтом Mentora. Если это ошибка — обратитесь к администратору.",
+                "⚠️ Этот ментор CRM уже связан с другим аккаунтом RAVAND. Если это ошибка — обратитесь к администратору.",
             _ =>
                 "⚠️ CRM сейчас недоступна. Попробуйте ещё раз чуть позже — /crm.",
         };
@@ -135,7 +135,7 @@ public sealed class TelegramUpdateHandler(
         var account = await FindAccountAsync(u => u.Id == userId, cancellationToken);
 
         var html =
-            $"✅ <b>Готово! Telegram подключён к Mentora</b>\n\n"
+            $"✅ <b>Готово! Telegram подключён к RAVAND</b>\n\n"
             + (account is null ? string.Empty : $"{Describe(account)}\n\n")
             + "Сюда будут приходить:\n"
             + "• новые задания и изменения сроков\n"
@@ -144,7 +144,7 @@ public sealed class TelegramUpdateHandler(
             + "Письма на почту никуда не денутся. Отключить Telegram можно в профиле в любой момент.";
 
         // A mentor or Lead not yet linked to the CRM gets the share button right away: one tap and
-        // their CRM groups open in Mentora.
+        // their CRM groups open in RAVAND.
         if (await crmPhoneLinks.CanOfferAsync(chatId, cancellationToken))
         {
             return new TelegramReply(chatId, $"{html}\n\n{CrmOffer}", Keyboard: TelegramKeyboard.RequestContact);
@@ -162,16 +162,16 @@ public sealed class TelegramUpdateHandler(
         {
             return Reply(
                 chatId,
-                $"👋 <b>{greeting}</b>\n\nЭтот чат уже подключён к Mentora.\n{Describe(account)}\n\n"
+                $"👋 <b>{greeting}</b>\n\nЭтот чат уже подключён к RAVAND.\n{Describe(account)}\n\n"
                 + "Уведомления о заданиях приходят сюда автоматически.",
                 DashboardUrl(account));
         }
 
         return Reply(
             chatId,
-            $"👋 <b>{greeting}</b>\n\nЭто бот уведомлений <b>Mentora</b>: новые задания, сроки, результаты проверки.\n\n"
+            $"👋 <b>{greeting}</b>\n\nЭто бот уведомлений <b>RAVAND</b>: новые задания, сроки, результаты проверки.\n\n"
             + "<b>Как подключить:</b>\n"
-            + "1. Откройте профиль в Mentora\n"
+            + "1. Откройте профиль в RAVAND\n"
             + "2. Нажмите «Подключить Telegram»\n"
             + "3. Вернитесь сюда и нажмите «Start»\n\n"
             + "Ссылка действует 15 минут.",
@@ -183,13 +183,13 @@ public sealed class TelegramUpdateHandler(
         var account = await FindAccountAsync(u => u.TelegramChatId == chatId, cancellationToken);
 
         return account is null
-            ? Reply(chatId, "Этот чат пока не подключён ни к одному аккаунту Mentora.\nПодключить можно в профиле — кнопка «Подключить Telegram».", ProfileUrl())
-            : Reply(chatId, $"🔗 <b>Чат подключён к Mentora</b>\n\n{Describe(account)}", DashboardUrl(account));
+            ? Reply(chatId, "Этот чат пока не подключён ни к одному аккаунту RAVAND.\nПодключить можно в профиле — кнопка «Подключить Telegram».", ProfileUrl())
+            : Reply(chatId, $"🔗 <b>Чат подключён к RAVAND</b>\n\n{Describe(account)}", DashboardUrl(account));
     }
 
     private TelegramReply Help(string chatId) => Reply(
         chatId,
-        "Этот бот доставляет уведомления Mentora. Действия по задачам выполняются в приложении.\n\n"
+        "Этот бот доставляет уведомления RAVAND. Действия по задачам выполняются в приложении.\n\n"
         + "/status — к какому аккаунту подключён чат\n"
         + "/crm — связать аккаунт с CRM по номеру телефона\n"
         + "/start — подключение и приветствие",

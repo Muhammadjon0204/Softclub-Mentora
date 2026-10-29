@@ -34,8 +34,8 @@
 
   <ItemGroup>
     <!-- Noto Sans (SIL OFL 1.1, see Reports/Fonts/OFL.txt): the container has no font with Cyrillic. -->
-    <EmbeddedResource Include="Reports/Fonts/NotoSans-Regular.ttf" LogicalName="Mentora.Fonts.NotoSans-Regular.ttf" />
-    <EmbeddedResource Include="Reports/Fonts/NotoSans-Bold.ttf" LogicalName="Mentora.Fonts.NotoSans-Bold.ttf" />
+    <EmbeddedResource Include="Reports/Fonts/NotoSans-Regular.ttf" LogicalName="Ravand.Fonts.NotoSans-Regular.ttf" />
+    <EmbeddedResource Include="Reports/Fonts/NotoSans-Bold.ttf" LogicalName="Ravand.Fonts.NotoSans-Bold.ttf" />
   </ItemGroup>
 
 </Project>

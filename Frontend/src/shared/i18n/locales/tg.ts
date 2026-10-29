@@ -43,7 +43,7 @@ export const tg: TranslationTree = {
     expandMenu: 'Васеъ кардани меню',
     collapseMenu: 'Пӯшидани меню',
     ariaLabel: 'Навигатсияи асосӣ',
-    brandHome: 'Mentora — ба дурнамо гузаштан',
+    brandHome: 'RAVAND — ба дурнамо гузаштан',
   },
   breadcrumbs: {
     ariaLabel: 'Пайроҳаи навигатсия',
@@ -84,7 +84,7 @@ export const tg: TranslationTree = {
   },
   auth: {
     login: {
-      title: 'Воридшавӣ ба Mentora',
+      title: 'Воридшавӣ ба RAVAND',
       subtitle: 'Барои идома додан почта ва рамзи худро ворид кунед.',
       email: 'Email',
       password: 'Рамз',

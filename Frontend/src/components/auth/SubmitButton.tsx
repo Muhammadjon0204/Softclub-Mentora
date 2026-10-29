@@ -18,7 +18,7 @@ const TONE_CLASS: Record<ButtonTone, string> = {
     'focus-visible:outline-indigo-600 disabled:bg-indigo-300',
   auth:
     'h-[46px] rounded-control bg-brand px-4 text-[15px] shadow-none hover:bg-brand-hover active:bg-brand-active ' +
-    'focus-visible:outline-brand disabled:bg-[rgba(91,92,226,0.4)]',
+    'focus-visible:outline-brand disabled:bg-[rgba(2,112,149,0.4)]',
 };
 
 /**

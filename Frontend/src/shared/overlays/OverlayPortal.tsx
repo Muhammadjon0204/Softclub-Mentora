@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 
-const OVERLAY_ROOT_ID = 'mentora-overlay-root';
+const OVERLAY_ROOT_ID = 'ravand-overlay-root';
 
 let sharedRoot: HTMLElement | null = null;
 let refCount = 0;
@@ -10,7 +10,7 @@ let createdBySystem = false;
 let pendingRemoval: number | null = null;
 
 /**
- * SSR-safe, идемпотентно: возвращает существующий #mentora-overlay-root или
+ * SSR-safe, идемпотентно: возвращает существующий #ravand-overlay-root или
  * создаёт один на всё приложение. Не трогает `refCount` — безопасно вызывать
  * из `useState`-инициализатора (React может вызвать его дважды в StrictMode).
  */
@@ -35,7 +35,7 @@ function ensureOverlayRoot(): HTMLElement | null {
 
 /**
  * Общий portal для всех overlays (Modal/Drawer/ConfirmDialog/Popover/ActionMenu/Tooltip/
- * ToastViewport) — рендерит children в единый `#mentora-overlay-root` в конце `<body>`,
+ * ToastViewport) — рендерит children в единый `#ravand-overlay-root` в конце `<body>`,
  * так что ничей `overflow: hidden`/`overflow: auto` на родительской Card их не обрезает.
  *
  * Root вычисляется синхронно в `useState`-инициализаторе (а не в `useEffect`) —

@@ -66,7 +66,7 @@ function downloadCsv(rows: ReportRow[], periodLabel: string): void {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Mentora — отчёт по направлениям (${periodLabel}).csv`;
+  link.download = `RAVAND — отчёт по направлениям (${periodLabel}).csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -107,7 +107,7 @@ export function ReportsPage(): JSX.Element {
     <div className="space-y-6 print:space-y-4">
       {/* Шапка только для печати / «Сохранить как PDF»: что за отчёт, за какой период и когда выгружен. */}
       <div className="hidden border-b border-line pb-3 print:block">
-        <p className="text-[18px] font-semibold text-ink">Mentora — отчёт по направлениям</p>
+        <p className="text-[18px] font-semibold text-ink">RAVAND — отчёт по направлениям</p>
         <p className="text-[12px] text-ink-muted">
           Период: {periodLabel.toLowerCase()} · выгружен {new Date(now).toLocaleString('ru-RU', { hour12: false })}
         </p>

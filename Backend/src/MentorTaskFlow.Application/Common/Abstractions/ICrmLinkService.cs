@@ -3,7 +3,7 @@ using MentorTaskFlow.Contracts.Integrations;
 namespace MentorTaskFlow.Application.Common.Abstractions;
 
 /// <summary>
-/// Who in Omuz CRM is who in Mentora: CRM mentor ↔ Mentora account, CRM branch ↔ Mentora branch.
+/// Who in Omuz CRM is who in RAVAND: CRM mentor ↔ RAVAND account, CRM branch ↔ RAVAND branch.
 /// </summary>
 /// <remarks>
 /// The links decide which CRM groups a person sees, so only the Organization Admin sets them. Matches

@@ -31,8 +31,8 @@ export const AVATAR_COLORS = [
 
 export type AvatarColorId = (typeof AVATAR_COLORS)[number]['id'];
 
-const avatarKey = (userId: string): string => `mentora.avatarColor.${userId}`;
-export const AVATAR_COLOR_EVENT = 'mentora:avatar-color';
+const avatarKey = (userId: string): string => `ravand.avatarColor.${userId}`;
+export const AVATAR_COLOR_EVENT = 'ravand:avatar-color';
 
 export function readAvatarColor(userId: string): AvatarColorId {
   const stored = readPreference(avatarKey(userId));

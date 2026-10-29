@@ -41,7 +41,7 @@ export type MetricAccent = 'brand' | 'info' | 'warning' | 'danger' | 'success';
  * Цвета — те же, что у токенов `--primary/--warning/...`, но с прозрачностью для тени.
  */
 const GLOW: Record<MetricAccent, string> = {
-  brand: 'border-[rgba(91,92,226,0.32)] shadow-[0_12px_32px_-10px_rgba(91,92,226,0.55),0_0_0_4px_rgba(91,92,226,0.06)]',
+  brand: 'border-[rgba(2,112,149,0.32)] shadow-[0_12px_32px_-10px_rgba(2,112,149,0.55),0_0_0_4px_rgba(2,112,149,0.06)]',
   info: 'border-[rgba(52,120,212,0.32)] shadow-[0_12px_32px_-10px_rgba(52,120,212,0.55),0_0_0_4px_rgba(52,120,212,0.06)]',
   warning: 'border-[rgba(200,120,18,0.32)] shadow-[0_12px_32px_-10px_rgba(200,120,18,0.55),0_0_0_4px_rgba(200,120,18,0.07)]',
   danger: 'border-[rgba(201,74,74,0.32)] shadow-[0_12px_32px_-10px_rgba(201,74,74,0.55),0_0_0_4px_rgba(201,74,74,0.06)]',

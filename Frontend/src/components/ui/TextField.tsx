@@ -3,7 +3,7 @@ import type { InputHTMLAttributes } from 'react';
 
 /**
  * `auth` — премиальный вид формы входа (раздел 6/13 брендинга Login):
- * токены Mentora Panel вместо сырых slate/indigo. `default` не трогаем —
+ * токены RAVAND Panel вместо сырых slate/indigo. `default` не трогаем —
  * им пользуются ForgotPassword/Reset/SetPassword и менять их вид не просили.
  */
 type FieldTone = 'default' | 'auth';
@@ -48,7 +48,7 @@ const HINT_CLASS: Record<FieldTone, string> = {
  * (та самая «сильная синяя заливка» из ТЗ). Обходим arbitrary-values
  * с готовым rgba — им опасен ту же ловушку.
  */
-const AUTH_FOCUS_RING = 'focus:ring-[3px] focus:ring-[rgba(91,92,226,0.16)]';
+const AUTH_FOCUS_RING = 'focus:ring-[3px] focus:ring-[rgba(2,112,149,0.16)]';
 const AUTH_FOCUS_RING_ERROR = 'focus:ring-[3px] focus:ring-[rgba(201,74,74,0.16)]';
 
 function inputClasses(hasError: boolean, tone: FieldTone, extra = ''): string {

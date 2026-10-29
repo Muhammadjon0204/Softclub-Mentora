@@ -13,7 +13,7 @@ interface BranchProviderProps {
   children: ReactNode;
 }
 
-const BRANCH_STORAGE_KEY_PREFIX = 'mentora.branchContext.selectedBranchId.';
+const BRANCH_STORAGE_KEY_PREFIX = 'ravand.branchContext.selectedBranchId.';
 
 // Персистим только сам выбор (это UI-предпочтение, не граница безопасности —
 // backend всё равно проверяет scope на каждый запрос), с ключом per-user,

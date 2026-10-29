@@ -10,7 +10,7 @@ namespace MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 /// The part of the CRM one person sees.
 /// </summary>
 /// <remarks>
-/// The CRM key reads every branch, so the CRM itself isolates nothing: this is where Mentora's own
+/// The CRM key reads every branch, so the CRM itself isolates nothing: this is where RAVAND's own
 /// roles are laid over it. <c>Missing</c> is set when the link the scope depends on does not exist yet —
 /// the person then sees nothing, never everything.
 /// </remarks>

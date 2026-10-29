@@ -39,13 +39,13 @@ public static class CrmReportPdf
     private const string Green = "#15803D";
     private const string Amber = "#B45309";
     private const string Red = "#B91C1C";
-    private const string Brand = "#4F46E5";
+    private const string Brand = "#027095";
 
     private static readonly Lazy<bool> Setup = new(() =>
     {
         QuestPDF.Settings.License = LicenseType.Community;
         var assembly = Assembly.GetExecutingAssembly();
-        foreach (var name in new[] { "Mentora.Fonts.NotoSans-Regular.ttf", "Mentora.Fonts.NotoSans-Bold.ttf" })
+        foreach (var name in new[] { "Ravand.Fonts.NotoSans-Regular.ttf", "Ravand.Fonts.NotoSans-Bold.ttf" })
         {
             using var stream = assembly.GetManifestResourceStream(name)
                                ?? throw new InvalidOperationException($"Шрифт {name} не встроен в сборку.");
@@ -104,7 +104,7 @@ public static class CrmReportPdf
             page.Footer().PaddingTop(12).AlignCenter().Text(text =>
             {
                 text.DefaultTextStyle(t => t.FontSize(8).FontColor(Muted));
-                text.Span("Mentora · баллы посчитаны по журналу Omuz CRM · стр. ");
+                text.Span("RAVAND · баллы посчитаны по журналу Omuz CRM · стр. ");
                 text.CurrentPageNumber();
                 text.Span(" из ");
                 text.TotalPages();

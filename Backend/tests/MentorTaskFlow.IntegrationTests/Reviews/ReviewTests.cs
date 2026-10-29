@@ -200,7 +200,7 @@ public sealed class ReviewTests(PostgresFixture postgres, MinioFixture minio) : 
         // mentor reads «what to fix» on the move — but the email still only says that a decision
         // exists and points to the interface.
         var rendered = NotificationTemplates.Render(
-            notification.EventType, notification.Payload, "https://mentora.test");
+            notification.EventType, notification.Payload, "https://ravand.test");
 
         rendered.PlainText.ShouldNotContain("индексы");
         rendered.Html.ShouldNotContain("индексы");

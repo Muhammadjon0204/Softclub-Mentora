@@ -40,7 +40,7 @@ export const ru = {
     expandMenu: 'Развернуть меню',
     collapseMenu: 'Свернуть меню',
     ariaLabel: 'Основная навигация',
-    brandHome: 'Mentora — перейти к обзору',
+    brandHome: 'RAVAND — перейти к обзору',
   },
   breadcrumbs: {
     ariaLabel: 'Хлебные крошки',
@@ -81,7 +81,7 @@ export const ru = {
   },
   auth: {
     login: {
-      title: 'Вход в Mentora',
+      title: 'Вход в RAVAND',
       subtitle: 'Введите рабочий email и пароль, чтобы продолжить.',
       email: 'Email',
       password: 'Пароль',

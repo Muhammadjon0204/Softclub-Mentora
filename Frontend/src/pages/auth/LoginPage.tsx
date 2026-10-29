@@ -34,7 +34,7 @@ export function LoginPage(): JSX.Element {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
-          backgroundImage: 'radial-gradient(46rem 30rem at 50% -8rem, rgba(91,92,226,0.07), transparent 65%)',
+          backgroundImage: 'radial-gradient(46rem 30rem at 50% -8rem, rgba(2,112,149,0.07), transparent 65%)',
         }}
       />
 

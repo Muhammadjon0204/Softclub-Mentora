@@ -37,7 +37,7 @@ export const en: TranslationTree = {
     expandMenu: 'Expand menu',
     collapseMenu: 'Collapse menu',
     ariaLabel: 'Main navigation',
-    brandHome: 'Mentora — go to overview',
+    brandHome: 'RAVAND — go to overview',
   },
   breadcrumbs: {
     ariaLabel: 'Breadcrumbs',
@@ -78,7 +78,7 @@ export const en: TranslationTree = {
   },
   auth: {
     login: {
-      title: 'Sign in to Mentora',
+      title: 'Sign in to RAVAND',
       subtitle: 'Enter your work email and password to continue.',
       email: 'Email',
       password: 'Password',
