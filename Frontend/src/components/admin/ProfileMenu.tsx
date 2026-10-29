@@ -4,26 +4,28 @@ import type { AuthUser } from '../../api/auth';
 import { useAuth } from '../../auth/useAuth';
 import { profilePathForRole } from '../../auth/roleRedirect';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
+import { useTranslation } from '../../shared/i18n/useTranslation';
+import type { UseTranslationResult } from '../../shared/i18n/useTranslation';
 import { Popover } from '../../shared/ui/Popover';
 import { ProfileMenuItem } from './ProfileMenuItem';
 import { Avatar } from '../../shared/ui/Avatar';
 import { avatarColorClass } from '../../features/profile/profilePresentation';
 import { useAvatarColor } from '../../features/profile/useAvatarColor';
 
-const ROLE_LABEL: Record<AuthUser['role'], string> = {
-  Admin: 'Администратор',
-  Lead: 'Руководитель направления',
-  Mentor: 'Ментор',
+const ROLE_KEY: Record<AuthUser['role'], string> = {
+  Admin: 'profile.role.admin',
+  Lead: 'profile.role.lead',
+  Mentor: 'profile.role.mentor',
 };
 
 /** Один компактный scope-badge вместо двух отдельных («Администратор» + «Организация»). */
-function scopeLabelOf(user: AuthUser): string {
+function scopeLabelOf(user: AuthUser, t: UseTranslationResult['t']): string {
   if (user.role === 'Admin') {
-    if (user.adminScope === 'Organization') return 'Администратор организации';
-    if (user.adminScope === 'Branch') return 'Администратор филиала';
-    return ROLE_LABEL.Admin;
+    if (user.adminScope === 'Organization') return t('profile.role.orgAdmin');
+    if (user.adminScope === 'Branch') return t('profile.role.branchAdmin');
+    return t(ROLE_KEY.Admin);
   }
-  return ROLE_LABEL[user.role];
+  return t(ROLE_KEY[user.role]);
 }
 
 /**
@@ -36,15 +38,16 @@ function scopeLabelOf(user: AuthUser): string {
  */
 export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
   const { logout } = useAuth();
+  const { t } = useTranslation();
   const avatarClass = avatarColorClass(useAvatarColor(user.id));
   const { isAllBranches, selectedBranchId, availableBranches } = useBranchContext();
 
-  const scopeLabel = scopeLabelOf(user);
+  const scopeLabel = scopeLabelOf(user, t);
   const isOrgAdmin = user.role === 'Admin' && user.adminScope === 'Organization';
   const organizationContextLine = isOrgAdmin
     ? isAllBranches
-      ? 'Все филиалы'
-      : (availableBranches.find((branch) => branch.id === selectedBranchId)?.name ?? 'Филиал выбран')
+      ? t('profile.allBranches')
+      : (availableBranches.find((branch) => branch.id === selectedBranchId)?.name ?? t('profile.branchSelected'))
     : (user.branch?.name ?? '—');
 
   return (
@@ -58,7 +61,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
           onClick={onClick}
           aria-haspopup="true"
           aria-expanded={isOpen}
-          aria-label="Открыть меню профиля"
+          aria-label={t('profile.openMenu')}
           className={`flex h-12 shrink-0 items-center gap-2.5 rounded-dropdown border px-2.5 transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
             isOpen ? 'border-brand/30 bg-brand-soft' : 'border-transparent hover:bg-surface-hover'
           }`}
@@ -103,9 +106,9 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
           </div>
 
           {/* 5.3 — действия. */}
-          <div role="menu" aria-label="Действия профиля" className="flex flex-col gap-0.5">
+          <div role="menu" aria-label={t('profile.actionsLabel')} className="flex flex-col gap-0.5">
             <ProfileMenuItem icon={<User className="h-full w-full" aria-hidden="true" />} to={profilePathForRole(user.role)} onClick={close}>
-              Профиль
+              {t('profile.profile')}
             </ProfileMenuItem>
             {user.role === 'Admin' ? (
               <ProfileMenuItem
@@ -113,7 +116,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
                 to="/admin/settings"
                 onClick={close}
               >
-                Настройки
+                {t('profile.settings')}
               </ProfileMenuItem>
             ) : null}
 
@@ -127,7 +130,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
                 void logout();
               }}
             >
-              Выйти
+              {t('profile.logout')}
             </ProfileMenuItem>
           </div>
         </div>

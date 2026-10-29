@@ -8,6 +8,7 @@ import { postLoginPath } from '../../auth/roleRedirect';
 import { useAuth } from '../../auth/useAuth';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { useRateLimitCountdown } from '../../hooks/useRateLimitCountdown';
+import { useTranslation } from '../../shared/i18n/useTranslation';
 import { loginSchema, type LoginFormValues } from '../../schemas/auth.schema';
 import { PasswordField, TextField } from '../ui/TextField';
 import { applyServerValidation } from './applyServerValidation';
@@ -28,6 +29,7 @@ export function LoginForm(): JSX.Element {
   const initialEmail = prefilledEmail(location.state);
   const isOnline = useOnlineStatus();
   const countdown = useRateLimitCountdown();
+  const { t } = useTranslation();
 
   const {
     register,
@@ -82,7 +84,7 @@ export function LoginForm(): JSX.Element {
 
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <TextField
-          label="Email"
+          label={t('auth.login.email')}
           type="email"
           inputMode="email"
           autoComplete="email"
@@ -96,7 +98,7 @@ export function LoginForm(): JSX.Element {
 
         <div className="space-y-2">
           <PasswordField
-            label="Пароль"
+            label={t('auth.login.password')}
             autoComplete="current-password"
             autoFocus={initialEmail.length > 0}
             tone="auth"
@@ -109,7 +111,7 @@ export function LoginForm(): JSX.Element {
               to="/forgot-password"
               className="rounded text-sm font-medium text-brand transition-colors duration-150 hover:text-brand-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand motion-reduce:transition-none"
             >
-              Забыли пароль?
+              {t('auth.login.forgotPassword')}
             </Link>
           </div>
         </div>
@@ -121,7 +123,7 @@ export function LoginForm(): JSX.Element {
           submittingLabel="Выполняется вход"
           className="mt-2"
         >
-          {countdown.isActive ? `Повторить через ${String(countdown.remaining)} сек.` : 'Войти'}
+          {countdown.isActive ? `Повторить через ${String(countdown.remaining)} сек.` : t('auth.login.submit')}
         </SubmitButton>
       </form>
 

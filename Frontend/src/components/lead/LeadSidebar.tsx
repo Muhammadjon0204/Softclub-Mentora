@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
+import { useTranslation } from '../../shared/i18n/useTranslation';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { LEAD_NAV_ITEMS } from './navConfig';
 import { NavActivePill } from '../../shared/ui/motion';
@@ -18,6 +19,7 @@ interface LeadSidebarProps {
 /** Тот же визуальный язык, что `AdminSidebar` (раздел 8 задачи Phase 3 — не новая design-система). */
 export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', onNavigate }: LeadSidebarProps): JSX.Element {
   const ownAssignments = useScopedLeadAssignments();
+  const { t } = useTranslation();
   const isCollapsed = variant === 'desktop' && collapsed;
 
   const suggestionsCount = ownAssignments.filter((a) => a.status === 'Suggested').length;
@@ -28,7 +30,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
     'review-queue': reviewQueueCount,
   };
 
-  const collapseLabel = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+  const collapseLabel = collapsed ? t('nav.expandMenu') : t('nav.collapseMenu');
 
   return (
     <div className="flex h-full flex-col bg-surface">
@@ -37,7 +39,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
           <Tooltip content="Mentora">
             <NavLink
               to="/lead/dashboard"
-              aria-label="Mentora — перейти к обзору"
+              aria-label={t('nav.brandHome')}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <BrandLogo variant="mark" alt="" />
@@ -46,7 +48,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
         ) : (
           <NavLink
             to="/lead/dashboard"
-            aria-label="Mentora — перейти к обзору"
+            aria-label={t('nav.brandHome')}
             className="flex min-w-0 items-center rounded-control-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <BrandLogo variant="full" alt="" />
@@ -71,10 +73,11 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
       </div>
 
       <LayoutGroup id={`nav-${variant}`}>
-      <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto px-2.5 py-3">
+      <nav aria-label={t('nav.ariaLabel')} className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
           {LEAD_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
+            const label = t(`nav.lead.${item.key}`);
             const badgeCount = badgeByKey[item.key];
 
             const link = (
@@ -99,7 +102,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
                   </span>
                   {!isCollapsed ? (
                     <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="whitespace-nowrap">{item.label}</span>
+                      <span className="whitespace-nowrap">{label}</span>
                       {badgeCount > 0 ? (
                         <span className="shrink-0 rounded-full bg-brand-soft px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums text-brand">
                           {badgeCount}
@@ -112,7 +115,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
               </NavLink>
             );
 
-            return <li key={item.key}>{isCollapsed ? <Tooltip content={item.label}>{link}</Tooltip> : link}</li>;
+            return <li key={item.key}>{isCollapsed ? <Tooltip content={label}>{link}</Tooltip> : link}</li>;
           })}
         </ul>
       </nav>
