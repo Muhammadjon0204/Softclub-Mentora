@@ -4,6 +4,9 @@ import type { SessionEndReason } from '../../auth/authEvents';
 import { LoginForm } from '../../components/auth/LoginForm';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
+import { LanguageSwitcher } from '../../shared/i18n/LanguageSwitcher';
+import { useTranslation } from '../../shared/i18n/useTranslation';
+import { ThemeToggle } from '../../shared/theme/ThemeToggle';
 
 /** Безопасные формулировки: ни одна не раскрывает деталей инцидента. */
 const REASON_MESSAGE: Record<SessionEndReason, string> = {
@@ -23,6 +26,7 @@ function isSessionEndReason(value: string | null): value is SessionEndReason {
 export function LoginPage(): JSX.Element {
   const [searchParams] = useSearchParams();
   const reason = searchParams.get('reason');
+  const { t } = useTranslation();
 
   return (
     <div className="relative min-h-screen bg-app">
@@ -36,6 +40,12 @@ export function LoginPage(): JSX.Element {
 
       <OfflineBanner />
 
+      {/* Тема/язык доступны и до входа — выбор переживает логин через тот же localStorage. */}
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-6 sm:top-6">
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
+
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 pb-[12vh] pt-10 sm:px-6">
         <main className="w-full max-w-[440px]">
           <div className="mb-7 flex justify-center">
@@ -43,9 +53,9 @@ export function LoginPage(): JSX.Element {
           </div>
 
           <div className="rounded-panel border border-line bg-surface p-6 shadow-surface sm:p-8">
-            <h1 className="text-[26px] font-semibold tracking-tight text-ink">Вход в Mentora</h1>
+            <h1 className="text-[26px] font-semibold tracking-tight text-ink">{t('auth.login.title')}</h1>
             <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
-              Введите рабочий email и пароль, чтобы продолжить.
+              {t('auth.login.subtitle')}
             </p>
 
             {isSessionEndReason(reason) ? (

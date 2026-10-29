@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../auth/useAuth';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
+import { useTranslation } from '../../shared/i18n/useTranslation';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { ADMIN_NAV_ITEMS } from './navConfig';
 import { NavActivePill } from '../../shared/ui/motion';
@@ -30,12 +31,13 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps): JSX.Element {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const isOrgAdmin = user?.role === 'Admin' && user.adminScope === 'Organization';
   const isCollapsed = variant === 'desktop' && collapsed;
 
   const items = ADMIN_NAV_ITEMS.filter((item) => item.organizationAdminOnly !== true || isOrgAdmin);
 
-  const collapseLabel = collapsed ? 'Развернуть меню' : 'Свернуть меню';
+  const collapseLabel = collapsed ? t('nav.expandMenu') : t('nav.collapseMenu');
 
   return (
     <div className="flex h-full flex-col bg-surface">
@@ -46,7 +48,7 @@ export function AdminSidebar({
           <Tooltip content="Mentora">
             <NavLink
               to="/admin/dashboard"
-              aria-label="Mentora — перейти к обзору"
+              aria-label={t('nav.brandHome')}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
             >
               <BrandLogo variant="mark" alt="" />
@@ -55,7 +57,7 @@ export function AdminSidebar({
         ) : (
           <NavLink
             to="/admin/dashboard"
-            aria-label="Mentora — перейти к обзору"
+            aria-label={t('nav.brandHome')}
             className="flex min-w-0 items-center rounded-control-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
           >
             <BrandLogo variant="full" alt="" />
@@ -82,10 +84,11 @@ export function AdminSidebar({
       </div>
 
       <LayoutGroup id={`nav-${variant}`}>
-      <nav aria-label="Основная навигация" className="flex-1 overflow-y-auto px-2.5 py-3">
+      <nav aria-label={t('nav.ariaLabel')} className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
           {items.map((item) => {
             const Icon = item.icon;
+            const label = t(`nav.admin.${item.key}`);
             if (!item.implemented) {
               const row = (
                 <div
@@ -96,9 +99,9 @@ export function AdminSidebar({
                   <Icon className="h-[19px] w-[19px] shrink-0" />
                   {!isCollapsed ? (
                     <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="whitespace-nowrap text-sm">{item.label}</span>
+                      <span className="whitespace-nowrap text-sm">{label}</span>
                       <span className="shrink-0 rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-medium text-ink-disabled">
-                        Скоро
+                        {t('nav.soon')}
                       </span>
                     </span>
                   ) : null}
@@ -106,7 +109,7 @@ export function AdminSidebar({
               );
               return isCollapsed ? (
                 <li key={item.key}>
-                  <Tooltip content={`${item.label} — скоро`}>{row}</Tooltip>
+                  <Tooltip content={`${label} — ${t('nav.soon').toLowerCase()}`}>{row}</Tooltip>
                 </li>
               ) : (
                 <li key={item.key}>{row}</li>
@@ -130,14 +133,14 @@ export function AdminSidebar({
                   <>
                     {isActive ? <NavActivePill /> : null}
                   <Icon className="h-[19px] w-[19px] shrink-0" aria-hidden="true" />
-                  {!isCollapsed ? <span className="whitespace-nowrap">{item.label}</span> : null}
+                  {!isCollapsed ? <span className="whitespace-nowrap">{label}</span> : null}
                   </>
                 )}
               </NavLink>
             );
 
             return (
-              <li key={item.key}>{isCollapsed ? <Tooltip content={item.label}>{link}</Tooltip> : link}</li>
+              <li key={item.key}>{isCollapsed ? <Tooltip content={label}>{link}</Tooltip> : link}</li>
             );
           })}
         </ul>

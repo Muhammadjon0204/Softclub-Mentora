@@ -55,9 +55,66 @@
   --focus-ring: rgba(91, 92, 226, 0.22);
 }
 
+/**
+ * Тёмная тема — переопределение тех же переменных, ни одного класса в компонентах
+ * не меняется (см. комментарий выше). Оттенки не инвертированы механически:
+ * поверхности — холодный тёмно-синий, а не чёрный, акцент посветлел для контраста
+ * на тёмном фоне, статусные цвета чуть приглушены, чтобы не резать глаза.
+ */
+:root[data-theme='dark'] {
+  --background: #0d0f16;
+  --background-subtle: #11141c;
+  --surface: #161922;
+  --surface-muted: #1b1f2b;
+  --surface-hover: #212632;
+
+  --text-primary: #e7e9f3;
+  --text-secondary: #aab0c4;
+  --text-muted: #838aa3;
+  --text-disabled: #565d74;
+
+  --border: #262b38;
+  --border-strong: #343a4c;
+  --divider: #1f2430;
+
+  --primary: #8688f2;
+  --primary-hover: #9698f5;
+  --primary-active: #7072e6;
+  --primary-soft: #23243f;
+  --primary-soft-hover: #2a2c4a;
+
+  --secondary-blue: #5e9ef8;
+  --secondary-violet: #9c87f0;
+  --secondary-cyan: #4fc3e8;
+
+  --success: #3ecf8e;
+  --success-soft: #122a20;
+  --success-border: #1f4a37;
+
+  --warning: #e8a53d;
+  --warning-soft: #2c2210;
+  --warning-border: #4d3a1a;
+
+  --danger: #ef6a6a;
+  --danger-soft: #2e1616;
+  --danger-border: #4d2424;
+
+  --info: #5e9ef0;
+  --info-soft: #16233b;
+  --info-border: #24395c;
+
+  --focus-ring: rgba(134, 136, 242, 0.35);
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    /* Браузерный chrome (скроллбары, автозаполнение, нативные контролы) тоже темнеет. */
+    color-scheme: dark;
   }
 
   body {
@@ -72,6 +129,32 @@
       'Helvetica Neue',
       Arial,
       sans-serif;
+  }
+}
+
+/**
+ * Плавная заливка при переключении темы (`ThemeToggle`/`themeStore.ts`). Класс навешивается
+ * ровно на время перехода и снимается таймером — не постоянно: иначе любое наведение или смена
+ * статус-цвета в другом месте интерфейса тоже тянулись бы 400 мс вместо своих обычных 150,
+ * расходясь с остальными `transition-colors duration-150` в компонентах.
+ */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition:
+    background-color 420ms ease,
+    border-color 420ms ease,
+    color 280ms ease,
+    fill 280ms ease,
+    stroke 280ms ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition: none !important;
   }
 }
 

@@ -18,17 +18,16 @@ import type { ComponentType } from 'react';
  */
 export interface LeadNavItem {
   key: string;
-  label: string;
   path: string;
   icon: ComponentType<{ className?: string }>;
 }
 
 export const LEAD_NAV_ITEMS: LeadNavItem[] = [
-  { key: 'dashboard', label: 'Обзор', path: '/lead/dashboard', icon: LayoutDashboard },
-  { key: 'assignments', label: 'Задания', path: '/lead/assignments', icon: ClipboardList },
-  { key: 'review-queue', label: 'На проверке', path: '/lead/review-queue', icon: ClipboardCheck },
-  { key: 'calendar', label: 'Календарь', path: '/lead/calendar', icon: CalendarDays },
-  { key: 'team', label: 'Команда', path: '/lead/team', icon: Users },
-  { key: 'reports', label: 'Отчёты', path: '/lead/reports', icon: BarChart3 },
-  { key: 'crm', label: 'Группы в CRM', path: '/lead/crm', icon: School },
+  { key: 'dashboard', path: '/lead/dashboard', icon: LayoutDashboard },
+  { key: 'assignments', path: '/lead/assignments', icon: ClipboardList },
+  { key: 'review-queue', path: '/lead/review-queue', icon: ClipboardCheck },
+  { key: 'calendar', path: '/lead/calendar', icon: CalendarDays },
+  { key: 'team', path: '/lead/team', icon: Users },
+  { key: 'reports', path: '/lead/reports', icon: BarChart3 },
+  { key: 'crm', path: '/lead/crm', icon: School },
 ];

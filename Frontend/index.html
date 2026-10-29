@@ -5,6 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Mentora</title>
+    <script>
+      // Тема и язык — до первой отрисовки CSS, синхронно: иначе страница на долю секунды
+      // мигает светлой/русской версией, а потом React подключается и переключает на
+      // сохранённые значения (themeStore.ts/localeStore.ts читают то же самое ключи).
+      (function () {
+        try {
+          var theme = localStorage.getItem('mtf-theme');
+          if (theme !== 'light' && theme !== 'dark') {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          document.documentElement.dataset.theme = theme;
+
+          var locale = localStorage.getItem('mtf-locale');
+          if (locale === 'ru' || locale === 'tg' || locale === 'en') {
+            document.documentElement.lang = locale;
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
