@@ -4,7 +4,7 @@ using MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 
 namespace MentorTaskFlow.UnitTests.Integrations;
 
-/// <summary>Who sees which CRM groups, and how a CRM mentor is matched to a Mentora account.</summary>
+/// <summary>Who sees which CRM groups, and how a CRM mentor is matched to a RAVAND account.</summary>
 public sealed class CrmLinkTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);

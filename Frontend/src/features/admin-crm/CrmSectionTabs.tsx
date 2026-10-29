@@ -1,4 +1,4 @@
-/** Переключатель разделов CRM-страницы: «Группы», «Отчёты», «Связи с Mentora». */
+/** Переключатель разделов CRM-страницы: «Группы», «Отчёты», «Связи с RAVAND». */
 export function CrmSectionTabs<T extends string>({ sections, value, onChange }: {
   sections: readonly { value: T; label: string }[];
   value: T;

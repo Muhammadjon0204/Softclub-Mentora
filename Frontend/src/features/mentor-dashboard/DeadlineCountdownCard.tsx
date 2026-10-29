@@ -61,7 +61,7 @@ const BAR: Record<Urgency, string> = {
   overdue: 'bg-[#ff9d9d]',
 };
 
-/** Волнистые линии фона — тот же приём, что у карточки Time Tracker из референса, в цветах Mentora. */
+/** Волнистые линии фона — тот же приём, что у карточки Time Tracker из референса, в цветах RAVAND. */
 function ContourLines(): JSX.Element {
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 800 260" preserveAspectRatio="xMidYMid slice" aria-hidden="true">

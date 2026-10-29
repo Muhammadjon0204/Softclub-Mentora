@@ -3,7 +3,7 @@ using MentorTaskFlow.Contracts.Integrations;
 namespace MentorTaskFlow.Application.Common.Abstractions;
 
 /// <summary>
-/// Mentors' weekly reports on their CRM groups: the CRM's figures scored by Mentora, the AI's draft of
+/// Mentors' weekly reports on their CRM groups: the CRM's figures scored by RAVAND, the AI's draft of
 /// the conclusions, the mentor's edit, and the report sent to the Lead.
 /// </summary>
 /// <remarks>

@@ -28,7 +28,7 @@ export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop'
     <div className="flex h-full flex-col bg-surface">
       <div className={`relative flex h-16 items-center border-b border-line px-4 ${isCollapsed ? 'justify-center px-2' : ''}`}>
         {isCollapsed ? (
-          <Tooltip content="Mentora">
+          <Tooltip content="RAVAND">
             <NavLink
               to="/mentor/dashboard"
               aria-label={t('nav.brandHome')}

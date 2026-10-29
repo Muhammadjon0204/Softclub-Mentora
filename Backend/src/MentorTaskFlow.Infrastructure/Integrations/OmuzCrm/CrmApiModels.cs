@@ -1,7 +1,7 @@
 namespace MentorTaskFlow.Infrastructure.Integrations.OmuzCrm;
 
 // The wire format of Omuz CRM `integration/v1`, as documented in INTEGRATION_API.md (19.10.2026) and
-// checked against the test server. Kept separate from Mentora's own contracts: if the CRM changes, only
+// checked against the test server. Kept separate from RAVAND's own contracts: if the CRM changes, only
 // this file and the mapping in CrmIntegrationService move.
 
 /// <summary>Every response: <c>{ data, statusCode, errors }</c>; lists add the page fields.</summary>

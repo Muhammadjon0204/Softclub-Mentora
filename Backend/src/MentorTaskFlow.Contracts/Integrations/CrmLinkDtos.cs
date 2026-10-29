@@ -20,7 +20,7 @@ public sealed record CrmAccessDto(
     string? BotUrl = null,
     bool Configured = true);
 
-/// <summary>A CRM mentor and the Mentora account linked to it, or the one that looks like it.</summary>
+/// <summary>A CRM mentor and the RAVAND account linked to it, or the one that looks like it.</summary>
 public sealed record CrmMentorLinkDto(
     int CrmMentorId,
     string FullName,
@@ -33,7 +33,7 @@ public sealed record CrmMentorLinkDto(
     Guid? SuggestedUserId,
     string? SuggestedUserName);
 
-/// <summary>A CRM branch and the Mentora branch linked to it, or the one that looks like it.</summary>
+/// <summary>A CRM branch and the RAVAND branch linked to it, or the one that looks like it.</summary>
 public sealed record CrmBranchLinkDto(
     int CrmBranchId,
     string Name,
@@ -41,7 +41,7 @@ public sealed record CrmBranchLinkDto(
     string? LinkedBranchName,
     Guid? SuggestedBranchId);
 
-/// <summary>A Mentora account that can be linked to a CRM mentor: a Mentor or a Lead.</summary>
+/// <summary>A RAVAND account that can be linked to a CRM mentor: a Mentor or a Lead.</summary>
 public sealed record CrmLinkableUserDto(Guid Id, string FullName, string Role, string? Branch, int? CrmMentorId);
 
 public sealed record CrmLinkableBranchDto(Guid Id, string Name, int? CrmBranchId);

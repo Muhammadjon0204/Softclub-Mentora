@@ -14,7 +14,7 @@ public sealed record CrmStatusDto(
 
 public sealed record CrmRefDto(int Id, string Name);
 
-/// <summary>A CRM group as Mentora shows it. Dates are calendar days in Dushanbe.</summary>
+/// <summary>A CRM group as RAVAND shows it. Dates are calendar days in Dushanbe.</summary>
 public sealed record CrmGroupDto(
     int Id,
     string Name,

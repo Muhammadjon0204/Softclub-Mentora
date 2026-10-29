@@ -16,7 +16,7 @@ public enum CrmGroupReportStatus
 /// </summary>
 /// <remarks>
 /// <para>
-/// The figures are the CRM's, scored by Mentora, and are kept as they were when the report was made
+/// The figures are the CRM's, scored by RAVAND, and are kept as they were when the report was made
 /// (<see cref="SnapshotJson"/>): a Lead reads what the mentor reported, not whatever the journal says
 /// later. <see cref="DataHash"/> is the fingerprint of those figures — when the journal is corrected
 /// afterwards, the fingerprint no longer matches and the report is shown as «данные изменились».

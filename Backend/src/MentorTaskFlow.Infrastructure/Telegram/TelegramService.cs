@@ -152,10 +152,10 @@ public sealed class TelegramService(
             "Проверка связи",
             string.Empty,
             string.Empty,
-            "<b>Проверка связи</b>\n\nTelegram подключён к Mentora. Сюда будут приходить уведомления о заданиях: "
+            "<b>Проверка связи</b>\n\nTelegram подключён к RAVAND. Сюда будут приходить уведомления о заданиях: "
             + "новые задания, сданные работы, решения по проверке и напоминания о сроках.",
             link,
-            "Открыть Mentora");
+            "Открыть RAVAND");
 
         var result = await sender.SendRenderedAsync(chatId, rendered, cancellationToken);
 
@@ -255,7 +255,7 @@ public sealed class TelegramService(
             await RecordAttemptAsync(chatId, candidate.UserId, AuditResult.Failure, "chat_already_bound", now, cancellationToken);
 
             return TelegramBindOutcome.Failed(
-                "Этот Telegram-аккаунт уже привязан к другому пользователю Mentora. Отключите его там в профиле и повторите.");
+                "Этот Telegram-аккаунт уже привязан к другому пользователю RAVAND. Отключите его там в профиле и повторите.");
         }
 
         var user = await dbContext.Users
@@ -280,7 +280,7 @@ public sealed class TelegramService(
     }
 
     private const string BindFailureReply =
-        "Ссылка привязки недействительна или её срок истёк. Откройте профиль в Mentora и нажмите «Подключить Telegram» ещё раз.";
+        "Ссылка привязки недействительна или её срок истёк. Откройте профиль в RAVAND и нажмите «Подключить Telegram» ещё раз.";
 
     /// <summary>
     /// <c>TG-015</c>: both outcomes are recorded, and neither record contains the token.

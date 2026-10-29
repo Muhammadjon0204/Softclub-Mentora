@@ -45,7 +45,7 @@ export function AdminSidebar({
         className={`relative flex h-16 items-center border-b border-line px-4 ${isCollapsed ? 'justify-center px-2' : ''}`}
       >
         {isCollapsed ? (
-          <Tooltip content="Mentora">
+          <Tooltip content="RAVAND">
             <NavLink
               to="/admin/dashboard"
               aria-label={t('nav.brandHome')}

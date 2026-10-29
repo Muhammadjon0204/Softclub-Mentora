@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /**
- * Design tokens Admin UI (MentorTaskFlow) — docs/design/MentorTaskFlow_Admin_UI.md.
+ * Design tokens Admin UI (RAVAND, бывш. Mentora) — docs/design/MentorTaskFlow_Admin_UI.md.
  *
  * Семантические CSS-переменные, а не сырые hex по всему коду: `tailwind.config.js`
  * ссылается на них через `var(--token)`. Здесь же в будущем подключится тёмная
@@ -17,7 +17,7 @@
   --surface-muted: #f8f9fc;
   --surface-hover: #f3f4fa;
 
-  --text-primary: #171a2b;
+  --text-primary: #061a3d;
   --text-secondary: #475467;
   --text-muted: #5f6a82;
   --text-disabled: #a4abba;
@@ -26,11 +26,15 @@
   --border-strong: #d8ddea;
   --divider: #edf0f5;
 
-  --primary: #5b5ce2;
-  --primary-hover: #4c4dc9;
-  --primary-active: #4142b3;
-  --primary-soft: #eeefff;
-  --primary-soft-hover: #e5e7ff;
+  /* Сэмплировано напрямую из артворка RAVAND (bars+check эмблема, favicon-512.png):
+     #027095/#025A89/#001F5B — три реальные точки одного и того же градиента, не
+     произвольный подбор. `--text-primary` выше — тот же навy, что и у словесного
+     знака (`logo-light.svg`, README бренд-кита: «Navy wordmark: #061A3D»). */
+  --primary: #027095;
+  --primary-hover: #025a89;
+  --primary-active: #001f5b;
+  --primary-soft: #e7f3f6;
+  --primary-soft-hover: #d9edf2;
 
   --secondary-blue: #3b82f6;
   --secondary-violet: #7c5ce7;
@@ -52,36 +56,41 @@
   --info-soft: #eff6ff;
   --info-border: #cfe2fa;
 
-  --focus-ring: rgba(91, 92, 226, 0.22);
+  --focus-ring: rgba(2, 112, 149, 0.22);
 }
 
 /**
  * Тёмная тема — переопределение тех же переменных, ни одного класса в компонентах
- * не меняется (см. комментарий выше). Оттенки не инвертированы механически:
- * поверхности — холодный тёмно-синий, а не чёрный, акцент посветлел для контраста
- * на тёмном фоне, статусные цвета чуть приглушены, чтобы не резать глаза.
+ * не меняется (см. комментарий выше). `--background` — не произвольный тёмный
+ * слейт, а буквально фон круглого favicon из бренд-кита RAVAND (`#0B1B3A`,
+ * README: «Circular favicon background») — тёмная тема в прямом смысле сделана
+ * из фирменного цвета, а не просто инверсией светлой. Акцент — яркий конец того
+ * же градиента эмблемы, что и в светлой теме (см. комментарий там), только
+ * другая точка: там, где на светлом фоне нужен тёмный насыщенный тон для
+ * контраста с белым текстом, на тёмном фоне нужен светлый — поэтому акцент
+ * едет к бирюзовому/мятному концу градиента, а не остаётся тем же самым hex.
  */
 :root[data-theme='dark'] {
-  --background: #0d0f16;
-  --background-subtle: #11141c;
-  --surface: #161922;
-  --surface-muted: #1b1f2b;
-  --surface-hover: #212632;
+  --background: #0b1b3a;
+  --background-subtle: #081530;
+  --surface: #122a52;
+  --surface-muted: #16305c;
+  --surface-hover: #1b3666;
 
-  --text-primary: #e7e9f3;
-  --text-secondary: #aab0c4;
-  --text-muted: #838aa3;
-  --text-disabled: #565d74;
+  --text-primary: #eaf1f8;
+  --text-secondary: #a9b9d6;
+  --text-muted: #8092b8;
+  --text-disabled: #52628a;
 
-  --border: #262b38;
-  --border-strong: #343a4c;
-  --divider: #1f2430;
+  --border: #1e3561;
+  --border-strong: #2a4578;
+  --divider: #16294e;
 
-  --primary: #8688f2;
-  --primary-hover: #9698f5;
-  --primary-active: #7072e6;
-  --primary-soft: #23243f;
-  --primary-soft-hover: #2a2c4a;
+  --primary: #01c6be;
+  --primary-hover: #01e5c8;
+  --primary-active: #01a5af;
+  --primary-soft: #0f3a45;
+  --primary-soft-hover: #134552;
 
   --secondary-blue: #5e9ef8;
   --secondary-violet: #9c87f0;
@@ -103,7 +112,7 @@
   --info-soft: #16233b;
   --info-border: #24395c;
 
-  --focus-ring: rgba(134, 136, 242, 0.35);
+  --focus-ring: rgba(1, 198, 190, 0.35);
 }
 
 @layer base {

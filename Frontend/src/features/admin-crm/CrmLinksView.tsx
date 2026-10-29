@@ -106,7 +106,7 @@ function BranchLinks({ data }: { data: CrmLinks }): JSX.Element {
                   value={b.linkedBranchId ?? NONE}
                   onValueChange={(value) => { mutation.mutate({ crmBranchId: b.crmBranchId, branchId: value === NONE ? null : value }); }}
                   options={options}
-                  ariaLabel={`Филиал Mentora для «${b.name}»`}
+                  ariaLabel={`Филиал RAVAND для «${b.name}»`}
                   size="sm"
                   disabled={mutation.isPending}
                 />
@@ -173,7 +173,7 @@ function MentorLinks({ data }: { data: CrmLinks }): JSX.Element {
                 options={options}
                 placeholder="Выберите пользователя"
                 searchPlaceholder="Имя пользователя…"
-                ariaLabel={`Пользователь Mentora для «${m.fullName}»`}
+                ariaLabel={`Пользователь RAVAND для «${m.fullName}»`}
                 size="sm"
                 disabled={mutation.isPending}
               />
@@ -186,7 +186,7 @@ function MentorLinks({ data }: { data: CrmLinks }): JSX.Element {
 }
 
 /**
- * Связи «кто есть кто» между CRM и Mentora. Только для админа организации: от этих связей зависит,
+ * Связи «кто есть кто» между CRM и RAVAND. Только для админа организации: от этих связей зависит,
  * какие группы CRM видит каждый человек.
  */
 export function CrmLinksView(): JSX.Element {

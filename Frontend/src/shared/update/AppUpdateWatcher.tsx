@@ -82,7 +82,7 @@ export function AppUpdateWatcher(): JSX.Element | null {
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[13.5px] font-semibold text-ink">Вышла новая версия Mentora</p>
+            <p className="text-[13.5px] font-semibold text-ink">Вышла новая версия RAVAND</p>
             <p className="text-[12px] text-ink-muted">Обновите страницу, чтобы получить исправления</p>
           </div>
           <button

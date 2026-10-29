@@ -58,7 +58,7 @@ function StatusCard(): JSX.Element {
 const SECTIONS = [
   { value: 'groups', label: 'Группы' },
   { value: 'reports', label: 'Отчёты' },
-  { value: 'links', label: 'Связи с Mentora' },
+  { value: 'links', label: 'Связи с RAVAND' },
 ] as const;
 
 const BRANCH_SECTIONS = SECTIONS.filter((s) => s.value !== 'links');
@@ -73,7 +73,7 @@ function SectionBody({ section }: { section: Section }): JSX.Element {
 
 /**
  * Интеграция с CRM в админке. Админ организации видит всё: подключение, все группы и связи «кто есть
- * кто» между CRM и Mentora. Админ филиала — только группы своего филиала.
+ * кто» между CRM и RAVAND. Админ филиала — только группы своего филиала.
  */
 export function CrmIntegrationPage(): JSX.Element {
   const { user } = useAuth();
