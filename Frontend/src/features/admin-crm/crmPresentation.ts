@@ -1,7 +1,8 @@
 /** Подписи и форматирование для экрана интеграции с CRM. */
+import { lazyDateTimeFormat } from '../../shared/i18n/intl';
 
-const DATE = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
-const DATE_YEAR = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' });
+const DATE = lazyDateTimeFormat({ day: 'numeric', month: 'short' });
+const DATE_YEAR = lazyDateTimeFormat({ day: 'numeric', month: 'short', year: 'numeric' });
 
 /** API отдаёт календарный день `2026-10-07` — без часового пояса, поэтому собираем дату локально. */
 function parseDay(value: string): Date {

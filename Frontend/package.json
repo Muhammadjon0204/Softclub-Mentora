@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "api:generate": "openapi-typescript openapi/mentortaskflow-auth.yaml -o src/api/generated/auth-api.ts",
-    "msw:init": "msw init public --save"
+    "msw:init": "msw init public --save",
+    "i18n:check": "node scripts/i18n-extract.mjs --check"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

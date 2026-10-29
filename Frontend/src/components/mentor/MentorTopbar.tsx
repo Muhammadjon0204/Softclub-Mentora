@@ -8,16 +8,14 @@ import { useTranslation } from '../../shared/i18n/useTranslation';
 import { ThemeToggle } from '../../shared/theme/ThemeToggle';
 import { IconButton } from '../../shared/ui/Button';
 import { MentorBreadcrumbs } from './MentorBreadcrumbs';
-import { MentorWorkspaceBadge } from './MentorWorkspaceBadge';
 
 interface MentorTopbarProps {
   onOpenMobileSidebar: () => void;
 }
 
 /**
- * Аналог `LeadTopbar`: read-only `MentorWorkspaceBadge` вместо branch-селектора
- * (Mentor не переключает ни Branch, ни Category). `ProfileMenu` переиспользуется
- * как есть — уже role-aware для Mentor.
+ * Аналог `LeadTopbar`: Mentor не переключает ни филиал, ни направление — где он работает,
+ * показывает `ProfileMenu`, отдельной плашки в шапке нет.
  */
 export function MentorTopbar({ onOpenMobileSidebar }: MentorTopbarProps): JSX.Element {
   const { user } = useAuth();
@@ -33,10 +31,7 @@ export function MentorTopbar({ onOpenMobileSidebar }: MentorTopbarProps): JSX.El
       <div className="hidden min-w-0 flex-1 lg:block">
         <MentorBreadcrumbs />
       </div>
-      {/* На телефоне правая группа может сжиматься: бейдж обрезается, а не выталкивает аватар за край. */}
       <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
-        <MentorWorkspaceBadge />
-
         {!isOnline ? (
           <span className="hidden items-center gap-1.5 rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 text-[12px] font-medium text-warning sm:flex">
             <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />

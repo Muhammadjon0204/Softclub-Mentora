@@ -44,13 +44,20 @@ function emitVersion(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), stripMockWorker(), emitVersion()],
+  // Свой JSX-рантайм — обёртка над react/jsx-runtime, переводящая текст интерфейса при рендере
+  // (src/shared/i18n/catalog.ts). Только исходники приложения: node_modules собраны со своим.
+  plugins: [react({ jsxImportSource: '@ravand/i18n-jsx' }), stripMockWorker(), emitVersion()],
   define: {
     'import.meta.env.VITE_APP_VERSION': JSON.stringify(BUILD_VERSION),
   },
   resolve: {
     // Абсолютный путь от корня проекта — без зависимости от @types/node.
-    alias: { '@': '/src' },
+    alias: { '@': '/src', '@ravand/i18n-jsx': '/src/shared/i18n/jsx' },
+  },
+  optimizeDeps: {
+    // Иначе dev-оптимизатор принимает рантайм за npm-пакет и пре-бандлит его вместе со своей копией
+    // catalog.ts: localeStore активирует каталог в одном экземпляре модуля, а JSX читает другой.
+    exclude: ['@ravand/i18n-jsx/jsx-runtime', '@ravand/i18n-jsx/jsx-dev-runtime'],
   },
   server: {
     port: 5173,

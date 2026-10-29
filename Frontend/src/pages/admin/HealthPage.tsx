@@ -14,6 +14,7 @@ import { Card } from '../../shared/ui/Card';
 import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { Skeleton } from '../../shared/ui/Skeleton';
+import { intlLocale } from '../../shared/i18n/intl';
 
 type IconType = ComponentType<{ className?: string }>;
 
@@ -75,11 +76,11 @@ function serviceMessage(service: ServiceHealthDto): string {
 }
 
 function timeOf(iso: string): string {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return new Date(iso).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function dateTimeOf(iso: string): string {
-  return new Date(iso).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleString(intlLocale(), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 export function HealthPage(): JSX.Element {

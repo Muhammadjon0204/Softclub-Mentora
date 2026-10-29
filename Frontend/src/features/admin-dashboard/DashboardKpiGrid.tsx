@@ -4,6 +4,7 @@ import type { DashboardKpis } from '../../api/admin/dashboard';
 import { PreviewMetricCard } from '../admin-preview/PreviewMetricCard';
 import { deltaTone } from './dashboardFormatters';
 import { StaggerContainer } from '../../shared/ui/motion';
+import { intlLocale } from '../../shared/i18n/intl';
 
 const VS_LAST_MONTH = 'к прошлому месяцу';
 
@@ -14,7 +15,7 @@ export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element
       <PreviewMetricCard
         icon={<Users aria-hidden="true" />}
         label="Всего пользователей"
-        value={kpis.totalUsers.toLocaleString('ru-RU')}
+        value={kpis.totalUsers.toLocaleString(intlLocale())}
         deltaPct={kpis.totalUsersDeltaPct}
         deltaTone={deltaTone(kpis.totalUsersDeltaPct, true)}
         hint={VS_LAST_MONTH}
@@ -24,7 +25,7 @@ export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element
       <PreviewMetricCard
         icon={<UserCheck aria-hidden="true" />}
         label="Активные менторы"
-        value={kpis.activeMentors.toLocaleString('ru-RU')}
+        value={kpis.activeMentors.toLocaleString(intlLocale())}
         deltaPct={kpis.activeMentorsDeltaPct}
         deltaTone={deltaTone(kpis.activeMentorsDeltaPct, true)}
         hint={VS_LAST_MONTH}
@@ -34,7 +35,7 @@ export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element
       <PreviewMetricCard
         icon={<ClipboardList aria-hidden="true" />}
         label="Активные задания"
-        value={kpis.activeAssignments.toLocaleString('ru-RU')}
+        value={kpis.activeAssignments.toLocaleString(intlLocale())}
         deltaPct={kpis.activeAssignmentsDeltaPct}
         deltaTone={deltaTone(kpis.activeAssignmentsDeltaPct, true)}
         hint={VS_LAST_MONTH}
@@ -44,7 +45,7 @@ export function DashboardKpiGrid({ kpis }: { kpis: DashboardKpis }): JSX.Element
       <PreviewMetricCard
         icon={<Clock3 aria-hidden="true" />}
         label="Ожидают проверки"
-        value={kpis.pendingReview.toLocaleString('ru-RU')}
+        value={kpis.pendingReview.toLocaleString(intlLocale())}
         deltaPct={kpis.pendingReviewDeltaPct}
         deltaTone={deltaTone(kpis.pendingReviewDeltaPct, false)}
         hint="Открыть очередь проверки"

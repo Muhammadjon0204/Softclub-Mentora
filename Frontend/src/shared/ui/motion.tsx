@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
 import { EASE_OUT_EXPO, SPRING_PILL, staggerContainerVariants, staggerItemVariants } from './motionTokens';
+import { intlLocale } from '../i18n/intl';
 
 /**
  * Анимационные примитивы интерфейса. Все переходы короткие (180–450 мс) и только на
@@ -63,7 +64,7 @@ export function AnimatedNumber({ value, decimals = 0, suffix = '', className, du
   const reduce = useReducedMotion();
   const motionValue = useMotionValue(reduce === true ? value : 0);
   const text = useTransform(motionValue, (latest) =>
-    `${latest.toLocaleString('ru-RU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`,
+    `${latest.toLocaleString(intlLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${suffix}`,
   );
 
   useEffect(() => {

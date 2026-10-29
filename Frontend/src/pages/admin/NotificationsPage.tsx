@@ -20,6 +20,7 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
 import { StaggerContainer } from '../../shared/ui/motion';
+import { intlLocale } from '../../shared/i18n/intl';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -243,8 +244,8 @@ export function NotificationsPage(): JSX.Element {
                       {item.attempts > 1 ? <span className="mt-0.5 block text-[11px] text-ink-muted">попыток: {item.attempts}</span> : null}
                     </PreviewTd>
                     <PreviewTd className="whitespace-nowrap tabular-nums">
-                      <span className="block text-[13px] text-ink">{created.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
-                      <span className="block text-[11.5px] text-ink-muted">{created.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                      <span className="block text-[13px] text-ink">{created.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short' })}</span>
+                      <span className="block text-[11.5px] text-ink-muted">{created.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                     </PreviewTd>
                     <PreviewTd className="text-right">
                       {item.status === 'DeadLetter' ? (

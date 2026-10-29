@@ -1,7 +1,6 @@
 import { HelpCircle, Menu as MenuIcon, WifiOff } from 'lucide-react';
 
 import { useAuth } from '../../auth/useAuth';
-import { BranchContextBadge } from '../../features/branch-context/BranchContextBadge';
 import { BranchContextSelector } from '../../features/branch-context/BranchContextSelector';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { LanguageSwitcher } from '../../shared/i18n/LanguageSwitcher';
@@ -43,7 +42,6 @@ export function AdminTopbar({ onOpenMobileSidebar }: AdminTopbarProps): JSX.Elem
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <BranchContextSelector />
-        <BranchContextBadge />
 
         {!isOnline ? (
           <span className="hidden items-center gap-1.5 rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 text-[12px] font-medium text-warning sm:flex">

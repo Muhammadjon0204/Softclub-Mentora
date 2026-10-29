@@ -2,6 +2,7 @@ import { db } from '../db';
 import { allAssignments, type MockAssignment, type AssignmentStatus } from './assignments';
 import { BRANCHES, CATEGORIES, categoriesOfBranch, findBranch, findCategory } from './organization';
 import { DAY_MS, MOCK_NOW } from './reference';
+import { lazyDateTimeFormat } from '../../shared/i18n/intl';
 
 export interface ScopeFilter {
   /** `null` — режим «Все филиалы» (только Organization Admin, только чтение). */
@@ -111,7 +112,7 @@ export interface ActivityPoint {
   overdue: number;
 }
 
-const RU_DATE_FMT = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: 'short' });
+const RU_DATE_FMT = lazyDateTimeFormat({ day: '2-digit', month: 'short' });
 
 /** Стабильный (не Math.random) псевдослучайный индекс дня из id — без завязки на реальный часовой пояс/время суток. */
 function stableDayIndex(seed: string, days: number): number {
@@ -136,7 +137,7 @@ const PERIOD_CHART_CONFIG: Record<ReportPeriod, PeriodChartConfig> = {
   all: { pointCount: 12, granularity: 'month' },
 };
 
-const RU_MONTH_FMT = new Intl.DateTimeFormat('ru-RU', { month: 'short' });
+const RU_MONTH_FMT = lazyDateTimeFormat({ month: 'short' });
 
 /** `all` визуально показан на том же 12-месячном окне, что и `1y` — реальных данных старше ~35 дней в mock нет, дальше окно физического смысла не меняет. */
 function periodBucketDates(period: ReportPeriod): { date: number; label: string }[] {

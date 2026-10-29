@@ -112,6 +112,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Каждая строка интерфейса должна иметь перевод en/tg, иначе на этих языках останется русский.
+      - name: i18n catalog
+        run: npm run i18n:check
+
       - name: Tests
         run: npm test
 

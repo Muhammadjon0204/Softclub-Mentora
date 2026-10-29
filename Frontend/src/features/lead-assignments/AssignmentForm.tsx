@@ -14,6 +14,7 @@ import { fieldA11yProps } from '../../shared/ui/fieldA11y';
 import { TimePicker } from '../../shared/ui/TimePicker';
 import { createAssignmentSchema, DEFAULT_DUE_TIME_LOCAL } from './createAssignment.schema';
 import type { CreateAssignmentFormValues } from './createAssignment.schema';
+import { dateTimeFormat } from '../../shared/i18n/intl';
 
 export interface AssignmentFormProps {
   formId: string;
@@ -31,7 +32,7 @@ function toDateInputValue(ms: number, timeZoneId: string): string {
 }
 
 function toTimeInputValue(ms: number, timeZoneId: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', { timeZone: timeZoneId, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(ms);
+  const parts = dateTimeFormat({ timeZone: timeZoneId, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(ms);
   const hour = parts.find((p) => p.type === 'hour')?.value ?? '23';
   const minute = parts.find((p) => p.type === 'minute')?.value ?? '59';
   return `${hour}:${minute}`;

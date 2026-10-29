@@ -34,6 +34,7 @@ import { Card } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { StaggerContainer } from '../../shared/ui/motion';
 import { UserAvatar } from '../../features/avatars/UserAvatar';
+import { tr } from '../../shared/i18n/catalog';
 
 const ROLE_OPTIONS = [
   { value: 'all', label: 'Все роли' },
@@ -59,7 +60,7 @@ function formatLastLogin(label: string): { primary: string; secondary?: string }
   const match = /^(\d{2})\.(\d{2})\.(\d{4}), (\d{2}:\d{2})$/.exec(label);
   if (match === null) return { primary: label };
   const [, day, month, year, time] = match;
-  const monthName = RU_MONTHS[Number(month) - 1] ?? month;
+  const monthName = tr(RU_MONTHS[Number(month) - 1] ?? month);
   return { primary: `${Number(day)} ${monthName} ${year}`, secondary: time };
 }
 

@@ -12,6 +12,7 @@ import { Card } from '../../shared/ui/Card';
 import { FormField, FormInput } from '../../shared/ui/FormField';
 import { pluralizeRu } from '../admin-assignments/assignmentPresentation';
 import { describeBrowser, isHandheld } from './profilePresentation';
+import { intlLocale } from '../../shared/i18n/intl';
 
 const SESSIONS_QUERY_KEY = ['auth', 'sessions'] as const;
 
@@ -111,7 +112,7 @@ export function ProfileSecurityCard(): JSX.Element {
               <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">Это устройство</span>
             </p>
             <p className="text-[12px] leading-[17px] text-ink-muted">
-              {lastLogin ? `Последний вход: ${new Date(lastLogin).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Последний вход: —'}
+              {lastLogin ? `Последний вход: ${new Date(lastLogin).toLocaleString(intlLocale(), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false })}` : 'Последний вход: —'}
             </p>
             <p className="flex items-center gap-1.5 text-[12px] leading-[17px] text-ink-muted">
               <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${others > 0 ? 'bg-warning' : 'bg-success'}`} />

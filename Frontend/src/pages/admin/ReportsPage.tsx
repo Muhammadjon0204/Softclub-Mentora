@@ -20,6 +20,8 @@ import { ErrorState } from '../../shared/ui/ErrorState';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
 import { StaggerContainer } from '../../shared/ui/motion';
 import { AnimatedBar } from '../../shared/ui/motion';
+import { intlLocale } from '../../shared/i18n/intl';
+import { tr } from '../../shared/i18n/catalog';
 
 const PERIOD_DAYS: Record<DashboardPeriod, number | null> = { all: null, '1m': 30, '3m': 90, '6m': 182, '1y': 365 };
 
@@ -45,17 +47,17 @@ function pct(value: number | null): string {
 }
 
 function downloadCsv(rows: ReportRow[], periodLabel: string): void {
-  const header = ['Направление', 'Филиал', 'Руководитель', 'Менторов', 'Всего задач', 'Одобрено', 'Сдано в срок, %', 'Просрочено', 'Среднее время проверки'];
+  const header = ['Направление', 'Филиал', 'Руководитель', 'Менторов', 'Всего задач', 'Одобрено', 'Сдано в срок, %', 'Просрочено', 'Среднее время проверки'].map(tr);
   const lines = rows.map((row) => [
     row.category,
     row.branch,
-    row.lead ?? 'Не назначен',
+    row.lead ?? tr('Не назначен'),
     row.mentors,
     row.stats.total,
     row.stats.approved,
     row.stats.onTimePct ?? '',
     row.stats.overdue,
-    formatHours(row.stats.avgReviewHours),
+    tr(formatHours(row.stats.avgReviewHours)),
   ]);
   const escape = (value: string | number): string => {
     const text = String(value);
@@ -66,7 +68,7 @@ function downloadCsv(rows: ReportRow[], periodLabel: string): void {
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `RAVAND — отчёт по направлениям (${periodLabel}).csv`;
+  link.download = tr(`RAVAND — отчёт по направлениям (${periodLabel}).csv`);
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -109,7 +111,7 @@ export function ReportsPage(): JSX.Element {
       <div className="hidden border-b border-line pb-3 print:block">
         <p className="text-[18px] font-semibold text-ink">RAVAND — отчёт по направлениям</p>
         <p className="text-[12px] text-ink-muted">
-          Период: {periodLabel.toLowerCase()} · выгружен {new Date(now).toLocaleString('ru-RU', { hour12: false })}
+          Период: {periodLabel.toLowerCase()} · выгружен {new Date(now).toLocaleString(intlLocale(), { hour12: false })}
         </p>
       </div>
       <div className="print:hidden">

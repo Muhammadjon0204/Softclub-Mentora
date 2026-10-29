@@ -19,6 +19,7 @@ import { EmptyState } from '../../shared/ui/EmptyState';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { StaggerContainer } from '../../shared/ui/motion';
 import { SkeletonRow } from '../../shared/ui/Skeleton';
+import { intlLocale } from '../../shared/i18n/intl';
 
 /** `Backend/src/MentorTaskFlow.Contracts/Admin/AuditLogDto.cs` — только поля, которые нужны странице. */
 interface AuditEntry {
@@ -85,8 +86,8 @@ function groupConsecutive(entries: AuditEntry[]): AuditRow[] {
 function formatDateTime(iso: string): { date: string; time: string } {
   const value = new Date(iso);
   return {
-    date: value.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', ''),
-    time: value.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+    date: value.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' }).replace(' г.', ''),
+    time: value.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
   };
 }
 
@@ -236,7 +237,7 @@ export function AuditPage(): JSX.Element {
                         <Badge tone={auditActionTone(entry.action)}>{auditActionLabel(entry.action)}</Badge>
                         {count > 1 ? <span className="rounded-full bg-surface-muted px-1.5 text-[11.5px] font-semibold tabular-nums text-ink-secondary">×{count}</span> : null}
                       </span>
-                      {count > 1 ? <span className="mt-0.5 block text-[11px] text-ink-muted">первое — {new Date(firstAt).toLocaleString('ru-RU', { hour12: false })}</span> : null}
+                      {count > 1 ? <span className="mt-0.5 block text-[11px] text-ink-muted">первое — {new Date(firstAt).toLocaleString(intlLocale(), { hour12: false })}</span> : null}
                     </PreviewTd>
                     <PreviewTd className="py-2.5">
                       <span className="block truncate text-[13px] text-ink">{object.name ?? object.type}</span>

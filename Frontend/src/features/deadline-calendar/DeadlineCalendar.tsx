@@ -28,6 +28,7 @@ import {
 import { TONE_CLASSES, TONE_LABEL, TONE_ORDER, type CalendarEvent } from './deadlineEvents';
 import { useCalendarDeadlines } from './useCalendarDeadlines';
 import { useNow } from './useNow';
+import { tr } from '../../shared/i18n/catalog';
 
 const UPCOMING_LIMIT = 6;
 const UPCOMING_WINDOW_MS = 120 * 86_400_000;
@@ -73,7 +74,7 @@ function initialsOf(fullName: string): string {
 
 function dayHeading(key: string): { weekday: string; date: string } {
   const { year, month, day } = parseDayKey(key);
-  return { weekday: WEEKDAY_LONG_RU[weekdayOf(year, month, day)], date: `${day} ${MONTH_NAMES_GENITIVE_RU[month - 1]}` };
+  return { weekday: tr(WEEKDAY_LONG_RU[weekdayOf(year, month, day)]), date: `${day} ${tr(MONTH_NAMES_GENITIVE_RU[month - 1])}` };
 }
 
 /**
@@ -220,7 +221,7 @@ export function DeadlineCalendar({ scopeKey, timeZoneId, toEvent, emptyUpcomingH
               const isSelected = cell.key === selectedKey;
               const isWeekend = cell.weekday >= 5;
               const extra = dayEvents.length - CHIPS_PER_CELL;
-              const label = `${cell.day} ${MONTH_NAMES_GENITIVE_RU[cell.month - 1]}${dayEvents.length > 0 ? `, ${dayEvents.length} ${pluralDeadlines(dayEvents.length)}` : ''}${isToday ? ', сегодня' : ''}`;
+              const label = `${cell.day} ${tr(MONTH_NAMES_GENITIVE_RU[cell.month - 1])}${dayEvents.length > 0 ? `, ${dayEvents.length} ${tr(pluralDeadlines(dayEvents.length))}` : ''}${isToday ? tr(', сегодня') : ''}`;
 
               return (
                 <button
@@ -385,7 +386,7 @@ function UpcomingRow({ event, timeZoneId }: { event: CalendarEvent; timeZoneId: 
     <li>
       <Link to={event.href} className="group flex min-w-0 items-center gap-3 rounded-control px-3 py-2.5 transition hover:bg-surface-hover">
         <span className="grid w-11 shrink-0 place-items-center rounded-control border border-line bg-surface-muted py-1 leading-tight">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-brand">{MONTH_NAMES_GENITIVE_RU[month - 1].slice(0, 3)}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-brand">{tr(MONTH_NAMES_GENITIVE_RU[month - 1]).slice(0, 3)}</span>
           <span className="text-[16px] font-semibold tabular-nums text-ink">{day}</span>
         </span>
         <span className="min-w-0 flex-1">

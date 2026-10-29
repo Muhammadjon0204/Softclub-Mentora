@@ -15,8 +15,9 @@ import { CrmPeriodView } from './CrmGroupDrawer';
 import { CrmReportSummary } from './CrmReportSummary';
 import { CrmReportText } from './CrmReportText';
 import { formatRange, periodTitle } from './crmPresentation';
+import { lazyDateTimeFormat } from '../../shared/i18n/intl';
 
-const DATE_TIME = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const DATE_TIME = lazyDateTimeFormat({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const when = (iso: string): string => DATE_TIME.format(new Date(iso)).replace(/\.(?=\s|,|$)/, '');
 
 /** Отчёт так, как его читает тимлид: сводка с динамикой, выводы ИИ и ментора, детали недели. */

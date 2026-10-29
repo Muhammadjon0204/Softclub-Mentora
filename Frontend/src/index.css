@@ -158,6 +158,22 @@ html.theme-transition *::after {
     fill 280ms ease,
     stroke 280ms ease !important;
 }
+/**
+ * Смена языка (`localeStore.ts`): короткое затухание содержимого вместо мгновенного перескока —
+ * перевод другой длины переносит строки по-новому, и плавный переход прячет этот момент.
+ * Только opacity: она не создаёт containing block для position:fixed (тултипы, drawer'ы).
+ */
+html.locale-transition #root {
+  animation: locale-fade 320ms ease-out;
+}
+@keyframes locale-fade {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.locale-transition #root { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.theme-transition,
   html.theme-transition *,

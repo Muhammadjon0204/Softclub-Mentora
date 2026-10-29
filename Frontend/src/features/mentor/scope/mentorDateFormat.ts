@@ -1,5 +1,6 @@
 import { pluralizeRu } from '../../admin-assignments/assignmentPresentation';
 import { DAY_MS, HOUR_MS, MINUTE_MS, MOCK_NOW } from '../../../mocks/domain/reference';
+import { dateTimeFormat } from '../../../shared/i18n/intl';
 
 /**
  * Порт `features/lead/scope/leadDateFormat.ts` для Mentor-раздела. Дедлайны и
@@ -7,7 +8,7 @@ import { DAY_MS, HOUR_MS, MINUTE_MS, MOCK_NOW } from '../../../mocks/domain/refe
  * часовой пояс браузера не используется.
  */
 export function formatCategoryDateTime(timestampMs: number, timeZoneId: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', {
+  const parts = dateTimeFormat({
     timeZone: timeZoneId,
     day: '2-digit',
     month: '2-digit',
@@ -22,7 +23,7 @@ export function formatCategoryDateTime(timestampMs: number, timeZoneId: string):
 }
 
 export function formatCategoryDate(timestampMs: number, timeZoneId: string): string {
-  const parts = new Intl.DateTimeFormat('ru-RU', {
+  const parts = dateTimeFormat({
     timeZone: timeZoneId,
     day: '2-digit',
     month: '2-digit',
@@ -57,7 +58,7 @@ export function categoryDayLabel(timestampMs: number, timeZoneId: string): strin
   const key = calendarDateKey(timestampMs, timeZoneId);
   if (key === todayKey) return 'Сегодня';
   if (key === tomorrowKey) return 'Завтра';
-  const label = new Intl.DateTimeFormat('ru-RU', { timeZone: timeZoneId, weekday: 'long', day: '2-digit', month: 'long' }).format(timestampMs);
+  const label = dateTimeFormat({ timeZone: timeZoneId, weekday: 'long', day: '2-digit', month: 'long' }).format(timestampMs);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 

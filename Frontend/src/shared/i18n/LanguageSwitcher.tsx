@@ -4,7 +4,8 @@ import { SPRING_PILL } from '../ui/motionTokens';
 import { SUPPORTED_LOCALES } from './translations';
 import { useTranslation } from './useTranslation';
 
-const LABEL: Record<string, string> = { ru: 'RU', tg: 'ТГ', en: 'EN' };
+// Код языка — ISO 639-1 (`tg`, он же в `<html lang>`), а на кнопке — привычное в Таджикистане TJ.
+const LABEL: Record<string, string> = { ru: 'RU', tg: 'TJ', en: 'EN' };
 
 /**
  * Три кнопки фиксированной ширины, а не выпадающий `Select` с текстом варианта на триггере:
