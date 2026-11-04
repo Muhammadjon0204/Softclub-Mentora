@@ -69,7 +69,10 @@ services:
 
   # ── Объектное хранилище ────────────────────────────────────────────────────
   mentora-minio:
-    image: minio/minio:latest
+    # minio/minio больше нет на Docker Hub и quay.io; тот же образ, что в MinioFixture.cs.
+    # Root: minio/minio работал от него, поэтому файлы в существующем томе остаются доступны.
+    image: cgr.dev/chainguard/minio:latest
+    user: "0"
     container_name: ${MINIO_CONTAINER_NAME}
     restart: unless-stopped
     command: server /data --console-address ":9001"
