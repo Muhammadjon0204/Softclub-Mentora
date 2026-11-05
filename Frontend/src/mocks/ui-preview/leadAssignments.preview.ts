@@ -21,7 +21,7 @@ export type LeadAssignmentStatus =
   | 'Approved'
   | 'Cancelled';
 
-export type LeadAssignmentSource = 'Auto' | 'Manual';
+export type LeadAssignmentSource = 'Auto' | 'Manual' | 'Proposal';
 
 export interface LeadSubmissionFile {
   id: string;
@@ -51,7 +51,7 @@ export interface LeadSubmissionRecord {
 
 export interface LeadTaskEventRecord {
   id: string;
-  kind: TaskEventKind | 'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated';
+  kind: TaskEventKind | 'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged';
   occurredAt: number;
   actorName: string;
   detail?: string;
@@ -79,6 +79,10 @@ export interface LeadAssignmentRecord {
   allowLateSubmission: boolean;
   submissions: LeadSubmissionRecord[];
   events: LeadTaskEventRecord[];
+  /** Роль выдавшего: `Admin` или `Lead`. */
+  assignedByRole?: string | null;
+  /** Может ли текущий пользователь вести задание. Считает сервер. */
+  canManage?: boolean;
   /**
    * Real `AssignmentDto.concurrencyToken` — required by every mutation (`publish`, `accept-suggestion`,
    * `reassign`, `start-review`, `cancel`, `PUT`). Optional here only for callers that build a partial

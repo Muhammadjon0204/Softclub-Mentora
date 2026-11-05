@@ -26,6 +26,8 @@ public sealed class Assignment : AuditableEntity
     public const int DescriptionMaxLength = 2000;
     public const int CancelReasonMinLength = 5;
     public const int CancelReasonMaxLength = 500;
+    public const int RescheduleReasonMinLength = 5;
+    public const int RescheduleReasonMaxLength = 500;
 
     /// <summary>Null for manual work outside the schedule.</summary>
     public Guid? TopicAssignmentId { get; private set; }
@@ -36,10 +38,16 @@ public sealed class Assignment : AuditableEntity
 
     public Guid CategoryId { get; private set; }
 
-    /// <summary>An active Mentor of the same organization, branch and category (composite FK, 12.2a).</summary>
+    /// <summary>
+    /// An active Mentor, or a Lead when an administrator hands the work to them, of the same
+    /// organization, branch and category (<c>trg_assignments_executor_scope</c>).
+    /// </summary>
     public Guid AssignedToId { get; private set; }
 
-    /// <summary>Null only while an auto-generated suggestion is still unaccepted.</summary>
+    /// <summary>
+    /// Who handed the work out, and therefore who leads it: only they review it and change its terms
+    /// (see <c>AssignmentOwnership</c>). Null only while an auto-generated suggestion is unaccepted.
+    /// </summary>
     public Guid? AssignedById { get; private set; }
 
     /// <summary>Copied from the template at creation and frozen after publication (10.6.1).</summary>
@@ -51,12 +59,16 @@ public sealed class Assignment : AuditableEntity
 
     public AssignmentSource Source { get; private set; }
 
-    /// <summary>The original deadline. Immutable once the assignment has been published.</summary>
+    /// <summary>
+    /// The original deadline. Immutable once published: <see cref="CurrentDueAt"/> moves instead, so
+    /// the first promise stays on record however often the date changes afterwards.
+    /// </summary>
     public DateTimeOffset InitialDueAt { get; private set; }
 
     /// <summary>
-    /// The deadline in force. Equals <see cref="InitialDueAt"/> at creation and changes <b>only</b> on
-    /// the transition to <see cref="AssignmentStatus.NeedsRework"/>, taking the review's value.
+    /// The deadline in force. Equals <see cref="InitialDueAt"/> at creation and changes on the
+    /// transition to <see cref="AssignmentStatus.NeedsRework"/>, taking the review's value, or when
+    /// whoever handed the work out moves it with a reason (<see cref="Reschedule"/>).
     /// </summary>
     public DateTimeOffset CurrentDueAt { get; private set; }
 
@@ -146,6 +158,34 @@ public sealed class Assignment : AuditableEntity
             title, description, initialDueAt, AssignmentStatus.Suggested, AssignmentSource.Auto,
             generatedForDate, autoGenerationKey, now);
 
+    /// <summary>
+    /// Creates published work from an approved proposal.
+    /// </summary>
+    /// <remarks>
+    /// There is no draft step: the mentor wrote the idea and the decider has just set its terms, so
+    /// there is nothing left to prepare, and the work is the author's own by definition.
+    /// </remarks>
+    public static Assignment CreateFromProposal(
+        Guid organizationId,
+        Guid branchId,
+        Guid categoryId,
+        Guid authorId,
+        Guid decidedById,
+        string title,
+        string? description,
+        DateTimeOffset dueAt,
+        DateTimeOffset now)
+    {
+        var assignment = Create(
+            organizationId, branchId, categoryId, authorId, decidedById, topicAssignmentId: null,
+            title, description, dueAt, AssignmentStatus.Assigned, AssignmentSource.Proposal,
+            generatedForDate: null, autoGenerationKey: null, now);
+
+        assignment.AssignedAt = now;
+
+        return assignment;
+    }
+
     private static Assignment Create(
         Guid organizationId,
         Guid branchId,
@@ -203,8 +243,9 @@ public sealed class Assignment : AuditableEntity
     /// </summary>
     /// <remarks>
     /// Allowed in <see cref="AssignmentStatus.Draft"/> and <see cref="AssignmentStatus.Suggested"/>
-    /// only. Once published, the title, description and initial deadline are what the Mentor was told,
-    /// and changing them afterwards would rewrite the terms of work already under way.
+    /// only. Once published, the title and description are what the Mentor was told, and changing them
+    /// afterwards would rewrite the terms of work already under way. The deadline alone may still move,
+    /// openly and with a reason, through <see cref="Reschedule"/>.
     /// </remarks>
     public void Edit(string title, string? description, DateTimeOffset initialDueAt, DateTimeOffset now)
     {
@@ -274,6 +315,66 @@ public sealed class Assignment : AuditableEntity
 
         AssignedToId = newAssigneeId;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Moves the deadline of published work that is with its executor.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Refused while the work is <see cref="AssignmentStatus.Submitted"/> or
+    /// <see cref="AssignmentStatus.InReview"/>: it has been handed in, so there is no deadline left for
+    /// anybody to meet. The review decides what happens next, and a return for rework sets a new date.
+    /// </para>
+    /// <para>
+    /// From <see cref="AssignmentStatus.Overdue"/> the task goes back to where it slipped from: work
+    /// with a new deadline is not overdue. <see cref="OverdueAt"/> stays, because it answers «did this
+    /// ever slip», and rescheduling must not be a way to erase that from <c>OverdueRate</c> (14.4).
+    /// </para>
+    /// </remarks>
+    /// <returns>The deadline that was in force, for the event and the notification.</returns>
+    public DateTimeOffset Reschedule(DateTimeOffset newDueAt, string reason, DateTimeOffset now)
+    {
+        EnsureNotTerminal();
+
+        if (Status is not (AssignmentStatus.Assigned or AssignmentStatus.NeedsRework or AssignmentStatus.Overdue))
+        {
+            throw new DomainException(
+                DomainErrorCodes.DeadlineChangeNotAllowed,
+                "Срок можно изменить только пока работа у исполнителя.",
+                new Dictionary<string, object?> { ["currentStatus"] = Status.ToString() });
+        }
+
+        if (newDueAt <= now)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Новый срок должен быть в будущем.");
+        }
+
+        if (newDueAt == CurrentDueAt)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Новый срок совпадает с текущим.");
+        }
+
+        if ((reason ?? string.Empty).Trim().Length is < RescheduleReasonMinLength or > RescheduleReasonMaxLength)
+        {
+            throw new DomainException(
+                DomainErrorCodes.ValidationFailed,
+                $"Причина изменения срока обязательна: от {RescheduleReasonMinLength} до {RescheduleReasonMaxLength} символов.");
+        }
+
+        var previousDueAt = CurrentDueAt;
+
+        if (Status is AssignmentStatus.Overdue)
+        {
+            // Overdue is entered only from Assigned and NeedsRework, and work that was ever submitted
+            // can only have come back through a rework decision.
+            Status = FirstSubmittedAt is null ? AssignmentStatus.Assigned : AssignmentStatus.NeedsRework;
+        }
+
+        CurrentDueAt = newDueAt;
+        UpdatedAt = now;
+
+        return previousDueAt;
     }
 
     /// <summary>

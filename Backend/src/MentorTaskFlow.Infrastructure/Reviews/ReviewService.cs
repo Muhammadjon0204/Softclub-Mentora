@@ -9,7 +9,9 @@ using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Domain.Tenancy;
+using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Assignments;
 using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +26,7 @@ public sealed class ReviewService(
     IBranchContext branchContext,
     ITenantStateGuard tenantState,
     IOutboxWriter outboxWriter,
+    IAuditWriter auditWriter,
     IRequestContext requestContext,
     IClock clock) : IReviewService
 {
@@ -51,7 +54,7 @@ public sealed class ReviewService(
         CreateReviewRequest request,
         CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
+        var actor = RequireReviewer();
         var decision = ParseDecision(request.Decision);
 
         dbContext.ChangeTracker.Clear();
@@ -65,6 +68,19 @@ public sealed class ReviewService(
 
         var assignment = await dbContext.Assignments
             .FirstAsync(a => a.Id == submission.AssignmentId, cancellationToken);
+
+
+        // Only whoever handed the work out judges it. A superior can see the work and the verdict, but
+        // has no way to know what was asked for (AssignmentOwnership). Before the token: somebody with
+        // no say should hear that, not that their copy of the task is stale.
+        var assigner = await AssignmentOwnership.LoadAssignerAsync(dbContext, assignment.AssignedById, cancellationToken);
+
+        if (!AssignmentOwnership.IsOwner(actor, assignment, assigner))
+        {
+            throw new ForbiddenException(
+                ErrorCodes.AssignmentNotOwner,
+                "Проверить работу может только тот, кто выдал задание.");
+        }
 
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
@@ -134,6 +150,21 @@ public sealed class ReviewService(
 
         await NotifyAssigneeAsync(assignment, review, cancellationToken);
 
+        auditWriter.Write(new AuditEntry
+        {
+            Action = AuditActions.ReviewDecide,
+            EntityType = nameof(Assignment),
+            EntityId = assignment.Id,
+            BranchId = assignment.BranchId,
+            CategoryId = assignment.CategoryId,
+            Metadata = JsonSerializer.SerializeToDocument(new
+            {
+                title = assignment.Title,
+                decision = decision.ToString(),
+                versionNumber = submission.VersionNumber,
+            }),
+        });
+
         await SaveTranslatingConstraintsAsync(assignment, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -158,13 +189,14 @@ public sealed class ReviewService(
     // -----------------------------------------------------------------
 
     /// <summary>
-    /// The submission a Lead of this very category may decide on.
+    /// The submission within the caller's reach.
     /// </summary>
     /// <remarks>
-    /// A Lead of another category or another branch gets 404, not 409: the object is outside their
+    /// Somebody of another category or branch gets 404, not 409: the object is outside their
     /// visibility, and saying anything else would confirm it exists (<c>TEN-006</c>). The 409
     /// <c>CROSS_SCOPE_REFERENCE</c> the endpoint catalog lists is the database's answer, reached only
-    /// by a path that bypasses this check.
+    /// by a path that bypasses this check. Being able to reach it does not make it theirs to decide:
+    /// that is checked once the assignment row is locked.
     /// </remarks>
     private async Task<Submission> FindReviewableAsync(
         Guid submissionId,
@@ -177,7 +209,15 @@ public sealed class ReviewService(
                 cancellationToken)
             ?? throw new NotFoundException();
 
-        if (submission.CategoryId != actor.CategoryId)
+        var reachable = actor switch
+        {
+            { Role: UserRole.Lead } => submission.CategoryId == actor.CategoryId,
+            { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => submission.BranchId == actor.BranchId,
+            { Role: UserRole.Admin, AdminScope: AdminScope.Organization } => true,
+            _ => false,
+        };
+
+        if (!reachable)
         {
             throw new NotFoundException();
         }
@@ -309,13 +349,13 @@ public sealed class ReviewService(
     private ICurrentUserContext RequireActor() => currentUser.Current ?? throw new UnauthorizedException();
 
     /// <summary>Reviewing belongs to the Lead of the category — to no administrator (<c>ASN-025</c>).</summary>
-    private ICurrentUserContext RequireLead()
+    private ICurrentUserContext RequireReviewer()
     {
         var actor = RequireActor();
 
-        return actor.Role is UserRole.Lead
+        return actor.Role is UserRole.Lead or UserRole.Admin
             ? actor
-            : throw new ForbiddenException(ErrorCodes.Forbidden, "Проверка работ доступна только тимлиду категории.");
+            : throw new ForbiddenException(ErrorCodes.Forbidden, "Проверка работ недоступна ментору.");
     }
 
     private static ReviewDto ToDto(Review review) => new(

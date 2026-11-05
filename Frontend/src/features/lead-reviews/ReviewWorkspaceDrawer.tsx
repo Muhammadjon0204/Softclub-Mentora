@@ -19,7 +19,6 @@ import { FilePreviewModal } from '../admin-assignments/FilePreviewModal';
 import { SubmissionVersionCard } from '../assignment-details/SubmissionVersionCard';
 import { LEAD_STATUS_META, sourceLabel } from '../lead/assignments/leadAssignmentPresentation';
 import { formatCategoryDateTime, formatRelative, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
-import { useLeadScope } from '../lead/scope/useLeadScope';
 import type { LeadAssignmentRecord, LeadSubmissionFile } from '../../mocks/ui-preview/leadAssignments.preview';
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
 import { approveSchema, needsReworkSchema } from './reviewDecision.schema';
@@ -33,6 +32,8 @@ export interface ReviewWorkspaceDrawerProps {
   onApprove: (a: LeadAssignmentRecord, comment: string | null) => void;
   onNeedsRework: (a: LeadAssignmentRecord, comment: string, reworkDueAtMs: number) => void;
   mentorNameOf: (mentorId: string) => string;
+  /** Дедлайн доработки показывается и вводится в часовом поясе категории (`UX-001`). */
+  timeZoneId: string;
 }
 
 type DecisionMode = 'none' | 'approve' | 'rework';
@@ -221,8 +222,7 @@ function DecisionChoice({ onApprove, onRework }: { onApprove: () => void; onRewo
  * `InReview` (REV-003); вне этого статуса форма решения не рендерится вовсе —
  * не просто задизейблена.
  */
-export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onStartReview, onApprove, onNeedsRework, mentorNameOf }: ReviewWorkspaceDrawerProps): JSX.Element {
-  const scope = useLeadScope();
+export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onStartReview, onApprove, onNeedsRework, mentorNameOf, timeZoneId }: ReviewWorkspaceDrawerProps): JSX.Element {
   const [mode, setMode] = useState<DecisionMode>('none');
   const [previewFile, setPreviewFile] = useState<SubmissionFile | null>(null);
   const [detailsFile, setDetailsFile] = useState<SubmissionFile | null>(null);
@@ -233,7 +233,7 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
   const statusMeta = assignment !== undefined ? LEAD_STATUS_META[assignment.status] : null;
   const latest = assignment !== undefined && assignment.submissions.length > 0 ? assignment.submissions[assignment.submissions.length - 1] : undefined;
   const previous = assignment !== undefined ? assignment.submissions.slice(0, -1).reverse() : [];
-  const formatDate = (ms: number): string => formatCategoryDateTime(ms, scope.timeZoneId);
+  const formatDate = (ms: number): string => formatCategoryDateTime(ms, timeZoneId);
 
   function handleOpenFile(file: LeadSubmissionFile, submittedAt: number): void {
     const entry: SubmissionFile = { ...file, uploadedLabel: formatDate(submittedAt) };
@@ -313,7 +313,7 @@ export function ReviewWorkspaceDrawer({ assignment, assignmentId, onClose, onSta
               ) : (
                 <NeedsReworkForm
                   assignment={assignment}
-                  timeZoneId={scope.timeZoneId}
+                  timeZoneId={timeZoneId}
                   onSubmit={(comment, dueAt) => { onNeedsRework(assignment, comment, dueAt); setMode('none'); }}
                   onCancel={() => { setMode('none'); }}
                 />

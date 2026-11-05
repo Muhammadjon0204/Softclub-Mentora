@@ -3,6 +3,7 @@ import { LayoutGroup } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 
 import { useAuth } from '../../auth/useAuth';
+import { usePermissions } from '../../auth/usePermissions';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
 import { useTranslation } from '../../shared/i18n/useTranslation';
 import { Tooltip } from '../../shared/ui/Tooltip';
@@ -31,11 +32,14 @@ export function AdminSidebar({
   onNavigate,
 }: AdminSidebarProps): JSX.Element {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const { t } = useTranslation();
   const isOrgAdmin = user?.role === 'Admin' && user.adminScope === 'Organization';
   const isCollapsed = variant === 'desktop' && collapsed;
 
-  const items = ADMIN_NAV_ITEMS.filter((item) => item.organizationAdminOnly !== true || isOrgAdmin);
+  const items = ADMIN_NAV_ITEMS.filter(
+    (item) => (item.organizationAdminOnly !== true || isOrgAdmin) && (item.permission === undefined || can(item.permission)),
+  );
 
   const collapseLabel = collapsed ? t('nav.expandMenu') : t('nav.collapseMenu');
 

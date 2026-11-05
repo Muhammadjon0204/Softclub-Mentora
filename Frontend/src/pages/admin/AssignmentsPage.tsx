@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { LayoutGroup, motion } from 'framer-motion';
-import { CheckCircle2, ClipboardList, Clock3, Columns3, Rows3, SearchX, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Clock3, Columns3, Plus, Rows3, SearchX, TriangleAlert } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -9,7 +9,21 @@ import { listUsers } from '../../api/admin/users';
 import { listAssignments } from '../../api/lead/assignments';
 import type { AssignmentDto } from '../../api/lead/assignments';
 import { useAuth } from '../../auth/useAuth';
+import { PERMISSION, usePermissions } from '../../auth/usePermissions';
+import { Button } from '../../shared/ui/Button';
+import { useToast } from '../../shared/overlays';
 import { AdminAssignmentDrawer } from '../../features/admin-assignments/AdminAssignmentDrawer';
+import type { AdminDrawerAction } from '../../features/admin-assignments/AdminAssignmentDrawer';
+import { AdminAssignmentFormDrawer } from '../../features/admin-assignments/AdminAssignmentFormDrawer';
+import { AdminReassignDialog } from '../../features/admin-assignments/AdminReassignDialog';
+import { useAdminAssignmentActions } from '../../features/admin-assignments/useAdminAssignmentActions';
+import { useAdminReview } from '../../features/admin-assignments/useAdminReview';
+import { RescheduleAssignmentDialog } from '../../features/assignment-deadline/RescheduleAssignmentDialog';
+import { AssignmentCancelDialog } from '../../features/lead-assignments/AssignmentCancelDialog';
+import { ReviewWorkspaceDrawer } from '../../features/lead-reviews/ReviewWorkspaceDrawer';
+import { canReassign, canReschedule } from '../../features/lead/assignments/leadAssignmentPresentation';
+import { toAssignmentRecord } from '../../features/lead/assignments/assignmentAdapter';
+import { useCategoryTimeZone } from '../../features/proposals/useProposals';
 import { AdminAssignmentsKanban } from '../../features/admin-assignments/AdminAssignmentsKanban';
 import {
   ACTIVE_STATUSES,
@@ -17,6 +31,7 @@ import {
   ASSIGNMENT_STATUS_LABEL,
   ASSIGNMENT_STATUS_TONE,
   AWAITING_REVIEW_STATUSES,
+  assignmentSourceLabel,
   deadlineHint,
   formatShortDateTimeRu,
   parseAssignmentFilter,
@@ -51,14 +66,18 @@ const FILTER_TONE: Record<AssignmentFilter, { text: string; bar: string }> = {
 };
 const HINT_TONE = { muted: 'text-ink-muted', warning: 'text-warning', danger: 'text-danger' } as const;
 
-/** Все задания филиала (или организации) — только просмотр, без действий руководителя. */
+/** Все задания контура. Своё задание администратор ведёт отсюда, чужое только смотрит. */
 export function AssignmentsPage(): JSX.Element {
   const { user } = useAuth();
   const branchContext = useBranchContext();
   const organizationId = user?.organization.id ?? 'anonymous';
   const scopeKey = (domain: string, ...rest: string[]) => branchScopedKey(domain, organizationId, branchContext.selectedBranchId, ...rest);
+  const { can } = usePermissions();
+  const toast = useToast();
+  const listKey = scopeKey('admin-assignments', 'list');
+  const actions = useAdminAssignmentActions(listKey);
 
-  const query = useQuery({ queryKey: scopeKey('admin-assignments', 'list'), queryFn: () => listAssignments({ page: 1, pageSize: 100, sort: 'currentDueAt', order: 'desc' }) });
+  const query = useQuery({ queryKey: listKey, queryFn: () => listAssignments({ page: 1, pageSize: 100, sort: 'currentDueAt', order: 'desc' }) });
   const usersQuery = useQuery({ queryKey: ['admin-users', 'list', organizationId], queryFn: () => listUsers({ page: 1, pageSize: 100 }) });
   const categoriesQuery = useQuery({ queryKey: scopeKey('admin-categories', 'list'), queryFn: () => listCategories({ page: 1, pageSize: 100 }) });
 
@@ -86,7 +105,23 @@ export function AssignmentsPage(): JSX.Element {
   const [branchFilter, setBranchFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [givenByMe, setGivenByMe] = useState(false);
+  const [rescheduling, setRescheduling] = useState<AssignmentDto | null>(null);
+  const [reassigning, setReassigning] = useState<AssignmentDto | null>(null);
+  const [cancelling, setCancelling] = useState<AssignmentDto | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+
+  // Открытое задание живёт в адресе: на него ведут уведомления и принятые предложения.
+  const openId = searchParams.get('assignmentId');
+  const setOpenId = (id: string | null): void => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (id === null) params.delete('assignmentId');
+      else params.set('assignmentId', id);
+      return params;
+    });
+  };
 
   const assignments = useMemo(() => query.data?.items ?? [], [query.data]);
   const userName = useMemo(() => new Map((usersQuery.data?.items ?? []).map((u) => [u.id, u.fullName])), [usersQuery.data]);
@@ -103,8 +138,8 @@ export function AssignmentsPage(): JSX.Element {
     for (const item of assignments) if (item.branch) byId.set(item.branch.id, item.branch.name);
     return [{ value: 'all', label: 'Все филиалы' }, ...[...byId].map(([value, label]) => ({ value, label }))];
   }, [assignments]);
-  const filtersActive = search.trim() !== '' || categoryFilter !== 'all' || branchFilter !== 'all' || filter !== 'all';
-  const resetFilters = (): void => { setSearch(''); setCategoryFilter('all'); setBranchFilter('all'); setFilter('all'); setPage(1); };
+  const filtersActive = search.trim() !== '' || categoryFilter !== 'all' || branchFilter !== 'all' || filter !== 'all' || givenByMe;
+  const resetFilters = (): void => { setSearch(''); setCategoryFilter('all'); setBranchFilter('all'); setFilter('all'); setGivenByMe(false); setPage(1); };
 
   const countFor = (statuses: string[] | null): number => (statuses === null ? assignments.length : assignments.filter((item) => statuses.includes(item.status)).length);
   const activeFilter = ASSIGNMENT_FILTERS.find((f) => f.id === filter) ?? ASSIGNMENT_FILTERS[0];
@@ -114,6 +149,7 @@ export function AssignmentsPage(): JSX.Element {
       (activeFilter.statuses === null || activeFilter.statuses.includes(item.status)) &&
       (categoryFilter === 'all' || item.categoryId === categoryFilter) &&
       (branchFilter === 'all' || item.branch?.id === branchFilter) &&
+      (!givenByMe || item.assignedById === user?.id) &&
       (needle === '' || item.title.toLowerCase().includes(needle) || mentorOf(item).toLowerCase().includes(needle)),
   );
 
@@ -126,14 +162,48 @@ export function AssignmentsPage(): JSX.Element {
   const toggle = (next: AssignmentFilter) => (): void => { setFilter(filter === next ? 'all' : next); setPage(1); };
   const overdueCount = countFor(['Overdue']);
   const reviewCount = countFor(AWAITING_REVIEW_STATUSES);
+  const myReviewCount = assignments.filter((item) => item.canManage === true && AWAITING_REVIEW_STATUSES.includes(item.status)).length;
+
+  const review = useAdminReview(reviewingId, listKey);
+  const reviewTimeZone = useCategoryTimeZone(review.assignment?.categoryId ?? rescheduling?.categoryId ?? null);
+
+  /** Что можно сделать с открытым заданием: статус, кто выдал и что разрешил владелец. */
+  const drawerActions = (item: AssignmentDto | null): AdminDrawerAction[] => {
+    if (item === null) return [];
+    const record = toAssignmentRecord(item);
+    const owns = item.canManage === true;
+    const open = !['Approved', 'Cancelled'].includes(item.status);
+    const result: AdminDrawerAction[] = [];
+
+    if (open && can(PERMISSION.assignmentsCancel)) result.push({ label: 'Отменить', onClick: () => { setCancelling(item); } });
+    if (owns && canReassign(record) && !item.firstSubmittedAt && can(PERMISSION.assignmentsReassign)) {
+      result.push({ label: 'Переназначить', onClick: () => { setReassigning(item); } });
+    }
+    if (owns && canReschedule(record) && can(PERMISSION.assignmentsReschedule)) {
+      result.push({ label: 'Изменить срок', onClick: () => { setRescheduling(item); } });
+    }
+    if (owns && AWAITING_REVIEW_STATUSES.includes(item.status) && can(PERMISSION.assignmentsReview)) {
+      result.push({ label: 'Проверить работу', primary: true, onClick: () => { setReviewingId(item.id); } });
+    }
+
+    return result;
+  };
 
   return (
     <div className="space-y-6">
-      <PreviewPageHeader title="Задания" subtitle="Контроль выполнения задач и соблюдения сроков по филиалам" />
+      <PreviewPageHeader
+        title="Задания"
+        subtitle="Контроль выполнения задач и соблюдения сроков по филиалам"
+        action={
+          can(PERMISSION.assignmentsAssign) ? (
+            <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormOpen(true); }}>Новое задание</Button>
+          ) : undefined
+        }
+      />
 
       <StaggerContainer className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <PreviewMetricCard icon={<ClipboardList />} label="Активные" value={String(countFor(ACTIVE_STATUSES))} hint="Назначены и ещё не закрыты" onClick={toggle('open')} active={filter === 'open'} accent="brand" />
-        <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint="Сданы, ждут руководителя" tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} accent="warning" />
+        <PreviewMetricCard icon={<Clock3 />} label="Ожидают проверки" value={String(reviewCount)} hint={myReviewCount > 0 ? `Ждут вашей проверки: ${String(myReviewCount)}` : 'Сданы, ждут того, кто выдал'} tone={reviewCount > 0 ? 'warning' : 'default'} onClick={toggle('review')} active={filter === 'review'} accent="warning" />
         <PreviewMetricCard icon={<TriangleAlert />} label="Просроченные" value={String(overdueCount)} hint={overdueCount > 0 ? 'Срок истёк без сдачи' : 'Просрочек нет'} tone={overdueCount > 0 ? 'danger' : 'default'} onClick={toggle('overdue')} active={filter === 'overdue'} accent="danger" />
         <PreviewMetricCard icon={<CheckCircle2 />} label="Одобрены" value={String(countFor(['Approved']))} hint="Приняты руководителем" tone="success" onClick={toggle('approved')} active={filter === 'approved'} accent="success" />
       </StaggerContainer>
@@ -176,6 +246,15 @@ export function AssignmentsPage(): JSX.Element {
           {branchOptions.length > 2 ? (
             <PreviewSelect label="Филиал" value={branchFilter} onChange={(value) => { setBranchFilter(value); setPage(1); }} options={branchOptions} width="lg" />
           ) : null}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={givenByMe}
+            onClick={() => { setGivenByMe(!givenByMe); setPage(1); }}
+            className={`h-10 shrink-0 rounded-control border px-3 text-[12.5px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${givenByMe ? 'border-brand bg-brand-soft text-brand-active' : 'border-line bg-surface text-ink-secondary hover:border-line-strong'}`}
+          >
+            Выданные мной
+          </button>
           <PreviewResetButton disabled={!filtersActive} onClick={resetFilters} />
           <LayoutGroup id="assignments-view">
             <div role="radiogroup" aria-label="Вид" className="ml-auto flex h-10 shrink-0 items-center rounded-control border border-line bg-surface p-1">
@@ -231,7 +310,7 @@ export function AssignmentsPage(): JSX.Element {
               <tr>
                 <td colSpan={columns}>
                   {assignments.length === 0 ? (
-                    <EmptyState icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} title="Заданий пока нет" description="Задания появятся, когда руководители направлений начнут их назначать." />
+                    <EmptyState icon={<ClipboardList className="h-5 w-5" aria-hidden="true" />} title="Заданий пока нет" description="Задания появятся, когда их начнут выдавать." />
                   ) : (
                     <EmptyState icon={<SearchX className="h-5 w-5" aria-hidden="true" />} title="Ничего не найдено" description="Попробуйте другой статус или запрос." />
                   )}
@@ -248,7 +327,7 @@ export function AssignmentsPage(): JSX.Element {
                     <PreviewTd className="py-2.5">
                       <button type="button" onClick={(event) => { event.stopPropagation(); setOpenId(item.id); }} className="block w-full min-w-0 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
                         <span className="block truncate text-[13.5px] font-medium text-ink" title={item.title}>{item.title}</span>
-                        <span className="block truncate text-[12px] text-ink-muted">{item.source === 'Auto' ? 'Из расписания' : 'Индивидуальное'}</span>
+                        <span className="block truncate text-[12px] text-ink-muted">{assignmentSourceLabel(item.source)}</span>
                       </button>
                     </PreviewTd>
                     <PreviewTd>
@@ -302,6 +381,89 @@ export function AssignmentsPage(): JSX.Element {
         categoryName={opened !== null ? (categoryName.get(opened.categoryId) ?? null) : null}
         nameOf={(id) => userName.get(id) ?? null}
         onClose={() => { setOpenId(null); }}
+        actions={drawerActions(opened)}
+      />
+
+      <AdminAssignmentFormDrawer
+        open={formOpen}
+        onClose={() => { setFormOpen(false); }}
+        users={usersQuery.data?.items ?? []}
+        categoryName={(id) => categoryName.get(id)}
+        actions={actions}
+        onAssigned={setOpenId}
+      />
+
+      <RescheduleAssignmentDialog
+        open={rescheduling !== null}
+        onOpenChange={(next) => { if (!next) setRescheduling(null); }}
+        assignmentTitle={rescheduling?.title ?? ''}
+        currentDueAtMs={rescheduling !== null ? Date.parse(rescheduling.currentDueAt) : 0}
+        isOverdue={rescheduling?.status === 'Overdue'}
+        timeZoneId={reviewTimeZone}
+        onConfirm={async (dueAtMs, reason) => {
+          if (rescheduling === null) return;
+          try {
+            await actions.reschedule(rescheduling, dueAtMs, reason);
+            toast.success('Срок изменён, исполнитель получит уведомление');
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не удалось изменить срок');
+            throw error;
+          }
+        }}
+      />
+
+      <AdminReassignDialog
+        assignment={reassigning}
+        users={usersQuery.data?.items ?? []}
+        categoryName={reassigning !== null ? categoryName.get(reassigning.categoryId) : undefined}
+        onClose={() => { setReassigning(null); }}
+        onConfirm={async (assigneeId) => {
+          if (reassigning === null) return;
+          try {
+            await actions.reassign(reassigning, assigneeId);
+            toast.success('Задание переназначено');
+            setReassigning(null);
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не удалось переназначить задание');
+          }
+        }}
+      />
+
+      <AssignmentCancelDialog
+        open={cancelling !== null}
+        onOpenChange={(next) => { if (!next) setCancelling(null); }}
+        title="Отменить задание"
+        assignmentTitle={cancelling?.title ?? ''}
+        confirmLabel="Отменить задание"
+        onConfirm={(reason) => {
+          if (cancelling === null) return;
+          actions.cancel(cancelling, reason)
+            .then(() => { toast.success('Задание отменено'); setCancelling(null); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось отменить задание'); });
+        }}
+      />
+
+      <ReviewWorkspaceDrawer
+        assignment={review.assignment}
+        assignmentId={reviewingId}
+        onClose={() => { setReviewingId(null); }}
+        mentorNameOf={(id) => userName.get(id) ?? 'Исполнитель'}
+        timeZoneId={reviewTimeZone}
+        onStartReview={(record) => {
+          const item = assignments.find((candidate) => candidate.id === record.id);
+          if (item === undefined) return;
+          actions.startReview(item).catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось начать проверку'); });
+        }}
+        onApprove={(record, comment) => {
+          review.decision.approve(record, comment)
+            .then(() => { toast.success('Работа принята'); setReviewingId(null); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось сохранить решение'); });
+        }}
+        onNeedsRework={(record, comment, dueMs) => {
+          review.decision.requestRework(record, comment, dueMs)
+            .then(() => { toast.success('Работа отправлена на доработку'); setReviewingId(null); })
+            .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось сохранить решение'); });
+        }}
       />
     </div>
   );

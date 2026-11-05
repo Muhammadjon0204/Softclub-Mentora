@@ -69,6 +69,17 @@ public static class AuditActions
 
     // Assignments, notifications, storage, reports, AI
     public const string AssignmentForceCancel = "assignment.force_cancel";
+
+    // What a superior reads afterwards: they do not act on someone else's work, so the log is how they
+    // follow it. The full step-by-step history of a task stays in TaskEvent (AUD-004).
+    public const string AssignmentPublish = "assignment.publish";
+    public const string AssignmentReassign = "assignment.reassign";
+    public const string AssignmentDeadlineChange = "assignment.deadline_change";
+    public const string ReviewDecide = "review.decide";
+    public const string ProposalApprove = "proposal.approve";
+    public const string ProposalReject = "proposal.reject";
+    public const string PermissionRoleUpdate = "permission.role_update";
+    public const string PermissionUserUpdate = "permission.user_update";
     public const string SchedulerNoActiveMentor = "scheduler.no_active_mentor";
     public const string RetentionCleanup = "retention.cleanup";
     public const string NotificationRetry = "notification.retry";
@@ -109,6 +120,7 @@ public static class AuditActions
         StorageCrossScopeInconsistency,
         ReportOrganizationExport,
         BootstrapProvision,
+        PermissionRoleUpdate,
     };
 
     /// <summary>

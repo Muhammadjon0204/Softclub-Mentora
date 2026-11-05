@@ -17,7 +17,7 @@ public sealed class ErrorCatalogTests
     /// Приложение C: «Версия 2.1 определяла 44 кода… всего 54 кода» — plus the two codes of the Omuz CRM
     /// integration (<c>INTEGRATION_NOT_CONFIGURED</c>, <c>INTEGRATION_UNAVAILABLE</c>).
     /// </summary>
-    private const int ExpectedCodeCount = 56;
+    private const int ExpectedCodeCount = 60;
 
     private static IReadOnlyList<string> DeclaredCodes() =>
     [

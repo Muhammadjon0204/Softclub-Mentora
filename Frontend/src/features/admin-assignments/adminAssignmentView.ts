@@ -46,7 +46,13 @@ const EXTRA_EVENT_LABEL: Record<string, string> = {
   SuggestedCreated: 'Предложено расписанием',
   SuggestionAccepted: 'Предложение принято',
   Reassigned: 'Переназначено',
+  DeadlineChanged: 'Срок изменён',
 };
+
+export function assignmentSourceLabel(source: string): string {
+  if (source === 'Auto') return 'Из расписания';
+  return source === 'Proposal' ? 'Предложение ментора' : 'Индивидуальное';
+}
 
 export function taskEventTitle(eventType: string): string {
   return (TASK_EVENT_LABEL as Record<string, string>)[eventType] ?? EXTRA_EVENT_LABEL[eventType] ?? eventType;

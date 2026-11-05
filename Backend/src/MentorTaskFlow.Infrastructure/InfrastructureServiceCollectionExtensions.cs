@@ -6,7 +6,9 @@ using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Security;
 using MentorTaskFlow.Application.Common.Tenancy;
 using MentorTaskFlow.Infrastructure.Analytics;
+using MentorTaskFlow.Infrastructure.Access;
 using MentorTaskFlow.Infrastructure.Assignments;
+using MentorTaskFlow.Infrastructure.Proposals;
 using MentorTaskFlow.Infrastructure.Auditing;
 using MentorTaskFlow.Infrastructure.Categories;
 using MentorTaskFlow.Infrastructure.Common;
@@ -123,6 +125,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<IAssignmentService, AssignmentService>();
+        services.AddScoped<IProposalService, ProposalService>();
+        services.AddScoped<IPermissionService, PermissionService>();
         services.AddSingleton<IDeadlineCalculator, DeadlineCalculator>();
 
         services.AddSingleton<AnalyticsMetrics>();

@@ -3,6 +3,7 @@ using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Application.Common.Exceptions;
 using MentorTaskFlow.Contracts.Analytics;
 using MentorTaskFlow.Infrastructure.Options;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -36,6 +37,7 @@ public sealed class ReportsController(
     /// </remarks>
     [HttpGet("personal")]
     [Authorize(Policy = MtfPolicies.Authenticated)]
+    [RequirePermission(Permissions.ReportsView)]
     [ProducesResponseType<ReportDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -54,6 +56,7 @@ public sealed class ReportsController(
     /// </remarks>
     [HttpGet("team")]
     [Authorize(Policy = MtfPolicies.Authenticated)]
+    [RequirePermission(Permissions.ReportsView)]
     [ProducesResponseType<ReportDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -99,6 +102,7 @@ public sealed class ReportsController(
     /// </remarks>
     [HttpPost("ai-summary")]
     [Authorize(Policy = MtfPolicies.Authenticated)]
+    [RequirePermission(Permissions.ReportsView)]
     [ProducesResponseType<AiSummaryDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<AiSummaryDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

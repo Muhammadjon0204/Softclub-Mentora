@@ -8,6 +8,7 @@ import {
   createAssignmentDraft,
   publishAssignment,
   reassignAssignment,
+  rescheduleAssignment,
   startAssignmentReview,
   updateAssignment as updateAssignmentApi,
 } from '../../../api/lead/assignments';
@@ -49,6 +50,7 @@ export interface UseAssignmentActionsResult {
   publish: (id: string, concurrencyToken: string) => Promise<LeadAssignmentRecord>;
   acceptSuggestion: (id: string, concurrencyToken: string) => Promise<LeadAssignmentRecord>;
   reassign: (id: string, concurrencyToken: string, mentorId: string) => Promise<LeadAssignmentRecord>;
+  reschedule: (id: string, concurrencyToken: string, dueAtMs: number, reason: string) => Promise<LeadAssignmentRecord>;
   startReview: (id: string, concurrencyToken: string) => Promise<LeadAssignmentRecord>;
   /** LA10. Also used for "reject suggestion" — same endpoint, same cancel reason validation (ASN-012 is just a cancel of a Suggested-status assignment). */
   cancel: (id: string, concurrencyToken: string, reason: string) => Promise<LeadAssignmentRecord>;
@@ -155,6 +157,14 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
     [run, applyUpdate],
   );
 
+  const reschedule = useCallback(
+    async (id: string, concurrencyToken: string, dueAtMs: number, reason: string): Promise<LeadAssignmentRecord> => {
+      const updated = await run(() => rescheduleAssignment(id, { dueAt: new Date(dueAtMs).toISOString(), reason, concurrencyToken }));
+      return applyUpdate(updated);
+    },
+    [run, applyUpdate],
+  );
+
   const startReview = useCallback(
     async (id: string, concurrencyToken: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => startAssignmentReview(id, { concurrencyToken }));
@@ -171,5 +181,5 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
     [run, applyUpdate],
   );
 
-  return { isSubmitting, createDraft, updateAssignment, publish, acceptSuggestion, reassign, startReview, cancel };
+  return { isSubmitting, createDraft, updateAssignment, publish, acceptSuggestion, reassign, reschedule, startReview, cancel };
 }

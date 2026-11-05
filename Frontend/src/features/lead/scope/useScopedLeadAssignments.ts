@@ -39,7 +39,9 @@ export function useScopedLeadAssignments(): LeadAssignmentRecord[] {
     queryFn: () => listAssignments({ pageSize: MAX_PAGE_SIZE }),
   });
 
-  const base = (listQuery.data?.items ?? []).map(toAssignmentRecord);
+  // Задания, которые лиду выдал администратор, живут в «Моих заданиях»: на доске и в очереди
+  // проверки лид ведёт работу команды, а не свою.
+  const base = (listQuery.data?.items ?? []).map(toAssignmentRecord).filter((a) => a.mentorId !== scope.leadId);
   const submissionsById = useSubmissionSummaries(base.map((a) => a.id));
 
   return base.map((a) => ({ ...a, submissions: submissionsById.get(a.id) ?? a.submissions }));

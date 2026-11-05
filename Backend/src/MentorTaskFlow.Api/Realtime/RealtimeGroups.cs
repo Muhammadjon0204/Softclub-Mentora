@@ -12,7 +12,8 @@ namespace MentorTaskFlow.Api.Realtime;
 /// A connection's groups come from the validated token alone, the way every read derives its scope
 /// (<c>TEN-030a</c>): an Organization Admin hears the whole organization, a Branch Admin their branch,
 /// a Lead their category, a Mentor only what is about them. Leads and Mentors also join their
-/// category's team group, which carries nothing but the shared schedule.
+/// category's team group, which carries nothing but the shared schedule. Everybody hears what is about
+/// them personally, such as a change of their own permissions.
 /// </para>
 /// <para>
 /// A Mentor carries the same category claim as their Lead but never joins the category group: that
@@ -24,9 +25,9 @@ public static class RealtimeGroups
 {
     public static IReadOnlyList<string> For(ICurrentUserContext user) => (user.Role, user.AdminScope) switch
     {
-        (UserRole.Admin, AdminScope.Organization) => [Organization(user.OrganizationId)],
-        (UserRole.Admin, AdminScope.Branch) => [Branch(user.BranchId!.Value)],
-        (UserRole.Lead, _) => [Category(user.CategoryId!.Value), Team(user.CategoryId!.Value)],
+        (UserRole.Admin, AdminScope.Organization) => [Organization(user.OrganizationId), User(user.UserId)],
+        (UserRole.Admin, AdminScope.Branch) => [Branch(user.BranchId!.Value), User(user.UserId)],
+        (UserRole.Lead, _) => [Category(user.CategoryId!.Value), Team(user.CategoryId!.Value), User(user.UserId)],
         _ => [User(user.UserId), Team(user.CategoryId!.Value)],
     };
 

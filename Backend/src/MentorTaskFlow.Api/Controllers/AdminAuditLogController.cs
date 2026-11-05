@@ -2,6 +2,7 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Admin;
 using MentorTaskFlow.Contracts.Common;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,6 +20,7 @@ namespace MentorTaskFlow.Api.Controllers;
 [Route("api/v1/admin/audit-log")]
 [Produces("application/json")]
 [Authorize(Policy = MtfPolicies.AnyAdmin)]
+[RequirePermission(Permissions.AuditView)]
 public sealed class AdminAuditLogController(
     IAuditLogReader auditLogReader,
     IUnitOfWork unitOfWork) : ControllerBase

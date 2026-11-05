@@ -24,6 +24,7 @@ public sealed class EndpointPolicyTests
         MtfPolicies.Lead,
         MtfPolicies.Mentor,
         MtfPolicies.LeadOrAdmin,
+        MtfPolicies.Executor,
     };
 
     private static IEnumerable<(Type Controller, MethodInfo Action)> Actions() =>

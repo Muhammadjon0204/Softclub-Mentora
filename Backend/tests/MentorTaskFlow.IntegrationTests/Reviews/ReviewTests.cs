@@ -383,7 +383,7 @@ public sealed class ReviewTests(PostgresFixture postgres, MinioFixture minio) : 
     [InlineData("organization-admin@mentortaskflow.test")]
     [InlineData("branch-admin-head@mentortaskflow.test")]
     [InlineData("mentor-head@mentortaskflow.test")]
-    public async Task Nobody_but_the_lead_decides(string email)
+    public async Task Nobody_but_whoever_handed_the_work_out_decides(string email)
     {
         var work = await WorkAwaitingReviewAsync();
 

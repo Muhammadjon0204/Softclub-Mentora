@@ -106,7 +106,8 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
                 <p className="truncate text-[12px] text-ink-secondary">{organizationContextLine}</p>
               </div>
             </div>
-            {user.category !== null ? (
+            {/* Сервер не присылает пустую категорию: у администратора здесь undefined, а не null. */}
+            {user.category ? (
               <div className="flex items-center gap-2.5 border-t border-divider pt-2.5">
                 <Tags className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
                 <div className="min-w-0 flex-1">

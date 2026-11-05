@@ -1,6 +1,7 @@
 using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Integrations;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -36,12 +37,14 @@ public sealed class CrmIntegrationController(ICrmIntegrationService crm, ICrmLin
 
     /// <summary><c>GET /integrations/crm/groups?status=Started</c> — the caller's groups.</summary>
     [HttpGet("groups")]
+    [RequirePermission(Permissions.CrmUse)]
     [ProducesResponseType<CrmGroupListDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CrmGroupListDto>> GroupsAsync([FromQuery] string status = "Started", CancellationToken cancellationToken = default) =>
         Ok(await crm.ListGroupsAsync(status, cancellationToken));
 
     /// <summary><c>GET /integrations/crm/groups/{id}</c> — the group with its journal scored by week.</summary>
     [HttpGet("groups/{groupId:int}")]
+    [RequirePermission(Permissions.CrmUse)]
     [ProducesResponseType<CrmGroupPreviewDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<CrmGroupPreviewDto>> GroupAsync(int groupId, CancellationToken cancellationToken) =>

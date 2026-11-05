@@ -95,6 +95,11 @@ export function canDecideReview(a: LeadAssignmentRecord): boolean {
  * работают над одним и тем же `LeadAssignmentRecord` (см.
  * `features/mentor/assignments/mentorAssignmentPreviewStore.ts`).
  */
+/** Срок двигается, пока работа у исполнителя: сданное ждёт решения, и срока у него уже нет. */
+export function canReschedule(a: LeadAssignmentRecord): boolean {
+  return a.status === 'Assigned' || a.status === 'NeedsRework' || a.status === 'Overdue';
+}
+
 export function canSubmit(a: LeadAssignmentRecord): boolean {
   if (a.status === 'Assigned' || a.status === 'NeedsRework') return true;
   if (a.status === 'Overdue') return a.allowLateSubmission;
@@ -107,6 +112,7 @@ export interface AssignmentCapabilities {
   canReject: boolean;
   canEdit: boolean;
   canReassign: boolean;
+  canReschedule: boolean;
   canCancel: boolean;
   canStartReview: boolean;
   canDecideReview: boolean;
@@ -116,15 +122,18 @@ export interface AssignmentCapabilities {
 
 /** Единая точка вычисления всех capability сразу — используется action-меню строк таблицы и drawer'ами. */
 export function assignmentCapabilities(a: LeadAssignmentRecord): AssignmentCapabilities {
+  // Вести задание может только тот, кто его выдал. `undefined` у записей без сервера (моки).
+  const owns = a.canManage !== false;
   return {
-    canPublish: canPublish(a),
-    canAcceptSuggestion: canAcceptSuggestion(a),
-    canReject: canReject(a),
-    canEdit: canEdit(a),
-    canReassign: canReassign(a),
-    canCancel: canCancel(a),
-    canStartReview: canStartReview(a),
-    canDecideReview: canDecideReview(a),
+    canPublish: owns && canPublish(a),
+    canAcceptSuggestion: owns && canAcceptSuggestion(a),
+    canReject: owns && canReject(a),
+    canEdit: owns && canEdit(a),
+    canReassign: owns && canReassign(a),
+    canReschedule: owns && canReschedule(a),
+    canCancel: owns && canCancel(a),
+    canStartReview: owns && canStartReview(a),
+    canDecideReview: owns && canDecideReview(a),
     canSubmit: canSubmit(a),
     isTerminal: isTerminal(a.status),
   };
@@ -140,10 +149,11 @@ export function averageVersionsLabel(a: LeadAssignmentRecord): string {
   return `${String(n)} ${pluralizeRu(n, 'версия', 'версии', 'версий')}`;
 }
 
-const EXTRA_EVENT_LABEL: Record<'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated', string> = {
+const EXTRA_EVENT_LABEL: Record<'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged', string> = {
   SuggestedCreated: 'Предложено планировщиком',
   SuggestionAccepted: 'Предложение принято',
   Reassigned: 'Переназначено',
+  DeadlineChanged: 'Срок изменён',
 };
 
 export function taskEventLabel(event: LeadTaskEventRecord): string {
@@ -152,5 +162,6 @@ export function taskEventLabel(event: LeadTaskEventRecord): string {
 }
 
 export function sourceLabel(source: LeadAssignmentRecord['source']): string {
-  return source === 'Auto' ? 'Из расписания' : 'Индивидуальное';
+  if (source === 'Auto') return 'Из расписания';
+  return source === 'Proposal' ? 'Предложение ментора' : 'Индивидуальное';
 }

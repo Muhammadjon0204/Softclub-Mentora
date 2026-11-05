@@ -5,13 +5,18 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
+  KeyRound,
   LayoutDashboard,
+  Lightbulb,
   PlugZap,
   ScrollText,
   Tags,
   Users,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
+
+import { PERMISSION } from '../../auth/usePermissions';
+import type { Permission } from '../../auth/usePermissions';
 
 export interface AdminNavItem {
   key: string;
@@ -25,6 +30,8 @@ export interface AdminNavItem {
    * (`ProfileMenu`), отдельный пункт навигации дублировал бы контекст.
    */
   organizationAdminOnly?: boolean;
+  /** Пункт скрыт, если владелец закрыл это право администратору филиала. */
+  permission?: Permission;
 }
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
@@ -39,9 +46,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   { key: 'users', path: '/admin/users', icon: Users, implemented: true },
   { key: 'categories', path: '/admin/categories', icon: Tags, implemented: true },
   { key: 'assignments', path: '/admin/assignments', icon: ClipboardList, implemented: true },
+  { key: 'proposals', path: '/admin/proposals', icon: Lightbulb, implemented: true },
   { key: 'calendar', path: '/admin/calendar', icon: CalendarDays, implemented: true },
-  { key: 'reports', path: '/admin/reports', icon: BarChart3, implemented: true },
-  { key: 'audit', path: '/admin/audit', icon: ScrollText, implemented: true },
+  { key: 'reports', path: '/admin/reports', icon: BarChart3, implemented: true, permission: PERMISSION.reportsView },
+  { key: 'audit', path: '/admin/audit', icon: ScrollText, implemented: true, permission: PERMISSION.auditView },
+  { key: 'permissions', path: '/admin/permissions', icon: KeyRound, implemented: true, permission: PERMISSION.permissionsManage },
   { key: 'notifications', path: '/admin/notifications', icon: Bell, implemented: true },
   { key: 'health', path: '/admin/health', icon: Activity, implemented: true },
   {

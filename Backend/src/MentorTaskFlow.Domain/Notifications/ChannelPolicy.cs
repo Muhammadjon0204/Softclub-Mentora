@@ -48,6 +48,10 @@ public static class ChannelPolicies
             [NotificationEventTypes.DeadlineReminder] = ChannelPolicy.TelegramPreferred,
             [NotificationEventTypes.AssignmentOverdue] = ChannelPolicy.Both,
             [NotificationEventTypes.AssignmentCancelled] = ChannelPolicy.Both,
+            [NotificationEventTypes.AssignmentDeadlineChanged] = ChannelPolicy.Both,
+            [NotificationEventTypes.ProposalSubmitted] = ChannelPolicy.Both,
+            [NotificationEventTypes.ProposalApproved] = ChannelPolicy.Both,
+            [NotificationEventTypes.ProposalRejected] = ChannelPolicy.Both,
 
             [NotificationEventTypes.SchedulerNoActiveMentor] = ChannelPolicy.EmailOnly,
             [NotificationEventTypes.CategoryWithoutLead] = ChannelPolicy.EmailOnly,

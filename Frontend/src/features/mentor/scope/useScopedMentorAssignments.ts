@@ -33,7 +33,8 @@ export function useScopedMentorAssignments(): LeadAssignmentRecord[] {
 
   const listQuery = useQuery({
     queryKey: mentorAssignmentsListQueryKey(scope.organizationId, scope.mentorId),
-    queryFn: () => listAssignments({ pageSize: MAX_PAGE_SIZE }),
+    // Ментору сервер и так отдаёт только своё, а лиду без фильтра вернул бы всю категорию.
+    queryFn: () => listAssignments({ pageSize: MAX_PAGE_SIZE, assignedToId: scope.mentorId }),
   });
 
   const base = (listQuery.data?.items ?? []).map(toAssignmentRecord);

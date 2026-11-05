@@ -5,6 +5,7 @@ using MentorTaskFlow.Domain.Assignments;
 using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Assignments;
 using MentorTaskFlow.Infrastructure.Observability;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
@@ -111,6 +112,7 @@ public sealed class OverdueJob(
                           a.branch_id,
                           a.category_id,
                           a.assigned_to_id,
+                          a.assigned_by_id,
                           a.title,
                           a.current_due_at,
                           a.last_event_sequence AS sequence_number
@@ -145,7 +147,7 @@ public sealed class OverdueJob(
     }
 
     /// <summary>
-    /// Tells the mentor and their Lead (Приложение E).
+    /// Tells the executor and whoever handed the work out (Приложение E).
     /// </summary>
     /// <remarks>
     /// <c>NTF-016</c>: the key carries the deadline value, so a second slip against a <b>new</b>
@@ -154,14 +156,12 @@ public sealed class OverdueJob(
     /// </remarks>
     private async Task NotifyAsync(OverdueRow row, CancellationToken cancellationToken)
     {
-        var leadId = await dbContext.Users
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => u.CategoryId == row.CategoryId && u.Role == UserRole.Lead && u.IsActive)
-            .Select(u => (Guid?)u.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var ownerId = await AssignmentOwnership.ResolveOwnerIdAsync(
+            dbContext, row.CategoryId, row.AssignedById, cancellationToken);
 
-        var recipients = leadId is { } lead ? new[] { row.AssignedToId, lead } : [row.AssignedToId];
+        var recipients = ownerId is { } owner && owner != row.AssignedToId
+            ? new[] { row.AssignedToId, owner }
+            : [row.AssignedToId];
 
         foreach (var recipientId in recipients)
         {
@@ -192,6 +192,7 @@ public sealed class OverdueJob(
         Guid BranchId,
         Guid CategoryId,
         Guid AssignedToId,
+        Guid? AssignedById,
         string Title,
         DateTimeOffset CurrentDueAt,
         int SequenceNumber);

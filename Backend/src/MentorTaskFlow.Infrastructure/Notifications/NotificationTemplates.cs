@@ -55,6 +55,25 @@ public static class NotificationTemplates
             NotificationEventTypes.AssignmentReassigned =>
                 ("Исполнитель задания изменён", $"Задание {quotedTitle} передано другому исполнителю.", "Открыть задание"),
 
+            NotificationEventTypes.AssignmentDeadlineChanged =>
+                ("Срок задания изменён", $"Изменён срок задания {quotedTitle}.", "Открыть задание"),
+
+            NotificationEventTypes.ProposalSubmitted =>
+                ("Новое предложение от ментора",
+                    $"{mentor ?? "Ментор"} предлагает: «{TryGetString(body, "proposalTitle")}». Посмотрите и примите решение.",
+                    "Открыть предложение"),
+
+            NotificationEventTypes.ProposalApproved =>
+                ("Ваше предложение принято",
+                    $"Предложение «{TryGetString(body, "proposalTitle")}» принято и теперь стоит у вас как задание.",
+                    "Открыть задание"),
+
+            NotificationEventTypes.ProposalRejected =>
+                ("Предложение отклонено",
+                    $"Предложение «{TryGetString(body, "proposalTitle")}» отклонено."
+                    + (TryGetString(body, "decisionComment") is { } decision ? $" Причина: {decision}" : string.Empty),
+                    "Открыть предложение"),
+
             NotificationEventTypes.SubmissionUploaded =>
                 ("Работа сдана на проверку", mentor is null
                     ? $"Ментор сдал задание {quotedTitle}. Зайдите и проверьте."
@@ -174,7 +193,9 @@ public static class NotificationTemplates
         // An accepted task has no deadline left to watch.
         if (eventType is not NotificationEventTypes.ReviewApproved && TryGetString(body, "dueAtLocal") is { } dueAt)
         {
-            details.Add(eventType is NotificationEventTypes.ReviewNeedsRework ? $"Новый срок: {dueAt}" : $"Срок: {dueAt}");
+            details.Add(eventType is NotificationEventTypes.ReviewNeedsRework or NotificationEventTypes.AssignmentDeadlineChanged
+                ? $"Новый срок: {dueAt}"
+                : $"Срок: {dueAt}");
         }
 
         if (TryGetString(body, "branchName") is { } branchName)

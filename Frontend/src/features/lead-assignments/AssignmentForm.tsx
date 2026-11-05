@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
 import type { LeadAssignmentRecord } from '../../mocks/ui-preview/leadAssignments.preview';
-import { formatCategoryDate, leadNow, localInputToUtcMs } from '../lead/scope/leadDateFormat';
+import { leadNow, localInputToUtcMs, toDateInputValue, toTimeInputValue } from '../lead/scope/leadDateFormat';
 import { useActiveLeadMentors } from '../lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../lead/scope/useLeadScope';
 import { useAllTopicAssignments, useScopedLeadTopics } from '../lead/scope/useScopedLeadSchedule';
@@ -14,7 +14,6 @@ import { fieldA11yProps } from '../../shared/ui/fieldA11y';
 import { TimePicker } from '../../shared/ui/TimePicker';
 import { createAssignmentSchema, DEFAULT_DUE_TIME_LOCAL } from './createAssignment.schema';
 import type { CreateAssignmentFormValues } from './createAssignment.schema';
-import { dateTimeFormat } from '../../shared/i18n/intl';
 
 export interface AssignmentFormProps {
   formId: string;
@@ -23,19 +22,6 @@ export interface AssignmentFormProps {
   bannerError: string | null;
   onDirtyChange: (dirty: boolean) => void;
   onSubmit: (values: { title: string; description: string; mentorId: string; dueAtMs: number; topicAssignmentId: string | null }) => void;
-}
-
-function toDateInputValue(ms: number, timeZoneId: string): string {
-  const label = formatCategoryDate(ms, timeZoneId);
-  const [day, month, year] = label.split('.');
-  return `${year}-${month}-${day}`;
-}
-
-function toTimeInputValue(ms: number, timeZoneId: string): string {
-  const parts = dateTimeFormat({ timeZone: timeZoneId, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(ms);
-  const hour = parts.find((p) => p.type === 'hour')?.value ?? '23';
-  const minute = parts.find((p) => p.type === 'minute')?.value ?? '59';
-  return `${hour}:${minute}`;
 }
 
 /**

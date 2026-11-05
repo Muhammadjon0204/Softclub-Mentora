@@ -2,6 +2,7 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Categories;
 using MentorTaskFlow.Contracts.Common;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -58,6 +59,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
     /// </remarks>
     [HttpPost]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.CategoriesManage)]
     [ProducesResponseType<CategoryDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CategoryDto>> CreateAsync(
@@ -71,6 +73,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.CategoriesManage)]
     [ProducesResponseType<CategoryDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CategoryDto>> UpdateAsync(
         Guid id,
@@ -80,6 +83,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
 
     [HttpPost("{id:guid}/activate")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.CategoriesManage)]
     [ProducesResponseType<CategoryDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CategoryDto>> ActivateAsync(
         Guid id,
@@ -97,6 +101,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
     /// </remarks>
     [HttpPost("{id:guid}/deactivate")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.CategoriesManage)]
     [ProducesResponseType<CategoryDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<CategoryDto>> DeactivateAsync(
@@ -121,6 +126,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
 
     [HttpPut("{id:guid}/settings")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.CategoriesManage)]
     [ProducesResponseType<CategorySettingsDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<CategorySettingsDto>> UpdateSettingsAsync(
         Guid id,

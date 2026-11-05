@@ -22,6 +22,9 @@ public static class RealtimeKinds
 
     /// <summary>The category's curriculum: topics and their assignment templates, shared by the whole team.</summary>
     public const string Schedule = "schedule";
+
+    /// <summary>A mentor's proposal: its author and whoever can see the category hear about it.</summary>
+    public const string Proposal = "proposal";
 }
 
 /// <summary>

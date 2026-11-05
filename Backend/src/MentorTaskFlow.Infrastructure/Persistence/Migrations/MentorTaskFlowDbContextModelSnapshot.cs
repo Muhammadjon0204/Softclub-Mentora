@@ -23,6 +23,114 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MentorTaskFlow.Domain.Access.RolePermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Allowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allowed");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("subject");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_role_permissions");
+
+                    b.HasIndex("UpdatedById")
+                        .HasDatabaseName("ix_role_permissions_updated_by_id");
+
+                    b.HasIndex("OrganizationId", "Subject", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("ux_role_permissions_rule");
+
+                    b.ToTable("role_permissions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_role_permissions_subject_allowed", "subject IN ('BranchAdmin','Lead','Mentor')");
+                        });
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Access.UserPermission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Allowed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allowed");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UpdatedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_permissions");
+
+                    b.HasIndex("UpdatedById")
+                        .HasDatabaseName("ix_user_permissions_updated_by_id");
+
+                    b.HasIndex("OrganizationId", "UserId")
+                        .HasDatabaseName("ix_user_permissions_organization_user");
+
+                    b.HasIndex("UserId", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_permissions_user_permission");
+
+                    b.ToTable("user_permissions", (string)null);
+                });
+
             modelBuilder.Entity("MentorTaskFlow.Domain.Analytics.AiSummary", b =>
                 {
                     b.Property<Guid>("Id")
@@ -320,11 +428,9 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_assignments_approved_fields", "(status <> 'Approved') OR (approved_at IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_assignments_auto_fields", "(source = 'Auto' AND generated_for_date IS NOT NULL AND auto_generation_key IS NOT NULL)\r\nOR (source = 'Manual' AND generated_for_date IS NULL AND auto_generation_key IS NULL)");
+                            t.HasCheckConstraint("ck_assignments_auto_fields", "(source = 'Auto' AND generated_for_date IS NOT NULL AND auto_generation_key IS NOT NULL)\nOR (source IN ('Manual','Proposal') AND generated_for_date IS NULL AND auto_generation_key IS NULL)");
 
-                            t.HasCheckConstraint("ck_assignments_cancel_fields", "(status <> 'Cancelled')\r\nOR (cancelled_at IS NOT NULL AND cancelled_by_id IS NOT NULL\r\n    AND char_length(cancel_reason) BETWEEN 5 AND 500)");
-
-                            t.HasCheckConstraint("ck_assignments_due_order", "current_due_at >= initial_due_at");
+                            t.HasCheckConstraint("ck_assignments_cancel_fields", "(status <> 'Cancelled')\nOR (cancelled_at IS NOT NULL AND cancelled_by_id IS NOT NULL\n    AND char_length(cancel_reason) BETWEEN 5 AND 500)");
 
                             t.HasCheckConstraint("ck_assignments_status_allowed", "status IN ('Draft','Suggested','Assigned','Submitted','InReview','NeedsRework','Overdue','Approved','Cancelled')");
                         });
@@ -559,7 +665,7 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_audit_logs_actor_shape", "(actor_type = 'System' AND actor_id IS NULL) OR (actor_type = 'User' AND actor_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_audit_logs_branch_scope", "branch_id IS NOT NULL OR action IN ('ai.summary_generate','audit.read','bootstrap.provision','branch.activate','branch.create','branch.deactivate','branch.make_head_office','branch.update','organization.update','report.organization_export','security.scope_override_rejected','storage.cross_scope_inconsistency','user.change_admin_scope','user.change_branch','user.create_organization_admin')");
+                            t.HasCheckConstraint("ck_audit_logs_branch_scope", "branch_id IS NOT NULL OR action IN ('ai.summary_generate','audit.read','bootstrap.provision','branch.activate','branch.create','branch.deactivate','branch.make_head_office','branch.update','organization.update','permission.role_update','report.organization_export','security.scope_override_rejected','storage.cross_scope_inconsistency','user.change_admin_scope','user.change_branch','user.create_organization_admin')");
                         });
                 });
 
@@ -1000,6 +1106,118 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_notification_outbox_attempts", "attempts BETWEEN 0 AND 5");
 
                             t.HasCheckConstraint("ck_notification_outbox_branch_scope", "branch_id IS NOT NULL OR event_type IN ('BranchWithoutAdmin','NotificationDeadLetter','OrganizationSystemAlert','PasswordReset','PasswordResetTelegram','UserInvitation')");
+                        });
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Proposals.Proposal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AssignmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignment_id");
+
+                    b.Property<Guid>("AuthorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("author_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("decided_at");
+
+                    b.Property<Guid?>("DecidedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decided_by_id");
+
+                    b.Property<string>("DecisionComment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("decision_comment");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<DateTimeOffset?>("PreferredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("preferred_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_proposals");
+
+                    b.HasIndex("DecidedById")
+                        .HasDatabaseName("ix_proposals_decided_by_id");
+
+                    b.HasIndex("AuthorId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_proposals_author_created_at");
+
+                    b.HasIndex("CategoryId", "OrganizationId", "BranchId")
+                        .HasDatabaseName("ix_proposals_category_id_organization_id_branch_id");
+
+                    b.HasIndex("AssignmentId", "OrganizationId", "BranchId", "CategoryId")
+                        .HasDatabaseName("ix_proposals_assignment_id_organization_id_branch_id_category_");
+
+                    b.HasIndex("OrganizationId", "BranchId", "CategoryId", "Status", "CreatedAt")
+                        .IsDescending(false, false, false, false, true)
+                        .HasDatabaseName("ix_proposals_scope_status_created_at");
+
+                    b.ToTable("proposals", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_proposals_decision_fields", "(status = 'Approved' AND assignment_id IS NOT NULL AND decided_by_id IS NOT NULL AND decided_at IS NOT NULL)\nOR (status = 'Rejected' AND assignment_id IS NULL AND decided_by_id IS NOT NULL AND decided_at IS NOT NULL\n    AND decision_comment IS NOT NULL)\nOR (status IN ('Pending','Withdrawn') AND assignment_id IS NULL AND decided_by_id IS NULL AND decided_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_proposals_kind_allowed", "kind IN ('MasterClass','ExtraLesson','Other')");
+
+                            t.HasCheckConstraint("ck_proposals_status_allowed", "status IN ('Pending','Approved','Rejected','Withdrawn')");
                         });
                 });
 
@@ -1859,7 +2077,7 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_users_role_category", "(role = 'Admin' AND category_id IS NULL) OR (role IN ('Lead','Mentor') AND category_id IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\r\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\r\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_users_scope_shape", "(role = 'Admin' AND admin_scope = 'Organization' AND branch_id IS NULL AND category_id IS NULL)\nOR (role = 'Admin' AND admin_scope = 'Branch' AND branch_id IS NOT NULL AND category_id IS NULL)\nOR (role IN ('Lead','Mentor') AND branch_id IS NOT NULL AND category_id IS NOT NULL)");
                         });
                 });
 
@@ -2020,6 +2238,47 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MentorTaskFlow.Domain.Access.RolePermission", b =>
+                {
+                    b.HasOne("MentorTaskFlow.Domain.Tenancy.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_permissions_organization");
+
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_permissions_updated_by");
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Access.UserPermission", b =>
+                {
+                    b.HasOne("MentorTaskFlow.Domain.Tenancy.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_permissions_organization");
+
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_permissions_updated_by");
+
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_permissions_user");
+                });
+
             modelBuilder.Entity("MentorTaskFlow.Domain.Analytics.AiSummary", b =>
                 {
                     b.HasOne("MentorTaskFlow.Domain.Categories.Category", null)
@@ -2176,6 +2435,37 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .HasPrincipalKey("Id", "OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_outbox_branch_scope");
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Proposals.Proposal", b =>
+                {
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_proposals_author");
+
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("DecidedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_proposals_decided_by");
+
+                    b.HasOne("MentorTaskFlow.Domain.Categories.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId", "OrganizationId", "BranchId")
+                        .HasPrincipalKey("Id", "OrganizationId", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_proposals_category_scope");
+
+                    b.HasOne("MentorTaskFlow.Domain.Assignments.Assignment", null)
+                        .WithMany()
+                        .HasForeignKey("AssignmentId", "OrganizationId", "BranchId", "CategoryId")
+                        .HasPrincipalKey("Id", "OrganizationId", "BranchId", "CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_proposals_assignment_scope");
                 });
 
             modelBuilder.Entity("MentorTaskFlow.Domain.Reports.CrmGroupReport", b =>

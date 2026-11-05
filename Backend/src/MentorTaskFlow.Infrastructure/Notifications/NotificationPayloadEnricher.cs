@@ -42,6 +42,14 @@ internal static class NotificationPayloadEnricher
         NotificationEventTypes.DeadlineReminder,
         NotificationEventTypes.AssignmentOverdue,
         NotificationEventTypes.AssignmentCancelled,
+        NotificationEventTypes.AssignmentDeadlineChanged,
+    };
+
+    private static readonly HashSet<string> ProposalEvents = new(StringComparer.Ordinal)
+    {
+        NotificationEventTypes.ProposalSubmitted,
+        NotificationEventTypes.ProposalApproved,
+        NotificationEventTypes.ProposalRejected,
     };
 
     private static readonly HashSet<string> SubmissionEvents = new(StringComparer.Ordinal)
@@ -57,6 +65,11 @@ internal static class NotificationPayloadEnricher
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (ProposalEvents.Contains(entry.EventType))
+        {
+            return await EnrichProposalAsync(dbContext, entry, cancellationToken);
+        }
+
         if (!AssignmentEvents.Contains(entry.EventType))
         {
             return entry.Payload;
@@ -92,7 +105,8 @@ internal static class NotificationPayloadEnricher
         var payload = JsonNode.Parse(entry.Payload.RootElement.GetRawText())?.AsObject() ?? [];
 
         payload["assignmentId"] = entry.EntityId.ToString();
-        payload["actionPath"] = ActionPath(entry.EventType, recipientRole, entry.EntityId);
+        payload["actionPath"] = ActionPath(
+            entry.EventType, recipientRole, entry.EntityId, entry.RecipientUserId == assignment.AssignedToId);
 
         if (payload["currentDueAt"] is JsonValue dueValue && dueValue.TryGetValue<DateTimeOffset>(out var dueAt))
         {
@@ -115,13 +129,46 @@ internal static class NotificationPayloadEnricher
     }
 
     /// <summary>The page this recipient acts on — the review queue for a Lead with work waiting.</summary>
-    private static string ActionPath(string eventType, UserRole? recipientRole, Guid assignmentId) => recipientRole switch
+    private static string ActionPath(string eventType, UserRole? recipientRole, Guid assignmentId, bool isExecutor) => recipientRole switch
     {
+        UserRole.Lead when isExecutor => $"/lead/my-tasks?assignmentId={assignmentId}",
         UserRole.Lead when SubmissionEvents.Contains(eventType) => $"/lead/review-queue?assignmentId={assignmentId}",
         UserRole.Lead => $"/lead/assignments?assignmentId={assignmentId}",
         UserRole.Mentor => $"/mentor/tasks?assignmentId={assignmentId}",
-        _ => "/admin/assignments",
+        _ => $"/admin/assignments?assignmentId={assignmentId}",
     };
+
+    /// <summary>The link for this recipient, and the deadline in the category's zone for an approval.</summary>
+    private static async Task<JsonDocument> EnrichProposalAsync(
+        MentorTaskFlowDbContext dbContext,
+        OutboxEntry entry,
+        CancellationToken cancellationToken)
+    {
+        var recipientRole = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.Id == entry.RecipientUserId)
+            .Select(u => (UserRole?)u.Role)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var payload = JsonNode.Parse(entry.Payload.RootElement.GetRawText())?.AsObject() ?? [];
+
+        payload["actionPath"] = recipientRole switch
+        {
+            UserRole.Mentor => $"/mentor/proposals?proposalId={entry.EntityId}",
+            UserRole.Lead => $"/lead/proposals?proposalId={entry.EntityId}",
+            _ => $"/admin/proposals?proposalId={entry.EntityId}",
+        };
+
+        if (entry.CategoryId is { } categoryId
+            && payload["currentDueAt"] is JsonValue dueValue
+            && dueValue.TryGetValue<DateTimeOffset>(out var dueAt))
+        {
+            payload["dueAtLocal"] = Format(dueAt, await TimeZoneOfAsync(dbContext, categoryId, cancellationToken));
+        }
+
+        return JsonSerializer.SerializeToDocument(payload);
+    }
 
     private static async Task<TimeZoneInfo> TimeZoneOfAsync(
         MentorTaskFlowDbContext dbContext,

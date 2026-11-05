@@ -3,7 +3,7 @@ using MentorTaskFlow.Domain.Submissions;
 
 namespace MentorTaskFlow.Domain.Reviews;
 
-/// <summary>The Lead's verdict on one version of the work (TZ 10.8).</summary>
+/// <summary>The verdict of whoever handed the work out on one version of it (TZ 10.8).</summary>
 public enum ReviewDecision
 {
     Approved = 0,
@@ -123,9 +123,8 @@ public sealed class Review : BaseEntity
             }
         }
 
-        // REV-022: a defensive invariant. By the data model a Lead is never an assignment's executor —
-        // work goes to mentors — so this is unreachable in Release 1.0. It is kept deliberately: it
-        // guards against a later model where a Lead can be assigned work, and against a bad migration.
+        // REV-022: an administrator can hand work to a Lead, so a person can now hold both roles around
+        // one category. Their own work is decided by whoever gave it to them, never by themselves.
         if (reviewerId == submission.SubmittedById)
         {
             throw new DomainException(

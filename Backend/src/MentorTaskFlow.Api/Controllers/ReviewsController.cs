@@ -1,6 +1,7 @@
 using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Reviews;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,7 +28,8 @@ public sealed class ReviewsController(IReviewService reviews) : ControllerBase
     /// study cycle; version 2.0's «Lead/Admin» wording was removed in 2.1 (<c>ASN-025</c>).
     /// </remarks>
     [HttpPost("reviews")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsReview)]
     [ProducesResponseType<ReviewDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

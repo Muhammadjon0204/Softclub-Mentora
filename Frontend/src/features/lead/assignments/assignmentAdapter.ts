@@ -90,6 +90,8 @@ export function toAssignmentRecord(dto: AssignmentDto): LeadAssignmentRecord {
     submissions: [],
     events: [],
     concurrencyToken: dto.concurrencyToken,
+    assignedByRole: dto.assignedByRole ?? null,
+    canManage: dto.canManage,
   };
 }
 
@@ -175,6 +177,6 @@ export function toTaskEventRecord(dto: TaskEventDto, actorName: string): LeadTas
     kind: dto.eventType as LeadTaskEventRecord['kind'],
     occurredAt: toMsRequired(dto.occurredAt),
     actorName,
-    detail: undefined,
+    detail: dto.reason ?? undefined,
   };
 }

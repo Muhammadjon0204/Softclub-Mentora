@@ -27,7 +27,9 @@ public sealed record AssignmentDto(
     string? CancelReason,
     DateTimeOffset CreatedAt,
     string ConcurrencyToken,
-    BranchSummaryDto? Branch);
+    BranchSummaryDto? Branch,
+    string? AssignedByRole = null,
+    bool CanManage = false);
 
 /// <summary>
 /// One entry of the assignment's history (TZ 10.9, Приложение F).
@@ -45,7 +47,10 @@ public sealed record TaskEventDto(
     string? PreviousStatus,
     string? NewStatus,
     DateTimeOffset OccurredAt,
-    Guid CorrelationId);
+    Guid CorrelationId,
+    DateTimeOffset? PreviousDueAt = null,
+    DateTimeOffset? NewDueAt = null,
+    string? Reason = null);
 
 /// <summary>
 /// <c>POST /assignments/drafts</c> (<c>ASN-001</c>).
@@ -81,6 +86,10 @@ public sealed record UpdateAssignmentRequest(
 /// <summary><c>POST /assignments/{id}/reassign</c> (<c>ASN-005</c>).</summary>
 public sealed record ReassignAssignmentRequest(Guid AssignedToId, string ConcurrencyToken, string? Reason = null);
 
+/// <summary><c>POST /assignments/{id}/reschedule</c> — moves the deadline of published work.</summary>
+/// <remarks>The reason is mandatory: the executor is told why, and it stays in the task's history.</remarks>
+public sealed record RescheduleAssignmentRequest(DateTimeOffset DueAt, string Reason, string ConcurrencyToken);
+
 /// <summary>
 /// <c>POST /assignments/{id}/cancel</c> (<c>ASN-006</c>).
 /// </summary>
@@ -104,6 +113,9 @@ public sealed record AssignmentListQuery
     public string? Status { get; init; }
 
     public Guid? CategoryId { get; init; }
+
+    /// <summary>Narrows to what one person handed out: an administrator's «given by me».</summary>
+    public Guid? AssignedById { get; init; }
 
     /// <summary>
     /// Ignored for a Mentor, who only ever sees their own tasks.

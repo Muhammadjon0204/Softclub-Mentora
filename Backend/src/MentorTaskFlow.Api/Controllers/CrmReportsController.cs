@@ -1,6 +1,7 @@
 using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Integrations;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +19,7 @@ namespace MentorTaskFlow.Api.Controllers;
 [Route("api/v1/integrations/crm")]
 [Produces("application/json")]
 [Authorize(Policy = MtfPolicies.Authenticated)]
+[RequirePermission(Permissions.CrmUse)]
 public sealed class CrmReportsController(ICrmReportService reports) : ControllerBase
 {
     /// <summary><c>GET …/groups/{id}/weeks/{week}/report</c> — the period's report, or whether the caller can make it.</summary>

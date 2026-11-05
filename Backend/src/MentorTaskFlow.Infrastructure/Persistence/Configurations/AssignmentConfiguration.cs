@@ -35,13 +35,8 @@ public sealed class AssignmentConfiguration : IEntityTypeConfiguration<Assignmen
                 "ck_assignments_auto_fields",
                 """
                 (source = 'Auto' AND generated_for_date IS NOT NULL AND auto_generation_key IS NOT NULL)
-                OR (source = 'Manual' AND generated_for_date IS NULL AND auto_generation_key IS NULL)
+                OR (source IN ('Manual','Proposal') AND generated_for_date IS NULL AND auto_generation_key IS NULL)
                 """);
-
-            // The working deadline may move forward on rework but never behind the original.
-            table.HasCheckConstraint(
-                "ck_assignments_due_order",
-                "current_due_at >= initial_due_at");
         });
 
         builder.HasKey(x => x.Id);
