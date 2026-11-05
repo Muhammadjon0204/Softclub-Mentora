@@ -137,13 +137,14 @@ git update-index --skip-worktree .env.web
 Npgsql, второй начинает комментарий в `.env`. Сгенерированные значения в hex таких
 символов не содержат.
 
-Домены уже проставлены, менять не нужно — пять строк для справки:
+Домены уже проставлены, менять не нужно — строки для справки:
 
 ```
 Auth__AppBaseUrl=https://tms.softclub.tj
 Auth__CsrfCookieDomain=softclub.tj
 Notifications__AppBaseUrl=https://tms.softclub.tj
 Cors__AllowedOrigins__0=https://tms.softclub.tj
+Cors__AllowedOrigins__1=https://ravand.softclub.tj
 Storage__PublicEndpoint=https://tmsstorage.softclub.tj
 ```
 
