@@ -1,14 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlignLeft, Building2, CalendarClock, CalendarPlus, CheckCircle2, Flag, FolderKanban, History, Send, Tag, UserRound, XCircle } from 'lucide-react';
+import { AlignLeft, Building2, CalendarClock, CalendarPlus, CheckCircle2, Eye, Flag, FolderKanban, History, Send, Tag, UserCheck, UserRound, XCircle } from 'lucide-react';
 
 import { getAssignmentHistory } from '../../api/lead/assignments';
 import type { AssignmentDto } from '../../api/lead/assignments';
 import { Drawer } from '../../shared/overlays';
 import { Badge, StatusDot } from '../../shared/ui/Badge';
+import { Button } from '../../shared/ui/Button';
 import { MetaTiles, Notice, SectionLabel, TextPanel } from '../../shared/ui/DetailBlocks';
 import type { MetaItem } from '../../shared/ui/DetailBlocks';
 import { Skeleton } from '../../shared/ui/Skeleton';
-import { ASSIGNMENT_STATUS_LABEL, ASSIGNMENT_STATUS_TONE, deadlineHint, formatDateTimeRu, taskEventTitle } from './adminAssignmentView';
+import { ASSIGNMENT_STATUS_LABEL, ASSIGNMENT_STATUS_TONE, assignmentSourceLabel, deadlineHint, formatDateTimeRu, taskEventTitle } from './adminAssignmentView';
 
 /** Сервер не пишет в JSON поля со значением null — они приходят как undefined. */
 function present<T>(value: T | null | undefined): value is T {
@@ -21,10 +22,21 @@ interface AdminAssignmentDrawerProps {
   categoryName: string | null;
   nameOf: (userId: string) => string | null;
   onClose: () => void;
+  /** Что разрешено сделать с заданием. Кто его не выдавал, тот здесь только смотрит. */
+  actions: AdminDrawerAction[];
 }
 
-/** Карточка задания для администратора: только чтение — описание, факты, история событий. */
-export function AdminAssignmentDrawer({ assignment, mentorName, categoryName, nameOf, onClose }: AdminAssignmentDrawerProps): JSX.Element {
+export interface AdminDrawerAction {
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+}
+
+/**
+ * Карточка задания для администратора. Своё задание он ведёт отсюда, чужое только смотрит: описание,
+ * факты, история событий. Отмена остаётся у него всегда как аварийный выход.
+ */
+export function AdminAssignmentDrawer({ assignment, mentorName, categoryName, nameOf, onClose, actions }: AdminAssignmentDrawerProps): JSX.Element {
   const status = assignment?.status ?? 'Draft';
   const tone = ASSIGNMENT_STATUS_TONE[status] ?? 'neutral';
 
@@ -34,6 +46,15 @@ export function AdminAssignmentDrawer({ assignment, mentorName, categoryName, na
       onOpenChange={(next) => { if (!next) onClose(); }}
       title={assignment?.title ?? 'Задание'}
       size="lg"
+      footer={
+        actions.length > 0 ? (
+          <div className="flex flex-wrap justify-end gap-2">
+            {actions.map((action) => (
+              <Button key={action.label} variant={action.primary === true ? 'primary' : 'secondary'} onClick={action.onClick}>{action.label}</Button>
+            ))}
+          </div>
+        ) : undefined
+      }
       headerActions={
         assignment !== null ? (
           <Badge tone={tone}>
@@ -48,12 +69,13 @@ export function AdminAssignmentDrawer({ assignment, mentorName, categoryName, na
   );
 }
 
-function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<AdminAssignmentDrawerProps, 'onClose' | 'assignment'> & { assignment: AssignmentDto }): JSX.Element {
+function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<AdminAssignmentDrawerProps, 'onClose' | 'assignment' | 'actions'> & { assignment: AssignmentDto }): JSX.Element {
   const deadlineMoved = assignment.currentDueAt !== assignment.initialDueAt;
   const hint = deadlineHint(assignment.status, new Date(assignment.currentDueAt).getTime(), Date.now());
 
   const items: MetaItem[] = [
-    { icon: UserRound, label: 'Ментор', value: mentorName, tone: 'brand' },
+    { icon: UserRound, label: 'Исполнитель', value: mentorName, tone: 'brand' },
+    ...(present(assignment.assignedById) ? [{ icon: UserCheck, label: 'Выдал', value: nameOf(assignment.assignedById) ?? '—' }] : []),
     { icon: FolderKanban, label: 'Направление', value: categoryName ?? '—' },
     {
       icon: CalendarClock,
@@ -67,7 +89,7 @@ function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<Ad
       tone: assignment.status === 'Overdue' ? 'danger' : 'warning',
     },
     ...(deadlineMoved ? [{ icon: Flag, label: 'Начальный дедлайн', value: formatDateTimeRu(assignment.initialDueAt) }] : []),
-    { icon: Tag, label: 'Источник', value: assignment.source === 'Auto' ? 'Из расписания' : 'Индивидуальное' },
+    { icon: Tag, label: 'Источник', value: assignmentSourceLabel(assignment.source) },
     ...(present(assignment.assignedAt) ? [{ icon: CalendarPlus, label: 'Назначено', value: formatDateTimeRu(assignment.assignedAt) }] : []),
     ...(present(assignment.firstSubmittedAt) ? [{ icon: Send, label: 'Первая сдача', value: formatDateTimeRu(assignment.firstSubmittedAt), tone: 'info' as const }] : []),
     ...(present(assignment.approvedAt) ? [{ icon: CheckCircle2, label: 'Одобрено', value: formatDateTimeRu(assignment.approvedAt), tone: 'success' as const }] : []),
@@ -78,6 +100,11 @@ function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<Ad
     <div className="space-y-5">
       {assignment.status === 'Cancelled' ? (
         <Notice tone="danger" icon={XCircle} title="Задание отменено">{assignment.cancelReason ?? 'Причина не указана.'}</Notice>
+      ) : null}
+      {assignment.canManage === false ? (
+        <Notice tone="info" icon={Eye} title="Вы видите ход работы">
+          Проверяет работу и ведёт задание тот, кто его выдал{present(assignment.assignedById) && nameOf(assignment.assignedById) !== null ? `: ${nameOf(assignment.assignedById) ?? ''}` : ''}.
+        </Notice>
       ) : null}
       <TextPanel icon={AlignLeft} title="Описание задания" text={assignment.description ?? ''} emptyText="Описание не добавлено" />
       <MetaTiles items={items} />
@@ -114,6 +141,12 @@ function AssignmentTimeline({ assignmentId, nameOf }: { assignmentId: string; na
                 </span>
                 <div className="min-w-0 pt-0.5">
                   <p className="text-[13px] font-medium text-ink">{taskEventTitle(event.eventType)}</p>
+                  {present(event.reason) ? <p className="text-[12.5px] text-ink-secondary">{event.reason}</p> : null}
+                  {present(event.newDueAt) && event.eventType === 'DeadlineChanged' ? (
+                    <p className="text-[12.5px] tabular-nums text-ink-secondary">
+                      {present(event.previousDueAt) ? `${formatDateTimeRu(event.previousDueAt)} → ` : ''}{formatDateTimeRu(event.newDueAt)}
+                    </p>
+                  ) : null}
                   <p className="mt-0.5 text-[12px] text-ink-muted">
                     {actor} · {formatDateTimeRu(event.occurredAt)}
                   </p>

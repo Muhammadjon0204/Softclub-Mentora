@@ -1,5 +1,8 @@
-import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, LayoutDashboard, School, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, Inbox, LayoutDashboard, Lightbulb, School, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
+
+import { PERMISSION } from '../../auth/usePermissions';
+import type { Permission } from '../../auth/usePermissions';
 
 /**
  * Состав раздела Lead (ТЗ 2.2, раздел 24.4 — «Страницы Lead»). `/profile` сюда
@@ -20,14 +23,18 @@ export interface LeadNavItem {
   key: string;
   path: string;
   icon: ComponentType<{ className?: string }>;
+  /** Пункт скрыт, если администратор закрыл это право: страница всё равно ответила бы отказом. */
+  permission?: Permission;
 }
 
 export const LEAD_NAV_ITEMS: LeadNavItem[] = [
   { key: 'dashboard', path: '/lead/dashboard', icon: LayoutDashboard },
   { key: 'assignments', path: '/lead/assignments', icon: ClipboardList },
   { key: 'review-queue', path: '/lead/review-queue', icon: ClipboardCheck },
+  { key: 'my-tasks', path: '/lead/my-tasks', icon: Inbox },
+  { key: 'proposals', path: '/lead/proposals', icon: Lightbulb },
   { key: 'calendar', path: '/lead/calendar', icon: CalendarDays },
   { key: 'team', path: '/lead/team', icon: Users },
-  { key: 'reports', path: '/lead/reports', icon: BarChart3 },
-  { key: 'crm', path: '/lead/crm', icon: School },
+  { key: 'reports', path: '/lead/reports', icon: BarChart3, permission: PERMISSION.reportsView },
+  { key: 'crm', path: '/lead/crm', icon: School, permission: PERMISSION.crmUse },
 ];

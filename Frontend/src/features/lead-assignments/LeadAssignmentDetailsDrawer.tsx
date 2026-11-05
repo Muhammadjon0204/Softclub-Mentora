@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, AlignLeft, CalendarClock, CalendarPlus, CheckCircle2, FileText, Flag, Layers, Tag, UserRound, XCircle } from 'lucide-react';
+import { AlertTriangle, AlignLeft, CalendarClock, CalendarPlus, CheckCircle2, FileText, Flag, Layers, ShieldCheck, Tag, UserRound, XCircle } from 'lucide-react';
 
 import { Drawer } from '../../shared/overlays';
 import { Button } from '../../shared/ui/Button';
@@ -14,7 +14,8 @@ import type { LeadAssignmentRecord, LeadSubmissionFile } from '../../mocks/ui-pr
 import { LEAD_ASSIGNMENT_STATUS_LABEL } from '../../mocks/ui-preview/leadAssignments.preview';
 import { formatCategoryDateTime } from '../lead/scope/leadDateFormat';
 import { useLeadScope } from '../lead/scope/useLeadScope';
-import { assignmentCapabilities, averageVersionsLabel, LEAD_STATUS_META, sourceLabel, taskEventLabel } from '../lead/assignments/leadAssignmentPresentation';
+import { averageVersionsLabel, LEAD_STATUS_META, sourceLabel, taskEventLabel } from '../lead/assignments/leadAssignmentPresentation';
+import type { AssignmentCapabilities } from '../lead/assignments/leadAssignmentPresentation';
 
 type Tab = 'overview' | 'submissions' | 'history';
 const TABS: { id: Tab; label: string }[] = [
@@ -33,6 +34,9 @@ export interface LeadAssignmentDetailsDrawerProps {
   onReject: (a: LeadAssignmentRecord) => void;
   onCancel: (a: LeadAssignmentRecord) => void;
   onReassign: (a: LeadAssignmentRecord) => void;
+  onReschedule: (a: LeadAssignmentRecord) => void;
+  /** Страница уже учла статус, владельца и разрешения: меню и кнопки здесь не должны расходиться. */
+  capabilitiesOf: (a: LeadAssignmentRecord) => AssignmentCapabilities;
   onStartReview: (a: LeadAssignmentRecord) => void;
   onOpenReview: (a: LeadAssignmentRecord) => void;
   mentorNameOf: (mentorId: string) => string;
@@ -57,6 +61,11 @@ function OverviewTab({ assignment, mentorNameOf }: { assignment: LeadAssignmentR
 
   return (
     <div className="space-y-5">
+      {assignment.canManage === false ? (
+        <Notice tone="info" icon={ShieldCheck} title="Это задание выдал администратор">
+          Вы видите ход работы. Проверяет её и ведёт задание тот, кто его выдал.
+        </Notice>
+      ) : null}
       <TextPanel icon={AlignLeft} title="Описание задания" text={assignment.description} emptyText="Описание не добавлено" />
       <MetaTiles items={items} />
       {assignment.status === 'Cancelled' && assignment.cancelReason !== null ? (
@@ -121,7 +130,7 @@ export function LeadAssignmentDetailsDrawer(props: LeadAssignmentDetailsDrawerPr
 
   const open = assignmentId !== null;
   const statusMeta = assignment !== undefined ? LEAD_STATUS_META[assignment.status] : null;
-  const caps = assignment !== undefined ? assignmentCapabilities(assignment) : null;
+  const caps = assignment !== undefined ? props.capabilitiesOf(assignment) : null;
 
   const scope = useLeadScope();
 
@@ -152,9 +161,10 @@ export function LeadAssignmentDetailsDrawer(props: LeadAssignmentDetailsDrawerPr
               {caps.canReject ? <Button variant="secondary" onClick={() => { props.onReject(assignment); }}>Отклонить</Button> : null}
               {caps.canCancel ? <Button variant="secondary" onClick={() => { props.onCancel(assignment); }}>Отменить</Button> : null}
               {caps.canReassign ? <Button variant="secondary" onClick={() => { props.onReassign(assignment); }}>Переназначить</Button> : null}
+              {caps.canReschedule ? <Button variant="secondary" onClick={() => { props.onReschedule(assignment); }}>Изменить срок</Button> : null}
               {caps.canEdit ? <Button variant="secondary" onClick={() => { props.onEdit(assignment); }}>Редактировать</Button> : null}
               {caps.canStartReview ? <Button variant="primary" onClick={() => { props.onStartReview(assignment); }}>Начать проверку</Button> : null}
-              {assignment.status === 'InReview' ? <Button variant="primary" onClick={() => { props.onOpenReview(assignment); }}>Перейти к проверке</Button> : null}
+              {assignment.status === 'InReview' && caps.canDecideReview ? <Button variant="primary" onClick={() => { props.onOpenReview(assignment); }}>Перейти к проверке</Button> : null}
               {caps.canAcceptSuggestion ? <Button variant="primary" onClick={() => { props.onAcceptSuggestion(assignment); }}>Принять</Button> : null}
               {caps.canPublish ? <Button variant="primary" onClick={() => { props.onPublish(assignment); }}>Опубликовать</Button> : null}
             </div>

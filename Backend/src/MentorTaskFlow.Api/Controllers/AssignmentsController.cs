@@ -2,6 +2,7 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Assignments;
 using MentorTaskFlow.Contracts.Common;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,9 +13,10 @@ namespace MentorTaskFlow.Api.Controllers;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The study cycle belongs to the Lead. Of this group an administrator may call only <c>GET</c> and
-/// <c>cancel</c>, in either contour and within its own reach. Version 2.0's «Lead/Admin — управление»
-/// wrongly widened Admin's reach and was removed in 2.1 (<c>ASN-025</c>, TZ 23.4).
+/// Work is led by whoever handed it out, a Lead or an administrator, and the policies below only say
+/// who can hand work out at all. Each service call then requires the caller to own that very task
+/// (<c>AssignmentOwnership</c>). This replaces <c>ASN-025</c>, which kept administrators out of the
+/// study cycle: anybody above the owner still only watches, except for the force-cancel.
 /// </para>
 /// <para>
 /// State changes never travel through <c>PUT</c> or <c>PATCH</c> of a <c>status</c> field — only
@@ -64,10 +66,12 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// </summary>
     /// <remarks>
     /// A draft is visible to the Lead and Admin only, sends no notification and counts in no metric.
-    /// It becomes real work at <c>publish</c>.
+    /// It becomes real work at <c>publish</c>. An administrator's draft lands in the assignee's branch
+    /// and category, which is how «anyone below them» works without a scope field in the request.
     /// </remarks>
     [HttpPost("drafts")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsAssign)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> CreateDraftAsync(
@@ -84,11 +88,13 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// (<c>ASN-004</c>).
     /// </summary>
     /// <remarks>
-    /// Once published, the title, description and deadline are the terms the Mentor was given, and
-    /// editing them would rewrite work already under way. Anything else answers 409.
+    /// Once published, the title and description are the terms the Mentor was given, and editing them
+    /// would rewrite work already under way. Anything else answers 409. The deadline alone can still
+    /// move, through <c>reschedule</c>.
     /// </remarks>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsAssign)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> UpdateAsync(
@@ -98,7 +104,8 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
         Ok(await assignmentService.UpdateAsync(id, request, cancellationToken));
 
     [HttpPost("{id:guid}/publish")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsAssign)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> PublishAsync(
@@ -110,6 +117,7 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// <summary><c>POST /assignments/{id}/accept-suggestion</c> (<c>ASN-003</c>, <c>ASN-010</c>).</summary>
     [HttpPost("{id:guid}/accept-suggestion")]
     [Authorize(Policy = MtfPolicies.Lead)]
+    [RequirePermission(Permissions.AssignmentsAssign)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AssignmentDto>> AcceptSuggestionAsync(
         Guid id,
@@ -121,7 +129,8 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// <c>POST /assignments/{id}/reassign</c> — only until the first submission (10.6.3).
     /// </summary>
     [HttpPost("{id:guid}/reassign")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsReassign)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> ReassignAsync(
@@ -129,6 +138,24 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
         ReassignAssignmentRequest request,
         CancellationToken cancellationToken) =>
         Ok(await assignmentService.ReassignAsync(id, request, cancellationToken));
+
+    /// <summary>
+    /// <c>POST /assignments/{id}/reschedule</c> — moves the deadline while the work is with its executor.
+    /// </summary>
+    /// <remarks>
+    /// Always with a reason, which reaches the executor and stays in the task's history. From
+    /// <c>Overdue</c> the task returns to where it slipped from; the fact that it slipped stays on record.
+    /// </remarks>
+    [HttpPost("{id:guid}/reschedule")]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsReschedule)]
+    [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AssignmentDto>> RescheduleAsync(
+        Guid id,
+        RescheduleAssignmentRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await assignmentService.RescheduleAsync(id, request, cancellationToken));
 
     /// <summary>
     /// <c>POST /assignments/{id}/start-review</c> (<c>REV-001</c>).
@@ -139,7 +166,8 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// (<c>API-013</c>).
     /// </remarks>
     [HttpPost("{id:guid}/start-review")]
-    [Authorize(Policy = MtfPolicies.Lead)]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsReview)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> StartReviewAsync(
@@ -149,7 +177,7 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
         Ok(await assignmentService.StartReviewAsync(id, request, cancellationToken));
 
     /// <summary>
-    /// <c>POST /assignments/{id}/cancel</c> — Lead of the category, or an administrator as a
+    /// <c>POST /assignments/{id}/cancel</c> — the owner of the task, or an administrator as a
     /// force-cancel (<c>ASN-006</c>).
     /// </summary>
     /// <remarks>
@@ -159,6 +187,7 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
     /// </remarks>
     [HttpPost("{id:guid}/cancel")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsCancel)]
     [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AssignmentDto>> CancelAsync(

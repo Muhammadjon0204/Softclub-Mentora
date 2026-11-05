@@ -28,8 +28,9 @@ export interface MentorScope {
 export function useMentorScope(): MentorScope {
   const { user } = useAuth();
 
-  if (user === null || user.role !== 'Mentor' || user.branch === null || user.category === null) {
-    throw new Error('useMentorScope: доступен только аутентифицированному Mentor с назначенной категорией');
+  // Lead тоже бывает исполнителем: «Мои задания» лида — те же экраны, что у ментора.
+  if (user === null || (user.role !== 'Mentor' && user.role !== 'Lead') || user.branch === null || user.category === null) {
+    throw new Error('useMentorScope: доступен только исполнителю с назначенной категорией');
   }
 
   return {

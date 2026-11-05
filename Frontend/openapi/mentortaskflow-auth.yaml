@@ -545,6 +545,11 @@ components:
           oneOf:
             - type: string
             - type: 'null'
+        permissions:
+          description: Что человеку разрешено сейчас. Подсказка для интерфейса; решает всегда сервер.
+          type: array
+          items:
+            type: string
 
     LoginRequest:
       type: object

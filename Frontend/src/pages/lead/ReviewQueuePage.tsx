@@ -185,7 +185,8 @@ export function ReviewQueuePage(): JSX.Element {
   }, [assignmentId, selected]);
 
   const rawQueue = useMemo(() => {
-    const items = assignments.filter((a) => a.status === 'Submitted' || a.status === 'InReview');
+    // Работу, которую выдал администратор, проверяет он: в очереди лида ей делать нечего.
+    const items = assignments.filter((a) => (a.status === 'Submitted' || a.status === 'InReview') && a.canManage !== false);
     return items.map((a) => ({ assignment: a, waitingSince: a.firstSubmittedAt ?? a.assignedAt ?? 0 }));
   }, [assignments]);
 
@@ -299,6 +300,7 @@ export function ReviewQueuePage(): JSX.Element {
         assignmentId={assignmentId}
         onClose={closeDrawer}
         mentorNameOf={mentorNameOf}
+        timeZoneId={scope.timeZoneId}
         onStartReview={(a) => {
           assignmentActions.startReview(a.id, token(a))
             .catch((error: unknown) => { toast.error(error instanceof Error ? error.message : 'Не удалось начать проверку'); });

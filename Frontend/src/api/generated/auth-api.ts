@@ -258,6 +258,8 @@ export interface components {
             category: components["schemas"]["CategorySummary"] | null;
             /** @description Путь к фотографии профиля (`/api/v1/avatars/...`) или null — тогда инициалы. */
             avatarUrl?: string | null;
+            /** @description Что человеку разрешено сейчас. Подсказка для интерфейса; решает всегда сервер. */
+            permissions?: string[];
         };
         LoginRequest: {
             /** Format: email */

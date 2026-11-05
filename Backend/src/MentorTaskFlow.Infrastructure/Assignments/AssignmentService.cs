@@ -72,6 +72,11 @@ public sealed class AssignmentService(
             source = source.Where(a => a.CurrentDueAt < to);
         }
 
+        if (query.AssignedById is { } assignedById)
+        {
+            source = source.Where(a => a.AssignedById == assignedById);
+        }
+
         // Applied after the ownership narrowing above, so for a Mentor it can only ever shrink the
         // result further — never widen it past their own tasks.
         if (query.AssignedToId is { } assignedToId && actor.Role is not UserRole.Mentor)
@@ -93,11 +98,16 @@ public sealed class AssignmentService(
             ? await LoadBranchSummariesAsync(rows.Select(r => r.Assignment.BranchId), cancellationToken)
             : [];
 
+        var assigners = await AssignmentOwnership.LoadAssignersAsync(
+            dbContext, rows.Select(r => r.Assignment), cancellationToken);
+
         var items = rows
             .Select(row => ToDto(
                 row.Assignment,
                 ConcurrencyTokenAccessor.EncodeFrom(row.Xmin),
-                branches.GetValueOrDefault(row.Assignment.BranchId)))
+                branches.GetValueOrDefault(row.Assignment.BranchId),
+                actor,
+                row.Assignment.AssignedById is { } by ? assigners.GetValueOrDefault(by) : null))
             .ToList();
 
         return new PagedResult<AssignmentDto>(items, page, pageSize, totalCount);
@@ -107,7 +117,7 @@ public sealed class AssignmentService(
     {
         var row = await FindReadableAsync(assignmentId, cancellationToken);
 
-        return ToDto(row.Assignment, ConcurrencyTokenAccessor.EncodeFrom(row.Xmin), null);
+        return await ToDtoAsync(row.Assignment, ConcurrencyTokenAccessor.EncodeFrom(row.Xmin), cancellationToken);
     }
 
     public async Task<IReadOnlyList<TaskEventDto>> GetHistoryAsync(Guid assignmentId, CancellationToken cancellationToken)
@@ -125,17 +135,29 @@ public sealed class AssignmentService(
         // readable — it explains what happened to their task — without naming other people.
         var hideActor = actor.Role is UserRole.Mentor;
 
+        IReadOnlySet<Guid> adminActors = hideActor
+            ? await LoadAdminActorsAsync(events, cancellationToken)
+            : new HashSet<Guid>();
+
         return events
-            .Select(e => new TaskEventDto(
-                e.Id,
-                e.SequenceNumber,
-                e.EventType.ToString(),
-                hideActor ? null : e.ActorId,
-                hideActor ? ActorLabel(e) : null,
-                e.PreviousStatus?.ToString(),
-                e.NewStatus?.ToString(),
-                e.OccurredAt,
-                e.CorrelationId))
+            .Select(e =>
+            {
+                var deadline = ReadDeadlineChange(e);
+
+                return new TaskEventDto(
+                    e.Id,
+                    e.SequenceNumber,
+                    e.EventType.ToString(),
+                    hideActor ? null : e.ActorId,
+                    hideActor ? ActorLabel(e, adminActors) : null,
+                    e.PreviousStatus?.ToString(),
+                    e.NewStatus?.ToString(),
+                    e.OccurredAt,
+                    e.CorrelationId,
+                    deadline.Previous,
+                    deadline.New,
+                    deadline.Reason);
+            })
             .ToList();
     }
 
@@ -154,13 +176,13 @@ public sealed class AssignmentService(
         CreateAssignmentDraftRequest request,
         CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-        var categoryId = actor.CategoryId!.Value;
+        var actor = RequireManager();
+        var (branchId, categoryId) = await ResolveNewWorkScopeAsync(actor, request.AssignedToId, cancellationToken);
 
         dbContext.ChangeTracker.Clear();
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        await tenantState.EnsureWritableAsync(actor.BranchId, categoryId, cancellationToken);
+        await tenantState.EnsureWritableAsync(branchId, categoryId, cancellationToken);
 
         // FOR SHARE on the assignee, held to commit: the other half of the FOR UPDATE a transfer takes
         // (scenarios 11 and 20 of Приложение K). Creation is the only way a mentor acquires work
@@ -171,7 +193,7 @@ public sealed class AssignmentService(
             $"SELECT id FROM users WHERE id = {request.AssignedToId} FOR SHARE",
             cancellationToken);
 
-        await EnsureAssigneeIsUsableAsync(request.AssignedToId, categoryId, cancellationToken);
+        await EnsureAssigneeIsUsableAsync(actor, request.AssignedToId, categoryId, cancellationToken);
 
         var template = await ResolveTemplateAsync(request.TopicAssignmentId, categoryId, cancellationToken);
 
@@ -187,7 +209,7 @@ public sealed class AssignmentService(
 
         var assignment = Assignment.CreateDraft(
             branchContext.EffectiveOrganizationId,
-            actor.BranchId!.Value,
+            branchId,
             categoryId,
             request.AssignedToId,
             actor.UserId,
@@ -210,18 +232,18 @@ public sealed class AssignmentService(
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> UpdateAsync(Guid assignmentId, UpdateAssignmentRequest request, CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-        var assignment = await FindWritableAsync(assignmentId, cancellationToken);
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
         if (assignment.AssignedToId != request.AssignedToId)
         {
-            await EnsureAssigneeIsUsableAsync(request.AssignedToId, assignment.CategoryId, cancellationToken);
+            await EnsureAssigneeIsUsableAsync(actor, request.AssignedToId, assignment.CategoryId, cancellationToken);
             assignment.Reassign(request.AssignedToId, hasSubmissions: false, clock.UtcNow);
         }
 
@@ -229,17 +251,17 @@ public sealed class AssignmentService(
 
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> PublishAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-        var assignment = await FindWritableAsync(assignmentId, cancellationToken);
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
         // ASN-008: publishing onto a deactivated mentor would hand work to somebody who cannot sign in.
-        await EnsureAssigneeIsUsableAsync(assignment.AssignedToId, assignment.CategoryId, cancellationToken);
+        await EnsureAssigneeIsUsableAsync(actor, assignment.AssignedToId, assignment.CategoryId, cancellationToken);
 
         var now = clock.UtcNow;
         var previous = assignment.Status;
@@ -256,18 +278,25 @@ public sealed class AssignmentService(
 
         await NotifyAssigneeAsync(assignment, NotificationEventTypes.AssignmentAssigned, cancellationToken);
 
+        WriteAudit(AuditActions.AssignmentPublish, assignment, new
+        {
+            title = assignment.Title,
+            assignedToId = assignment.AssignedToId,
+            currentDueAt = assignment.CurrentDueAt,
+        });
+
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> AcceptSuggestionAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken)
     {
         var actor = RequireLead();
-        var assignment = await FindWritableAsync(assignmentId, cancellationToken);
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
-        await EnsureAssigneeIsUsableAsync(assignment.AssignedToId, assignment.CategoryId, cancellationToken);
+        await EnsureAssigneeIsUsableAsync(actor, assignment.AssignedToId, assignment.CategoryId, cancellationToken);
 
         var now = clock.UtcNow;
         var previous = assignment.Status;
@@ -292,16 +321,16 @@ public sealed class AssignmentService(
 
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> ReassignAsync(Guid assignmentId, ReassignAssignmentRequest request, CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-        var assignment = await FindWritableAsync(assignmentId, cancellationToken);
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
-        await EnsureAssigneeIsUsableAsync(request.AssignedToId, assignment.CategoryId, cancellationToken);
+        await EnsureAssigneeIsUsableAsync(actor, request.AssignedToId, assignment.CategoryId, cancellationToken);
 
         // 10.6.3: after the first submission the executor is fixed. Reassigning would leave one
         // person's work attached to a task now owned by another.
@@ -335,15 +364,70 @@ public sealed class AssignmentService(
                 cancellationToken, $"{assignment.LastEventSequence}:{assignment.AssignedToId:N}");
         }
 
+        WriteAudit(AuditActions.AssignmentReassign, assignment, new
+        {
+            title = assignment.Title,
+            previousAssignedToId = previousAssigneeId,
+            newAssignedToId = assignment.AssignedToId,
+        });
+
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
+    }
+
+    public async Task<AssignmentDto> RescheduleAsync(Guid assignmentId, RescheduleAssignmentRequest request, CancellationToken cancellationToken)
+    {
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
+        dbContext.Expect(assignment, request.ConcurrencyToken);
+
+        var now = clock.UtcNow;
+        var previous = assignment.Status;
+        var reason = (request.Reason ?? string.Empty).Trim();
+
+        var previousDueAt = assignment.Reschedule(request.DueAt, reason, now);
+
+        // NewStatus is filled only when the move lifted the task out of Overdue; otherwise this is a
+        // change of date, not of state.
+        RecordEvent(
+            assignment,
+            TaskEventType.DeadlineChanged,
+            actor.UserId,
+            previous,
+            assignment.Status == previous ? null : assignment.Status,
+            now,
+            JsonSerializer.SerializeToDocument(new
+            {
+                previousCurrentDueAt = previousDueAt,
+                newCurrentDueAt = assignment.CurrentDueAt,
+                reason,
+            }));
+
+        // The sequence number keeps a second move of the same task from being deduplicated away.
+        await NotifyAssigneeAsync(
+            assignment,
+            NotificationEventTypes.AssignmentDeadlineChanged,
+            cancellationToken,
+            assignment.LastEventSequence.ToString());
+
+        WriteAudit(AuditActions.AssignmentDeadlineChange, assignment, new
+        {
+            title = assignment.Title,
+            previousCurrentDueAt = previousDueAt,
+            newCurrentDueAt = assignment.CurrentDueAt,
+            reason,
+        });
+
+        await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
+
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> StartReviewAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-        var assignment = await FindWritableAsync(assignmentId, cancellationToken);
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
         dbContext.Expect(assignment, request.ConcurrencyToken);
 
         var now = clock.UtcNow;
@@ -356,7 +440,7 @@ public sealed class AssignmentService(
 
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     public async Task<AssignmentDto> CancelAsync(Guid assignmentId, CancelAssignmentRequest request, CancellationToken cancellationToken)
@@ -407,7 +491,7 @@ public sealed class AssignmentService(
 
         await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
 
-        return ToDto(assignment, dbContext.Read(assignment), null);
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
     // -----------------------------------------------------------------
@@ -439,6 +523,24 @@ public sealed class AssignmentService(
             requestContext.CorrelationId,
             now,
             metadata));
+
+    /// <summary>
+    /// Records a step a superior follows from the audit log.
+    /// </summary>
+    /// <remarks>
+    /// The branch comes from the assignment, not the request: an Organization Admin acting from the
+    /// all-branches view has none selected, and the event belongs to the branch the work is in.
+    /// </remarks>
+    private void WriteAudit(string action, Assignment assignment, object metadata) =>
+        auditWriter.Write(new AuditEntry
+        {
+            Action = action,
+            EntityType = nameof(Assignment),
+            EntityId = assignment.Id,
+            BranchId = assignment.BranchId,
+            CategoryId = assignment.CategoryId,
+            Metadata = JsonSerializer.SerializeToDocument(metadata),
+        });
 
     private Task NotifyAssigneeAsync(
         Assignment assignment,
@@ -487,14 +589,7 @@ public sealed class AssignmentService(
 
     private ICurrentUserContext RequireActor() => currentUser.Current ?? throw new UnauthorizedException();
 
-    /// <summary>
-    /// The study cycle belongs to the Lead.
-    /// </summary>
-    /// <remarks>
-    /// No endpoint of this group except <c>GET</c> and <c>cancel</c> is available to an administrator
-    /// in either contour. Version 2.0's «Lead/Admin — управление» wrongly widened Admin's reach and
-    /// was removed in 2.1 (<c>ASN-025</c>, TZ 23.4).
-    /// </remarks>
+    /// <summary>Scheduler suggestions are the Lead's alone: they belong to the category's curriculum.</summary>
     private ICurrentUserContext RequireLead()
     {
         var actor = RequireActor();
@@ -502,6 +597,22 @@ public sealed class AssignmentService(
         return actor.Role is UserRole.Lead
             ? actor
             : throw new ForbiddenException(ErrorCodes.Forbidden, "Операция доступна только тимлиду категории.");
+    }
+
+    /// <summary>
+    /// Lead or Admin: the people who can hand work out.
+    /// </summary>
+    /// <remarks>
+    /// Being one of them is not enough to act on a given task: <see cref="FindOwnedAsync"/> then
+    /// requires the caller to be the one who handed it out (<see cref="AssignmentOwnership"/>).
+    /// </remarks>
+    private ICurrentUserContext RequireManager()
+    {
+        var actor = RequireActor();
+
+        return actor.Role is UserRole.Lead or UserRole.Admin
+            ? actor
+            : throw new ForbiddenException(ErrorCodes.Forbidden, "Операция недоступна ментору.");
     }
 
     private static IQueryable<Assignment> ApplyVisibility(IQueryable<Assignment> source, ICurrentUserContext actor) => actor switch
@@ -513,7 +624,13 @@ public sealed class AssignmentService(
             && a.Status != AssignmentStatus.Draft
             && a.Status != AssignmentStatus.Suggested),
 
-        { Role: UserRole.Lead } => source.Where(a => a.CategoryId == actor.CategoryId),
+        // A Lead can be an executor too, and an administrator's unpublished draft for them is no more
+        // theirs to see than a Mentor's is.
+        { Role: UserRole.Lead } => source.Where(a =>
+            a.CategoryId == actor.CategoryId
+            && !(a.AssignedToId == actor.UserId
+                && (a.Status == AssignmentStatus.Draft || a.Status == AssignmentStatus.Suggested))),
+
         { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => source.Where(a => a.BranchId == actor.BranchId),
         _ => source,
     };
@@ -532,26 +649,85 @@ public sealed class AssignmentService(
             ?? throw new NotFoundException();
     }
 
-    /// <summary>Loads a tracked assignment the Lead of its category may act on.</summary>
-    private async Task<Assignment> FindWritableAsync(Guid assignmentId, CancellationToken cancellationToken)
+    /// <summary>
+    /// Loads a tracked assignment the caller leads (<see cref="AssignmentOwnership"/>).
+    /// </summary>
+    /// <remarks>
+    /// Two different answers on purpose. A task outside the caller's reach is 404: it must be
+    /// indistinguishable from one that does not exist (<c>TEN-006</c>). A task they can see but did not
+    /// hand out is 403, because a superior looking at it needs to know why they cannot act.
+    /// </remarks>
+    private async Task<Assignment> FindOwnedAsync(
+        ICurrentUserContext actor,
+        Guid assignmentId,
+        CancellationToken cancellationToken)
     {
-        var actor = RequireLead();
-
         var assignment = await dbContext.Assignments.FirstOrDefaultAsync(
                 a => a.Id == assignmentId && a.OrganizationId == branchContext.EffectiveOrganizationId,
                 cancellationToken)
             ?? throw new NotFoundException();
 
-        // 404 rather than 403: another category's task must be indistinguishable from one that does
-        // not exist (TEN-006).
-        if (assignment.CategoryId != actor.CategoryId)
+        var reachable = actor switch
+        {
+            { Role: UserRole.Lead } => assignment.CategoryId == actor.CategoryId,
+            { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => assignment.BranchId == actor.BranchId,
+            { Role: UserRole.Admin, AdminScope: AdminScope.Organization } => true,
+            _ => false,
+        };
+
+        if (!reachable)
         {
             throw new NotFoundException();
+        }
+
+        var assigner = await AssignmentOwnership.LoadAssignerAsync(dbContext, assignment.AssignedById, cancellationToken);
+
+        if (!AssignmentOwnership.IsOwner(actor, assignment, assigner))
+        {
+            throw new ForbiddenException(
+                ErrorCodes.AssignmentNotOwner,
+                "Вести задание может только тот, кто его выдал.");
         }
 
         await tenantState.EnsureWritableAsync(assignment.BranchId, assignment.CategoryId, cancellationToken);
 
         return assignment;
+    }
+
+    /// <summary>
+    /// Where new work lands: a Lead's own category, or for an administrator the assignee's.
+    /// </summary>
+    /// <remarks>
+    /// An administrator has no category of their own, and <c>SEC-003</c> forbids taking scope from the
+    /// client, so it is read from the person the work is for. A Branch Admin reaching past their
+    /// branch gets the same 409 a direct insert would get from the trigger.
+    /// </remarks>
+    private async Task<(Guid BranchId, Guid CategoryId)> ResolveNewWorkScopeAsync(
+        ICurrentUserContext actor,
+        Guid assigneeId,
+        CancellationToken cancellationToken)
+    {
+        if (actor.Role is UserRole.Lead)
+        {
+            return (actor.BranchId!.Value, actor.CategoryId!.Value);
+        }
+
+        var assignee = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.Id == assigneeId && u.OrganizationId == branchContext.EffectiveOrganizationId)
+            .Select(u => new { u.BranchId, u.CategoryId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var inContour = assignee is { BranchId: not null, CategoryId: not null }
+            && (actor.AdminScope is AdminScope.Organization || assignee.BranchId == actor.BranchId);
+
+        return inContour
+            ? (assignee!.BranchId!.Value, assignee.CategoryId!.Value)
+            : throw new ConflictException(
+                ErrorCodes.CrossScopeReference,
+                "Исполнитель должен быть ментором или тимлидом в вашем контуре.",
+                new Dictionary<string, object?> { ["relation"] = "assignedToId" });
     }
 
     /// <summary>
@@ -593,6 +769,17 @@ public sealed class AssignmentService(
             throw new NotFoundException();
         }
 
+        // A Lead sees an administrator's task in their category but it is not theirs to stop. An
+        // administrator keeps the force-cancel below for any task in reach: it is the way out when
+        // work gets stuck, and it is audited.
+        if (actor.Role is UserRole.Lead
+            && !AssignmentOwnership.IsOwner(actor, assignment, await AssignmentOwnership.LoadAssignerAsync(dbContext, assignment.AssignedById, cancellationToken)))
+        {
+            throw new ForbiddenException(
+                ErrorCodes.AssignmentNotOwner,
+                "Вести задание может только тот, кто его выдал.");
+        }
+
         // Deliberately no EnsureWritableAsync: BRN-033 allows a force-cancel inside a deactivated
         // branch precisely so stuck work can be closed out.
         if (actor.Role is UserRole.Lead)
@@ -604,14 +791,24 @@ public sealed class AssignmentService(
     }
 
     /// <summary>
-    /// Verifies the executor is an active mentor of the same category (<c>ASN-008</c>).
+    /// Verifies the executor is an active person of the same category (<c>ASN-008</c>).
     /// </summary>
     /// <remarks>
-    /// A mentor from another branch or category answers 409 <c>CROSS_SCOPE_REFERENCE</c>, and the
-    /// composite FK <c>fk_assignments_assignee_scope</c> refuses the same combination in the database
-    /// — application validation is never the only guard (<c>TEN-025</c>).
+    /// <para>
+    /// A Lead hands work to their mentors. An administrator can also hand it to the Lead: everyone
+    /// below them, which is why this looks at who is asking.
+    /// </para>
+    /// <para>
+    /// Somebody from another branch or category answers 409 <c>CROSS_SCOPE_REFERENCE</c>, and the
+    /// trigger <c>trg_assignments_executor_scope</c> refuses the same combination in the database —
+    /// application validation is never the only guard (<c>TEN-025</c>).
+    /// </para>
     /// </remarks>
-    private async Task EnsureAssigneeIsUsableAsync(Guid assigneeId, Guid categoryId, CancellationToken cancellationToken)
+    private async Task EnsureAssigneeIsUsableAsync(
+        ICurrentUserContext actor,
+        Guid assigneeId,
+        Guid categoryId,
+        CancellationToken cancellationToken)
     {
         var assignee = await dbContext.Users
             .IgnoreQueryFilters()
@@ -620,11 +817,16 @@ public sealed class AssignmentService(
             .Select(u => new { u.Role, u.CategoryId, u.IsActive })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (assignee is null || assignee.Role != UserRole.Mentor || assignee.CategoryId != categoryId)
+        var roleAccepted = assignee?.Role is UserRole.Mentor
+            || (assignee?.Role is UserRole.Lead && actor.Role is UserRole.Admin);
+
+        if (assignee is null || !roleAccepted || assignee.CategoryId != categoryId)
         {
             throw new ConflictException(
                 ErrorCodes.CrossScopeReference,
-                "Исполнитель должен быть ментором этой категории.",
+                actor.Role is UserRole.Admin
+                    ? "Исполнитель должен быть ментором или тимлидом этой категории."
+                    : "Исполнитель должен быть ментором этой категории.",
                 new Dictionary<string, object?> { ["relation"] = "assignedToId" });
         }
 
@@ -699,7 +901,45 @@ public sealed class AssignmentService(
     // Helpers
     // -----------------------------------------------------------------
 
-    private static string ActorLabel(TaskEvent taskEvent) => taskEvent.ActorId is null ? "Система" : "Lead";
+    private static string ActorLabel(TaskEvent taskEvent, IReadOnlySet<Guid> adminActors) => taskEvent.ActorId switch
+    {
+        null => "Система",
+        { } id when adminActors.Contains(id) => "Администратор",
+        _ => "Lead",
+    };
+
+    private async Task<IReadOnlySet<Guid>> LoadAdminActorsAsync(
+        IReadOnlyCollection<TaskEvent> events,
+        CancellationToken cancellationToken)
+    {
+        var actorIds = events.Where(e => e.ActorId is not null).Select(e => e.ActorId!.Value).Distinct().ToArray();
+
+        var admins = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => actorIds.Contains(u.Id) && u.Role == UserRole.Admin)
+            .Select(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+        return admins.ToHashSet();
+    }
+
+    /// <summary>The two events that move a deadline say so in their metadata; everything else has nothing.</summary>
+    private static (DateTimeOffset? Previous, DateTimeOffset? New, string? Reason) ReadDeadlineChange(TaskEvent taskEvent)
+    {
+        if (taskEvent.EventType is not (TaskEventType.DeadlineChanged or TaskEventType.ReviewNeedsRework)
+            || taskEvent.Metadata is not { } metadata)
+        {
+            return (null, null, null);
+        }
+
+        var root = metadata.RootElement;
+
+        return (
+            root.TryGetProperty("previousCurrentDueAt", out var previous) ? previous.GetDateTimeOffset() : null,
+            root.TryGetProperty("newCurrentDueAt", out var next) ? next.GetDateTimeOffset() : null,
+            root.TryGetProperty("reason", out var reason) ? reason.GetString() : null);
+    }
 
     private static IQueryable<Assignment> ApplySort(IQueryable<Assignment> source, AssignmentListQuery query)
     {
@@ -734,7 +974,19 @@ public sealed class AssignmentService(
             .ToDictionaryAsync(b => b.Id, cancellationToken);
     }
 
-    private static AssignmentDto ToDto(Assignment assignment, string concurrencyToken, BranchSummaryDto? branch) => new(
+    private async Task<AssignmentDto> ToDtoAsync(Assignment assignment, string concurrencyToken, CancellationToken cancellationToken)
+    {
+        var assigner = await AssignmentOwnership.LoadAssignerAsync(dbContext, assignment.AssignedById, cancellationToken);
+
+        return ToDto(assignment, concurrencyToken, null, RequireActor(), assigner);
+    }
+
+    private static AssignmentDto ToDto(
+        Assignment assignment,
+        string concurrencyToken,
+        BranchSummaryDto? branch,
+        ICurrentUserContext actor,
+        AssignerInfo? assigner) => new(
         assignment.Id,
         assignment.OrganizationId,
         assignment.BranchId,
@@ -758,7 +1010,9 @@ public sealed class AssignmentService(
         assignment.CancelReason,
         assignment.CreatedAt,
         concurrencyToken,
-        branch);
+        branch,
+        assigner?.Role.ToString(),
+        AssignmentOwnership.IsOwner(actor, assignment, assigner));
 
     /// <summary>Carries the shadow <c>xmin</c> out of a no-tracking query alongside its entity.</summary>
     private sealed record AssignmentRow(Assignment Assignment, uint Xmin);

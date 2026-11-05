@@ -126,23 +126,16 @@ public sealed class AssignmentLifecycleTests(PostgresFixture fixture) : IAsyncLi
     }
 
     // -----------------------------------------------------------------
-    // Who may act (ASN-025)
+    // Who may act
     // -----------------------------------------------------------------
 
-    /// <summary>
-    /// The study cycle belongs to the Lead. Version 2.0's «Lead/Admin — управление» wrongly widened
-    /// Admin's reach and was removed in 2.1.
-    /// </summary>
-    [Theory]
-    [InlineData("organization-admin@mentortaskflow.test")]
-    [InlineData("branch-admin-head@mentortaskflow.test")]
-    [InlineData("mentor-head@mentortaskflow.test")]
-    public async Task Nobody_but_the_lead_creates_a_draft(string email)
+    [Fact]
+    public async Task A_mentor_cannot_hand_out_work()
     {
-        using var client = await SignInAsync(email);
+        using var client = await SignInAsync("mentor-head@mentortaskflow.test");
 
         var response = await client.PostAsJsonAsync("/api/v1/assignments/drafts",
-            new CreateAssignmentDraftRequest(_headMentorId, null, "Задача", null, null));
+            new CreateAssignmentDraftRequest(_secondHeadMentorId, null, "Задача", null, null));
 
         response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
     }

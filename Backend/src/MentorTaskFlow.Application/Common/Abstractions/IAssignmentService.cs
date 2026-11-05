@@ -34,6 +34,9 @@ public interface IAssignmentService
 
     Task<AssignmentDto> ReassignAsync(Guid assignmentId, ReassignAssignmentRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Moves the deadline of published work that is still with its executor.</summary>
+    Task<AssignmentDto> RescheduleAsync(Guid assignmentId, RescheduleAssignmentRequest request, CancellationToken cancellationToken);
+
     /// <summary>Transition 8: <c>Submitted → InReview</c> (<c>REV-001</c>).</summary>
     Task<AssignmentDto> StartReviewAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken);
 

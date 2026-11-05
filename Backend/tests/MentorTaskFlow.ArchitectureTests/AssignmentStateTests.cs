@@ -87,10 +87,7 @@ public sealed class AssignmentStateTests
     public void The_enums_match_the_specification()
     {
         Enum.GetValues<AssignmentStatus>().Length.ShouldBe(9);
-        Enum.GetValues<TaskEventType>().Length.ShouldBe(12);
-
-        // Removed in 2.1: no Release 1.0 action produced it, and a deadline change is recorded by the
-        // fields of ReviewNeedsRework instead.
-        Enum.GetNames<TaskEventType>().ShouldNotContain("DueDateChanged");
+        Enum.GetValues<TaskEventType>().Length.ShouldBe(13);
+        Enum.GetNames<TaskEventType>().ShouldContain(nameof(TaskEventType.DeadlineChanged));
     }
 }

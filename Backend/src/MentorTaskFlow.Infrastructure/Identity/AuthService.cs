@@ -35,6 +35,7 @@ public sealed class AuthService(
     PasswordPolicy passwordPolicy,
     IAuditWriter auditWriter,
     IOutboxWriter outboxWriter,
+    IPermissionService permissions,
     IOptions<AuthOptions> options,
     IClock clock) : IAuthService
 {
@@ -654,7 +655,8 @@ public sealed class AuthService(
             organization,
             branch,
             category,
-            Users.AvatarService.UrlFor(user.AvatarKey));
+            Users.AvatarService.UrlFor(user.AvatarKey),
+            await permissions.GetEffectiveAsync(user.Id, user.Role, user.AdminScope, user.OrganizationId, cancellationToken));
     }
 
     private static UnauthorizedException InvalidCredentials() =>

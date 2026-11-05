@@ -9,6 +9,7 @@ using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Assignments;
 using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
@@ -60,7 +61,7 @@ public sealed class SubmissionService(
 
         // Steps 0a–7: everything decidable without reading the body. Cheapest first, and none of it
         // touches storage.
-        var actor = RequireMentor();
+        var actor = RequireExecutor();
         var assignment = await FindSubmittableAsync(assignmentId, actor, cancellationToken);
 
         // Comment-only (2026-09-28): none of the file-specific steps (8–11: inspection, dedup, upload)
@@ -312,12 +313,10 @@ public sealed class SubmissionService(
     /// </remarks>
     private async Task NotifyLeadAsync(Assignment assignment, Submission submission, CancellationToken cancellationToken)
     {
-        var leadId = await dbContext.Users
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => u.CategoryId == assignment.CategoryId && u.Role == UserRole.Lead && u.IsActive)
-            .Select(u => (Guid?)u.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        // Whoever handed the work out reviews it, so they are the one to tell: for a task from an
+        // administrator that is the administrator, not the Lead of the category.
+        var leadId = await AssignmentOwnership.ResolveOwnerIdAsync(
+            dbContext, assignment.CategoryId, assignment.AssignedById, cancellationToken);
 
         var leadName = leadId is { } id
             ? await dbContext.Users.IgnoreQueryFilters().AsNoTracking().Where(u => u.Id == id).Select(u => u.FullName).FirstOrDefaultAsync(cancellationToken)
@@ -570,11 +569,12 @@ public sealed class SubmissionService(
 
     private ICurrentUserContext RequireActor() => currentUser.Current ?? throw new UnauthorizedException();
 
-    private ICurrentUserContext RequireMentor()
+    /// <summary>A Mentor, or a Lead given work by an administrator. Ownership of the task is checked next.</summary>
+    private ICurrentUserContext RequireExecutor()
     {
         var actor = RequireActor();
 
-        return actor.Role is UserRole.Mentor
+        return actor.Role is UserRole.Mentor or UserRole.Lead
             ? actor
             : throw new ForbiddenException(ErrorCodes.Forbidden, "Загрузка работы доступна только исполнителю задачи.");
     }

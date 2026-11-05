@@ -10,6 +10,9 @@ import { AssignmentsKanbanBoard } from '../../features/lead-assignments/Assignme
 import { LeadAssignmentDetailsDrawer } from '../../features/lead-assignments/LeadAssignmentDetailsDrawer';
 import { ReassignAssignmentDialog } from '../../features/lead-assignments/ReassignAssignmentDialog';
 import { assignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
+import type { AssignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
+import { RescheduleAssignmentDialog } from '../../features/assignment-deadline/RescheduleAssignmentDialog';
+import { PERMISSION, usePermissions } from '../../auth/usePermissions';
 import type { KanbanDragAction } from '../../features/lead/assignments/leadAssignmentKanban';
 import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
 import { useActiveLeadMentors, useLeadMentorNameResolver } from '../../features/lead/scope/useScopedLeadMentors';
@@ -70,6 +73,7 @@ export function AssignmentsPage(): JSX.Element {
   const allOwnAssignments = useScopedLeadAssignments();
   const mentorNameOf = useLeadMentorNameResolver();
   const actions = useAssignmentActions();
+  const { can } = usePermissions();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
@@ -77,6 +81,7 @@ export function AssignmentsPage(): JSX.Element {
   const [formDrawer, setFormDrawer] = useState<AssignmentFormDrawerState | null>(null);
   const [cancelDialog, setCancelDialog] = useState<CancelDialogState | null>(null);
   const [reassignDialog, setReassignDialog] = useState<LeadAssignmentRecord | null>(null);
+  const [rescheduleDialog, setRescheduleDialog] = useState<LeadAssignmentRecord | null>(null);
 
   const assignmentId = searchParams.get('assignmentId');
   const selected = useResolvedLeadAssignment(assignmentId);
@@ -142,12 +147,13 @@ export function AssignmentsPage(): JSX.Element {
 
   /** Единственное место, где строится список действий карточки (раздел I промпта: только реально применимые). */
   function buildActionItems(a: LeadAssignmentRecord): PreviewActionMenuItem[] {
-    const caps = assignmentCapabilities(a);
+    const caps = permittedCapabilities(a);
     return [
       { label: 'Открыть', onClick: () => { openRow(a.id); } },
       ...(caps.canEdit ? [{ label: 'Редактировать', onClick: () => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); } }] : []),
       ...(caps.canPublish ? [{ label: 'Опубликовать', onClick: () => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); } }] : []),
       ...(caps.canAcceptSuggestion ? [{ label: 'Принять', onClick: () => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); } }] : []),
+      ...(caps.canReschedule ? [{ label: 'Изменить срок', onClick: () => { setRescheduleDialog(a); } }] : []),
       ...(caps.canReassign ? [{ label: 'Переназначить', onClick: () => { setReassignDialog(a); } }] : []),
       ...(caps.canStartReview ? [{ label: 'Начать проверку', onClick: () => { void runAction(() => actions.startReview(a.id, token(a)), 'Проверка начата'); navigate(`/lead/review-queue?assignmentId=${a.id}`); } }] : []),
       ...(caps.canReject ? [{ label: 'Отклонить', destructive: true, onClick: () => { setCancelDialog({ assignment: a, kind: 'reject' }); } }] : []),
@@ -155,8 +161,29 @@ export function AssignmentsPage(): JSX.Element {
     ];
   }
 
+  /** Что можно с заданием: его статус, кто его выдал и что разрешил администратор. */
+  function permittedCapabilities(a: LeadAssignmentRecord): AssignmentCapabilities {
+    const caps = assignmentCapabilities(a);
+    return {
+      ...caps,
+      canPublish: caps.canPublish && can(PERMISSION.assignmentsAssign),
+      canEdit: caps.canEdit && can(PERMISSION.assignmentsAssign),
+      canAcceptSuggestion: caps.canAcceptSuggestion && can(PERMISSION.assignmentsAssign),
+      canReassign: caps.canReassign && can(PERMISSION.assignmentsReassign),
+      canReschedule: caps.canReschedule && can(PERMISSION.assignmentsReschedule),
+      canCancel: caps.canCancel && can(PERMISSION.assignmentsCancel),
+      canReject: caps.canReject && can(PERMISSION.assignmentsCancel),
+      canStartReview: caps.canStartReview && can(PERMISSION.assignmentsReview),
+      canDecideReview: caps.canDecideReview && can(PERMISSION.assignmentsReview),
+    };
+  }
+
   /** Карточку перетащили — тот же самый обработчик, что и у соответствующего пункта меню выше. */
   function handleDropAction(a: LeadAssignmentRecord, action: KanbanDragAction): void {
+    if (a.canManage === false) {
+      toast.info('Вести это задание может только тот, кто его выдал');
+      return;
+    }
     if (action === 'publish') {
       void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано');
       return;
@@ -176,9 +203,11 @@ export function AssignmentsPage(): JSX.Element {
         title="Задания"
         subtitle={`${scope.categoryName} · ${scope.branchDisplayName}`}
         action={
-          <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
-            Новое задание
-          </Button>
+          can(PERMISSION.assignmentsAssign) ? (
+            <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setFormDrawer({ mode: 'create' }); }}>
+              Новое задание
+            </Button>
+          ) : undefined
         }
       />
 
@@ -222,6 +251,8 @@ export function AssignmentsPage(): JSX.Element {
         assignmentId={assignmentId}
         onClose={closeDrawer}
         mentorNameOf={mentorNameOf}
+        capabilitiesOf={permittedCapabilities}
+        onReschedule={(a) => { setRescheduleDialog(a); }}
         onEdit={(a) => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); }}
         onPublish={(a) => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); }}
         onAcceptSuggestion={(a) => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); }}
@@ -233,6 +264,25 @@ export function AssignmentsPage(): JSX.Element {
       />
 
       <AssignmentFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} />
+
+      <RescheduleAssignmentDialog
+        open={rescheduleDialog !== null}
+        onOpenChange={(next) => { if (!next) setRescheduleDialog(null); }}
+        assignmentTitle={rescheduleDialog?.title ?? ''}
+        currentDueAtMs={rescheduleDialog?.currentDueAt ?? 0}
+        isOverdue={rescheduleDialog?.status === 'Overdue'}
+        timeZoneId={scope.timeZoneId}
+        onConfirm={async (dueAtMs, reason) => {
+          if (rescheduleDialog === null) return;
+          try {
+            await actions.reschedule(rescheduleDialog.id, token(rescheduleDialog), dueAtMs, reason);
+            toast.success('Срок изменён, исполнитель получит уведомление');
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не удалось изменить срок');
+            throw error;
+          }
+        }}
+      />
 
       <AssignmentCancelDialog
         open={cancelDialog !== null}

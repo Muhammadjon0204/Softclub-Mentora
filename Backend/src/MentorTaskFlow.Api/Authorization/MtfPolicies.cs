@@ -45,6 +45,9 @@ public static class MtfPolicies
     /// <summary>Lead or either Admin — the shape of most configuration endpoints.</summary>
     public const string LeadOrAdmin = "mtf.lead-or-admin";
 
+    /// <summary>Whoever can be handed work: a Mentor, or a Lead given it by an administrator.</summary>
+    public const string Executor = "mtf.executor";
+
     public static IServiceCollection AddMentorTaskFlowAuthorization(this IServiceCollection services)
     {
         services.AddAuthorizationBuilder()
@@ -66,7 +69,10 @@ public static class MtfPolicies
                 .RequireClaim(MtfClaimTypes.Role, nameof(UserRole.Mentor)))
             .AddPolicy(LeadOrAdmin, policy => policy
                 .RequireAuthenticatedUser()
-                .RequireClaim(MtfClaimTypes.Role, nameof(UserRole.Admin), nameof(UserRole.Lead)));
+                .RequireClaim(MtfClaimTypes.Role, nameof(UserRole.Admin), nameof(UserRole.Lead)))
+            .AddPolicy(Executor, policy => policy
+                .RequireAuthenticatedUser()
+                .RequireClaim(MtfClaimTypes.Role, nameof(UserRole.Mentor), nameof(UserRole.Lead)));
 
         return services;
     }

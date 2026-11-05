@@ -3,6 +3,7 @@ import { LayoutGroup } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 
 import { BrandLogo } from '../../shared/branding/BrandLogo';
+import { usePermissions } from '../../auth/usePermissions';
 import { useTranslation } from '../../shared/i18n/useTranslation';
 import { Tooltip } from '../../shared/ui/Tooltip';
 import { useMentorNavBadges } from './useMentorNavBadges';
@@ -19,6 +20,7 @@ interface MentorSidebarProps {
 /** Тот же визуальный язык, что `LeadSidebar`/`AdminSidebar` — не новая design-система. */
 export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop', onNavigate }: MentorSidebarProps): JSX.Element {
   const badgeByKey = useMentorNavBadges();
+  const { can } = usePermissions();
   const { t } = useTranslation();
   const isCollapsed = variant === 'desktop' && collapsed;
 
@@ -67,7 +69,7 @@ export function MentorSidebar({ collapsed, onToggleCollapse, variant = 'desktop'
       <LayoutGroup id={`nav-${variant}`}>
       <nav aria-label={t('nav.ariaLabel')} className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
-          {MENTOR_NAV_ITEMS.map((item) => {
+          {MENTOR_NAV_ITEMS.filter((item) => item.permission === undefined || can(item.permission)).map((item) => {
             const Icon = item.icon;
             const label = t(`nav.mentor.${item.key}`);
             const badgeCount = badgeByKey[item.key];

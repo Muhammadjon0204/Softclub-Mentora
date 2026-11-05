@@ -23,6 +23,8 @@ public static class DomainErrorCodes
     public const string AssignmentInvalidStatusTransition = "ASSIGNMENT_INVALID_STATUS_TRANSITION";
     public const string AssignmentTerminal = "ASSIGNMENT_TERMINAL";
     public const string ReassignNotAllowed = "REASSIGN_NOT_ALLOWED";
+    public const string DeadlineChangeNotAllowed = "DEADLINE_CHANGE_NOT_ALLOWED";
+    public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
     public const string SubmissionNotAllowed = "SUBMISSION_NOT_ALLOWED";
     public const string AssigneeInactive = "ASSIGNEE_INACTIVE";
     public const string SelfReviewForbidden = "SELF_REVIEW_FORBIDDEN";

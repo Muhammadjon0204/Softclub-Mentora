@@ -1,7 +1,9 @@
 using System.Runtime.CompilerServices;
+using MentorTaskFlow.Domain.Access;
 using MentorTaskFlow.Domain.Assignments;
 using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Notifications;
+using MentorTaskFlow.Domain.Proposals;
 using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Schedule;
 using MentorTaskFlow.Domain.Submissions;
@@ -151,6 +153,19 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
                 yield return new RealtimeSignal(
                     RealtimeKinds.Assignment, review.OrganizationId, review.BranchId, review.CategoryId,
                     review.AssignmentId, []);
+                break;
+
+            case Proposal proposal:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.Proposal, proposal.OrganizationId, proposal.BranchId, proposal.CategoryId,
+                    proposal.Id, [proposal.AuthorId]);
+                break;
+
+            // Reaches only the person concerned, as a change to them: their profile, and with it what
+            // they may do, is refetched at once.
+            case UserPermission permission:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.User, permission.OrganizationId, null, null, permission.UserId, [permission.UserId]);
                 break;
 
             case User user:

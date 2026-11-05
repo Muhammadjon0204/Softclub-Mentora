@@ -1,11 +1,14 @@
 import { CheckCircle2 } from 'lucide-react';
 
+import { PERMISSION, usePermissions } from '../../auth/usePermissions';
+import { UserPermissionsEditor } from '../admin-permissions/UserPermissionsEditor';
 import { ROLE_LABEL } from '../../mocks/ui-preview/users.preview';
 import { accessSummaryFor, branchDisplayName, emptyOrValue } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
 
 /** Компактные 3–5 пунктов вместо полноценной permission matrix (раздел 8 промпта). */
 export function UserAccessSection({ user }: { user: PreviewUserDetails }): JSX.Element {
+  const { can } = usePermissions();
   const summary = accessSummaryFor(user.role);
 
   return (
@@ -29,17 +32,21 @@ export function UserAccessSection({ user }: { user: PreviewUserDetails }): JSX.E
         ) : null}
       </div>
 
-      <div>
-        <h4 className="mb-2.5 text-[12.5px] font-semibold text-ink-secondary">Текущие разрешения</h4>
-        <ul className="space-y-2">
-          {summary.map((line) => (
-            <li key={line} className="flex items-start gap-2.5 text-[13px] leading-[19px] text-ink-secondary">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
-              {line}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {can(PERMISSION.permissionsManage) ? (
+        <UserPermissionsEditor userId={user.id} />
+      ) : (
+        <div>
+          <h4 className="mb-2.5 text-[12.5px] font-semibold text-ink-secondary">Текущие разрешения</h4>
+          <ul className="space-y-2">
+            {summary.map((line) => (
+              <li key={line} className="flex items-start gap-2.5 text-[13px] leading-[19px] text-ink-secondary">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

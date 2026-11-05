@@ -2,7 +2,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { LayoutGroup } from 'framer-motion';
 import { NavLink } from 'react-router-dom';
 
+import { usePermissions } from '../../auth/usePermissions';
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
+import { usePendingProposalCount } from '../../features/proposals/useProposals';
 import { BrandLogo } from '../../shared/branding/BrandLogo';
 import { useTranslation } from '../../shared/i18n/useTranslation';
 import { Tooltip } from '../../shared/ui/Tooltip';
@@ -19,15 +21,18 @@ interface LeadSidebarProps {
 /** Тот же визуальный язык, что `AdminSidebar` (раздел 8 задачи Phase 3 — не новая design-система). */
 export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', onNavigate }: LeadSidebarProps): JSX.Element {
   const ownAssignments = useScopedLeadAssignments();
+  const { can } = usePermissions();
+  const pendingProposals = usePendingProposalCount();
   const { t } = useTranslation();
   const isCollapsed = variant === 'desktop' && collapsed;
 
   const suggestionsCount = ownAssignments.filter((a) => a.status === 'Suggested').length;
-  const reviewQueueCount = ownAssignments.filter((a) => a.status === 'Submitted' || a.status === 'InReview').length;
+  const reviewQueueCount = ownAssignments.filter((a) => (a.status === 'Submitted' || a.status === 'InReview') && a.canManage !== false).length;
 
   const badgeByKey: Record<string, number> = {
     suggestions: suggestionsCount,
     'review-queue': reviewQueueCount,
+    proposals: pendingProposals,
   };
 
   const collapseLabel = collapsed ? t('nav.expandMenu') : t('nav.collapseMenu');
@@ -75,7 +80,7 @@ export function LeadSidebar({ collapsed, onToggleCollapse, variant = 'desktop', 
       <LayoutGroup id={`nav-${variant}`}>
       <nav aria-label={t('nav.ariaLabel')} className="flex-1 overflow-y-auto px-2.5 py-3">
         <ul className="space-y-0.5">
-          {LEAD_NAV_ITEMS.map((item) => {
+          {LEAD_NAV_ITEMS.filter((item) => item.permission === undefined || can(item.permission)).map((item) => {
             const Icon = item.icon;
             const label = t(`nav.lead.${item.key}`);
             const badgeCount = badgeByKey[item.key];

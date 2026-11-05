@@ -170,13 +170,13 @@ public sealed class AuditScopeTests
     [Fact]
     public void The_organization_level_lists_match_the_specification()
     {
-        // The 13 of TEN-048, verbatim.
-        AuditActions.AlwaysOrganizationLevelActions.Count.ShouldBe(13);
+        // The 13 of TEN-048, plus a role's permission rule, which binds the whole organization.
+        AuditActions.AlwaysOrganizationLevelActions.Count.ShouldBe(14);
 
-        // Those 13 plus audit.read and ai.summary_generate — the two documented deviations, each for
+        // Those 14 plus audit.read and ai.summary_generate — the two documented deviations, each for
         // a rule elsewhere in the TZ that defines a branchless action TEN-048 does not list. See
         // AuditActions.OrganizationLevelActions.
-        AuditActions.OrganizationLevelActions.Count.ShouldBe(15);
+        AuditActions.OrganizationLevelActions.Count.ShouldBe(16);
         AuditActions.OrganizationLevelActions.ShouldContain(AuditActions.AuditRead);
         AuditActions.OrganizationLevelActions.ShouldContain(AuditActions.AiSummaryGenerate);
 

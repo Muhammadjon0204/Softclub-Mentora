@@ -34,6 +34,20 @@ export function formatCategoryDate(timestampMs: number, timeZoneId: string): str
   return `${get('day')}.${get('month')}.${get('year')}`;
 }
 
+/** Значение для `DatePicker`: дата момента в часовом поясе категории. */
+export function toDateInputValue(ms: number, timeZoneId: string): string {
+  const [day, month, year] = formatCategoryDate(ms, timeZoneId).split('.');
+  return `${year}-${month}-${day}`;
+}
+
+/** Значение для `TimePicker`: время момента в часовом поясе категории. */
+export function toTimeInputValue(ms: number, timeZoneId: string): string {
+  const parts = dateTimeFormat({ timeZone: timeZoneId, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(ms);
+  const hour = parts.find((p) => p.type === 'hour')?.value ?? '23';
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '59';
+  return `${hour}:${minute}`;
+}
+
 /**
  * «Сейчас» — реальное время. Раньше это был детерминированный preview-якорь (`MOCK_NOW`), пригодный
  * только пока все даты вокруг тоже были sынтетическими фикстурами; с реальными датами из backend

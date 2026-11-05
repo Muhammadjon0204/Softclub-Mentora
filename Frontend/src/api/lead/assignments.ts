@@ -42,6 +42,10 @@ export interface AssignmentDto {
   createdAt: string;
   concurrencyToken: string;
   branch: { id: string; name: string; code: string; isHeadOffice: boolean } | null;
+  /** Роль того, кто выдал задание: `Admin` или `Lead`. */
+  assignedByRole?: string | null;
+  /** Может ли этот пользователь вести задание: проверять, менять срок, переназначать. Считает сервер. */
+  canManage?: boolean;
 }
 
 /**
@@ -59,6 +63,10 @@ export interface TaskEventDto {
   newStatus: string | null;
   occurredAt: string;
   correlationId: string;
+  /** Заполнены у событий, сдвинувших срок: `DeadlineChanged` и `ReviewNeedsRework`. */
+  previousDueAt?: string | null;
+  newDueAt?: string | null;
+  reason?: string | null;
 }
 
 export interface AssignmentListQuery {
@@ -67,6 +75,8 @@ export interface AssignmentListQuery {
   status?: string;
   categoryId?: string;
   assignedToId?: string;
+  /** Только то, что выдал этот человек: «выданные мной» у администратора. */
+  assignedById?: string;
   source?: string;
   /** ISO instant, inclusive — narrows by `currentDueAt` (the deadline calendar's visible range). */
   dueFrom?: string;
@@ -100,6 +110,12 @@ export interface ReassignAssignmentRequest {
   reason?: string | null;
 }
 
+export interface RescheduleAssignmentRequest {
+  dueAt: string;
+  reason: string;
+  concurrencyToken: string;
+}
+
 export interface CancelAssignmentRequest {
   cancelReason: string;
   concurrencyToken: string;
@@ -116,6 +132,7 @@ function toQueryParams(query: AssignmentListQuery): Record<string, string | numb
   if (query.status !== undefined) params.status = query.status;
   if (query.categoryId !== undefined) params.categoryId = query.categoryId;
   if (query.assignedToId !== undefined) params.assignedToId = query.assignedToId;
+  if (query.assignedById !== undefined) params.assignedById = query.assignedById;
   if (query.source !== undefined) params.source = query.source;
   if (query.dueFrom !== undefined) params.dueFrom = query.dueFrom;
   if (query.dueTo !== undefined) params.dueTo = query.dueTo;
@@ -174,6 +191,12 @@ export async function acceptAssignmentSuggestion(id: string, request: Assignment
 /** LA8: `POST /assignments/{id}/reassign` — Draft/Suggested always, Assigned only if no submission exists yet. */
 export async function reassignAssignment(id: string, request: ReassignAssignmentRequest): Promise<AssignmentDto> {
   const { data } = await apiClient.post<AssignmentDto>(`/api/v1/assignments/${id}/reassign`, request);
+  return data;
+}
+
+/** `POST /assignments/{id}/reschedule` — срок опубликованной работы, пока она у исполнителя. Причина обязательна. */
+export async function rescheduleAssignment(id: string, request: RescheduleAssignmentRequest): Promise<AssignmentDto> {
+  const { data } = await apiClient.post<AssignmentDto>(`/api/v1/assignments/${id}/reschedule`, request);
   return data;
 }
 

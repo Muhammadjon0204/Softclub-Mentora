@@ -34,6 +34,15 @@ public static class NotificationEventTypes
     public const string AssignmentOverdue = "AssignmentOverdue";
     public const string AssignmentCancelled = "AssignmentCancelled";
 
+    /// <summary>The deadline of published work moved. Told to the executor, with the new date.</summary>
+    public const string AssignmentDeadlineChanged = "AssignmentDeadlineChanged";
+
+    /// <summary>A mentor put forward an idea: whoever decides it in the category is told.</summary>
+    public const string ProposalSubmitted = "ProposalSubmitted";
+
+    public const string ProposalApproved = "ProposalApproved";
+    public const string ProposalRejected = "ProposalRejected";
+
     // Category-level.
     public const string SchedulerNoActiveMentor = "SchedulerNoActiveMentor";
     public const string CategoryWithoutLead = "CategoryWithoutLead";

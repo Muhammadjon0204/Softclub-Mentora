@@ -5,10 +5,10 @@ namespace MentorTaskFlow.Domain.Notifications;
 /// </summary>
 public enum NotificationTopic
 {
-    /// <summary>New, suggested, reassigned and cancelled assignments.</summary>
+    /// <summary>New, suggested, reassigned and cancelled assignments, and proposals.</summary>
     Assignments = 0,
 
-    /// <summary>Deadline reminders and overdue notices.</summary>
+    /// <summary>Deadline reminders, overdue notices and moved deadlines.</summary>
     Deadlines = 1,
 
     /// <summary>Hand-ins, receipts and review outcomes.</summary>
@@ -31,10 +31,14 @@ public static class NotificationTopics
         NotificationEventTypes.AssignmentAssigned
             or NotificationEventTypes.AssignmentSuggested
             or NotificationEventTypes.AssignmentReassigned
-            or NotificationEventTypes.AssignmentCancelled => NotificationTopic.Assignments,
+            or NotificationEventTypes.AssignmentCancelled
+            or NotificationEventTypes.ProposalSubmitted
+            or NotificationEventTypes.ProposalApproved
+            or NotificationEventTypes.ProposalRejected => NotificationTopic.Assignments,
 
         NotificationEventTypes.DeadlineReminder
-            or NotificationEventTypes.AssignmentOverdue => NotificationTopic.Deadlines,
+            or NotificationEventTypes.AssignmentOverdue
+            or NotificationEventTypes.AssignmentDeadlineChanged => NotificationTopic.Deadlines,
 
         NotificationEventTypes.SubmissionUploaded
             or NotificationEventTypes.LateSubmissionUploaded

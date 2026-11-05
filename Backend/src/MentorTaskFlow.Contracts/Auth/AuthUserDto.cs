@@ -34,7 +34,8 @@ public sealed record AuthUserDto(
     OrganizationSummaryDto Organization,
     BranchSummaryDto? Branch,
     CategorySummaryDto? Category,
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    IReadOnlyList<string>? Permissions = null);
 
 /// <summary>Response of <c>POST /auth/login</c> — the profile plus the access token (<c>AUTH-039</c>).</summary>
 /// <remarks>

@@ -183,17 +183,27 @@ public sealed class SubmissionUploadTests(PostgresFixture postgres, MinioFixture
             .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
-    [Theory]
-    [InlineData("lead-sharp@mentortaskflow.test")]
-    [InlineData("branch-admin-head@mentortaskflow.test")]
-    public async Task Nobody_but_a_mentor_may_upload(string email)
+    [Fact]
+    public async Task An_administrator_never_uploads()
     {
         var assignmentId = await PublishAssignmentAsync();
 
-        using var client = await SignInAsync(email);
+        using var client = await SignInAsync("branch-admin-head@mentortaskflow.test");
 
         (await UploadAsync(client, assignmentId, Pdf(), "работа.pdf"))
             .StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    /// <summary>A Lead can be an executor now, but only of their own task: a mentor's stays the mentor's.</summary>
+    [Fact]
+    public async Task A_lead_cannot_upload_for_their_mentor()
+    {
+        var assignmentId = await PublishAssignmentAsync();
+
+        using var client = await SignInAsync("lead-sharp@mentortaskflow.test");
+
+        (await UploadAsync(client, assignmentId, Pdf(), "работа.pdf"))
+            .StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     /// <summary><c>SUB-001</c>: a submitted task is with the Lead; a second upload is not a new version.</summary>

@@ -2,6 +2,7 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Common;
 using MentorTaskFlow.Contracts.Users;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -58,6 +59,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// </remarks>
     [HttpPost]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -73,6 +75,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// <summary><c>PATCH /users/{id}</c> — the display name and nothing else (<c>API-009</c>).</summary>
     [HttpPatch("{id:guid}")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserDto>> PatchAsync(
         Guid id,
@@ -82,6 +85,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
 
     [HttpPost("{id:guid}/activate")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<UserDto>> ActivateAsync(
@@ -100,6 +104,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// </remarks>
     [HttpPost("{id:guid}/deactivate")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<UserDto>> DeactivateAsync(
         Guid id,
@@ -117,6 +122,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// </remarks>
     [HttpPost("{id:guid}/change-role")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<UserDto>> ChangeRoleAsync(
@@ -135,6 +141,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// </remarks>
     [HttpPost("{id:guid}/change-category")]
     [Authorize(Policy = MtfPolicies.AnyAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType<UserDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -175,6 +182,7 @@ public sealed class UsersController(IUserService userService) : ControllerBase
     /// </remarks>
     [HttpPost("{id:guid}/resend-invitation")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.UsersManage)]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     public async Task<IActionResult> ResendInvitationAsync(Guid id, CancellationToken cancellationToken)
     {

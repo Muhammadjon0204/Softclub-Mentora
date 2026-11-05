@@ -42,7 +42,7 @@ public sealed class SubmissionsController(ISubmissionService submissions) : Cont
     /// </para>
     /// </remarks>
     [HttpPost("assignments/{id:guid}/submissions", Name = RouteNames.UploadSubmission)]
-    [Authorize(Policy = MtfPolicies.Mentor)]
+    [Authorize(Policy = MtfPolicies.Executor)]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(52_428_800)]
     [ProducesResponseType<SubmissionDto>(StatusCodes.Status201Created)]

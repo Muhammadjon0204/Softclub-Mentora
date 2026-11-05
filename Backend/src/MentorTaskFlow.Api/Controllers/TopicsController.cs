@@ -2,6 +2,7 @@ using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Contracts.Common;
 using MentorTaskFlow.Contracts.Schedule;
+using MentorTaskFlow.Domain.Access;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -45,6 +46,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
 
     [HttpPost]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicDto>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<TopicDto>> CreateAsync(
@@ -58,6 +60,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicDto>> UpdateAsync(
         Guid id,
@@ -67,6 +70,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
 
     [HttpPost("{id:guid}/activate")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicDto>> ActivateAsync(
         Guid id,
@@ -83,6 +87,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
     /// </remarks>
     [HttpPost("{id:guid}/deactivate")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicDto>> DeactivateAsync(
         Guid id,
@@ -99,6 +104,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
     /// </remarks>
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken)
@@ -126,6 +132,7 @@ public sealed class TopicsController(IScheduleService scheduleService) : Control
     /// </remarks>
     [HttpPost("{topicId:guid}/assignments")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicAssignmentDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<TopicAssignmentDto>> CreateAssignmentAsync(
         Guid topicId,
@@ -153,6 +160,7 @@ public sealed class TopicAssignmentsController(IScheduleService scheduleService)
 
     [HttpPut("{id:guid}")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicAssignmentDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicAssignmentDto>> UpdateAsync(
         Guid id,
@@ -162,6 +170,7 @@ public sealed class TopicAssignmentsController(IScheduleService scheduleService)
 
     [HttpPost("{id:guid}/activate")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicAssignmentDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicAssignmentDto>> ActivateAsync(
         Guid id,
@@ -178,6 +187,7 @@ public sealed class TopicAssignmentsController(IScheduleService scheduleService)
     /// </remarks>
     [HttpPost("{id:guid}/deactivate")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType<TopicAssignmentDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<TopicAssignmentDto>> DeactivateAsync(
         Guid id,
@@ -187,6 +197,7 @@ public sealed class TopicAssignmentsController(IScheduleService scheduleService)
 
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.ScheduleManage)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> DeleteAsync(Guid id, CancellationToken cancellationToken)

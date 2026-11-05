@@ -6,6 +6,7 @@ using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
+using MentorTaskFlow.Infrastructure.Access;
 using MentorTaskFlow.Infrastructure.Auditing;
 using MentorTaskFlow.Infrastructure.Identity;
 using MentorTaskFlow.Infrastructure.Notifications;
@@ -458,6 +459,12 @@ public sealed class OutboxDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
             new PasswordPolicy(),
             new AuditWriter(context, new StubCurrentUserAccessor(), new StubBranchContext(Guid.Empty, Guid.Empty), new StubRequestContext(), clock),
             new OutboxWriter(context, new StubBranchContext(Guid.Empty, Guid.Empty), Metrics(), clock),
+            new PermissionService(
+                context,
+                new StubCurrentUserAccessor(),
+                new StubBranchContext(Guid.Empty, Guid.Empty),
+                new AuditWriter(context, new StubCurrentUserAccessor(), new StubBranchContext(Guid.Empty, Guid.Empty), new StubRequestContext(), clock),
+                clock),
             authOptions,
             clock);
     }

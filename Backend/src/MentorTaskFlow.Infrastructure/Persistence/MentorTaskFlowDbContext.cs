@@ -1,10 +1,12 @@
 using System.Reflection;
+using MentorTaskFlow.Domain.Access;
 using MentorTaskFlow.Domain.Analytics;
 using MentorTaskFlow.Domain.Assignments;
 using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Identity;
 using MentorTaskFlow.Domain.Notifications;
+using MentorTaskFlow.Domain.Proposals;
 using MentorTaskFlow.Domain.Reports;
 using MentorTaskFlow.Domain.Reviews;
 using MentorTaskFlow.Domain.Schedule;
@@ -75,6 +77,14 @@ public class MentorTaskFlowDbContext(
     public DbSet<AiSummary> AiSummaries => Set<AiSummary>();
 
     public DbSet<CrmGroupReport> CrmGroupReports => Set<CrmGroupReport>();
+
+    public DbSet<Proposal> Proposals => Set<Proposal>();
+
+    // Organization-level configuration: no branch to filter by, and reached with the organization
+    // pinned explicitly, because a person's permissions are also read during sign-in.
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
 
     // Referenced by the query-filter expressions below. EF Core re-evaluates these on every query,
     // so one compiled model serves every tenant without leaking a captured value between requests.
@@ -162,6 +172,18 @@ public class MentorTaskFlowDbContext(
             || (FilterOrganizationId != null
                 && e.OrganizationId == FilterOrganizationId
                 && (FilterBranchId == null || e.BranchId == FilterBranchId)));
+
+        modelBuilder.Entity<Proposal>().HasQueryFilter(e =>
+            FilterSuppressed
+            || (FilterOrganizationId != null
+                && e.OrganizationId == FilterOrganizationId
+                && (FilterBranchId == null || e.BranchId == FilterBranchId)));
+
+        modelBuilder.Entity<RolePermission>().HasQueryFilter(e =>
+            FilterSuppressed || (FilterOrganizationId != null && e.OrganizationId == FilterOrganizationId));
+
+        modelBuilder.Entity<UserPermission>().HasQueryFilter(e =>
+            FilterSuppressed || (FilterOrganizationId != null && e.OrganizationId == FilterOrganizationId));
 
         modelBuilder.Entity<UserCategoryHistory>().HasQueryFilter(e =>
             FilterSuppressed

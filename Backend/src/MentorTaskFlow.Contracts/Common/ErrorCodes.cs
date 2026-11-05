@@ -45,6 +45,10 @@ public static class ErrorCodes
 
     public const string CategoryInactive = "CATEGORY_INACTIVE";
     public const string SelfReviewForbidden = "SELF_REVIEW_FORBIDDEN";
+    public const string PermissionDenied = "PERMISSION_DENIED";
+    public const string AssignmentNotOwner = "ASSIGNMENT_NOT_OWNER";
+    public const string DeadlineChangeNotAllowed = "DEADLINE_CHANGE_NOT_ALLOWED";
+    public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
     public const string InsufficientSampleSize = "INSUFFICIENT_SAMPLE_SIZE";
 
     // ---- 404 Not Found ---------------------------------------------------
@@ -134,10 +138,14 @@ public static class ErrorCodes
         [ScopeOverrideForbidden] = 403,
         [CategoryInactive] = 403,
         [SelfReviewForbidden] = 403,
+        [PermissionDenied] = 403,
+        [AssignmentNotOwner] = 403,
         [InsufficientSampleSize] = 403,
 
         [ResourceNotFound] = 404,
 
+        [DeadlineChangeNotAllowed] = 409,
+        [ProposalNotPending] = 409,
         [ConcurrencyConflict] = 409,
         [CrossScopeReference] = 409,
         [BranchAlreadyExists] = 409,

@@ -3,11 +3,11 @@ using MentorTaskFlow.Domain.Common;
 
 namespace MentorTaskFlow.Domain.Assignments;
 
-/// <summary>The twelve event types of Приложение F.</summary>
+/// <summary>The twelve event types of Приложение F, plus <see cref="DeadlineChanged"/>.</summary>
 /// <remarks>
-/// Version 2.0's <c>DueDateChanged</c> was removed: no Release 1.0 action produced it. A deadline
-/// change is recorded by the <c>previousCurrentDueAt</c> and <c>newCurrentDueAt</c> fields of
-/// <see cref="ReviewNeedsRework"/>, where it actually happens.
+/// A deadline set by a rework decision is recorded by the <c>previousCurrentDueAt</c> and
+/// <c>newCurrentDueAt</c> fields of <see cref="ReviewNeedsRework"/>, where it happens.
+/// <see cref="DeadlineChanged"/> is the other way it moves: on its own, with a reason.
 /// </remarks>
 public enum TaskEventType
 {
@@ -23,6 +23,7 @@ public enum TaskEventType
     ReviewNeedsRework = 9,
     MarkedOverdue = 10,
     Cancelled = 11,
+    DeadlineChanged = 12,
 }
 
 /// <summary>

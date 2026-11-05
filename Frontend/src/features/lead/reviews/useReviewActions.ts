@@ -35,13 +35,19 @@ export interface UseReviewActionsResult {
 
 export function useReviewActions(): UseReviewActionsResult {
   const scope = useLeadScope();
-  const queryClient = useQueryClient();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const listQueryKey = useMemo(
     () => leadAssignmentsListQueryKey(scope.organizationId, scope.categoryId),
     [scope.organizationId, scope.categoryId],
   );
+
+  return useReviewDecision(listQueryKey);
+}
+
+/** Само решение. Отдельно от Lead-обёртки: администратор проверяет то, что выдал сам. */
+export function useReviewDecision(listQueryKey: readonly unknown[]): UseReviewActionsResult {
+  const queryClient = useQueryClient();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // The list itself is patched directly in `decide()` below (we already fetch the updated assignment
   // there) instead of invalidated — a decision is the exact "feels slow" complaint: the old

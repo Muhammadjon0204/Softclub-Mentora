@@ -60,6 +60,9 @@ public enum AssignmentSource
     /// <summary>Produced by the scheduler; carries <c>GeneratedForDate</c> and <c>AutoGenerationKey</c>.</summary>
     Auto = 0,
 
-    /// <summary>Created by a Lead; both auto-generation fields are null (<c>SCH-012</c>).</summary>
+    /// <summary>Created by a Lead or an Admin; both auto-generation fields are null (<c>SCH-012</c>).</summary>
     Manual = 1,
+
+    /// <summary>A mentor's own idea, approved. The proposal records which assignment it became.</summary>
+    Proposal = 2,
 }
