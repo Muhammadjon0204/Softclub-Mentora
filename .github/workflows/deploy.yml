@@ -136,11 +136,11 @@ jobs:
             exit 1
           fi
 
-      # git pull нужен ради compose-файлов и скрипта ролей БД. .env.api и .env.web на
-      # сервере помечены skip-worktree (см. DEPLOY.md), но если их шаблон поменялся в
-      # репозитории, pull отказывается обновляться («would be overwritten»). Поэтому
-      # серверные файлы откладываются в сторону, git обновляет шаблон, и свои файлы
-      # возвращаются на место — при любом исходе pull.
+      # git pull нужен ради compose-файлов и скрипта ролей БД. .env.api в репозитории нет, а
+      # .env.web на сервере помечен skip-worktree (см. DEPLOY.md): если его шаблон поменялся,
+      # pull откажется обновляться («would be overwritten»). Поэтому серверные файлы
+      # откладываются в сторону, git обновляет код, и они возвращаются на место — при любом
+      # исходе pull.
       #
       # IMAGE_TAG из окружения перекрывает значение из .env-файлов: разворачивается
       # ровно проверенный коммит, а не «какой-то latest».
@@ -175,10 +175,16 @@ jobs:
             cp .env.api .env.web "$env_backup/"
             restore_env() {
               cp "$env_backup/.env.api" "$env_backup/.env.web" .
-              git update-index --skip-worktree .env.api .env.web
+              git update-index --skip-worktree .env.web
             }
-            git update-index --no-skip-worktree .env.api .env.web
-            git checkout -- .env.api .env.web
+            # .env.api убран из репозитория. На сервере он числится отслеживаемым только до
+            # первого такого pull: pull удалит файл, а restore_env вернёт его как неотслеживаемый.
+            if git ls-files --error-unmatch .env.api >/dev/null 2>&1; then
+              git update-index --no-skip-worktree .env.api
+              git checkout -- .env.api
+            fi
+            git update-index --no-skip-worktree .env.web
+            git checkout -- .env.web
             if ! git pull --ff-only; then
               restore_env
               echo "git pull не прошёл — .env-файлы возвращены, деплой остановлен"

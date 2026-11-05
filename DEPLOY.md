@@ -84,33 +84,39 @@ docker compose -f docker-compose.prod.yml down -v
 
 ## 2. Обновить код и заполнить `.env`
 
+`.env.api` хранит пароли и в репозиторий не входит: там лежит только шаблон `.env.api.example`.
+На новом сервере один раз создайте файл из шаблона и заполните его:
+
 ```bash
 git pull
+cp .env.api.example .env.api
 nano .env.api
 ```
 
-`.env.api` и `.env.web` лежат в репозитории, поэтому заполненные на сервере значения
+Значения секретов сгенерируйте заново, например `openssl rand -hex 32`. Файл `.gitignore` не даст
+случайно закоммитить `.env.api`.
+
+`.env.web` секретов не содержит и лежит в репозитории, поэтому заполненные на сервере значения
 `git pull` затрёт или упрётся в конфликт. Один раз выполните на сервере:
 
 ```bash
-git update-index --skip-worktree .env.api .env.web
+git update-index --skip-worktree .env.web
 ```
 
-После этого git перестанет замечать локальные правки этих двух файлов. Если шаблон
-файла поменялся в репозитории, ручной `git pull` откажется обновляться — автодеплой это
-обходит сам: откладывает серверные файлы, обновляет код и возвращает их. Чтобы подтянуть
-новые переменные из репозитория руками:
+После этого git перестанет замечать локальные правки этого файла. Если шаблон файла поменялся в
+репозитории, ручной `git pull` откажется обновляться — автодеплой это обходит сам: откладывает
+серверные файлы, обновляет код и возвращает их. Вручную новые переменные переносятся так:
 
 ```bash
-git update-index --no-skip-worktree .env.api .env.web
+git update-index --no-skip-worktree .env.web
 git pull
 # перенести свои значения в обновлённый файл
-git update-index --skip-worktree .env.api .env.web
+git update-index --skip-worktree .env.web
 ```
 
 ### `.env.api`
 
-Пароли уже сгенерированы и лежат в файле — `POSTGRES_PASSWORD`, три пароля ролей БД,
+Пароли сгенерируйте сами и держите только в этом файле — `POSTGRES_PASSWORD`, три пароля ролей БД,
 `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD` и `Auth__JwtSigningKey`. Каждый записан **один
 раз**: строки подключения и ключи доступа к MinIO `docker-compose.api.yml` собирает из
 них сам.
@@ -213,8 +219,8 @@ Telegram__WebhookUrl=https://tmsapi.softclub.tj/api/v1/telegram/webhook
 `receiving updates by long polling` — бот работает и так. Проверка: напишите боту `/start` —
 он ответит приветствием; затем «Подключить Telegram» в профиле и кнопка «Отправить тест».
 
-**Включить ИИ-отчёты (Gemini).** `.env.api` на сервере помечен `skip-worktree`, поэтому
-новые строки в него нужно дописать руками — `git pull` их не принесёт:
+**Включить ИИ-отчёты (Gemini).** `.env.api` в репозитории нет, поэтому новые строки в него
+нужно дописать на сервере руками — `git pull` их не принесёт:
 
 ```bash
 Ai__Enabled=true
@@ -363,7 +369,7 @@ cat ~/.ssh/mentora_deploy        # это значение секрета SSH_KE
 
 # чтобы git pull не трогал заполненные .env (см. раздел 2)
 cd <папка проекта>
-git update-index --skip-worktree .env.api .env.web
+git update-index --skip-worktree .env.web
 ```
 
 **В GitHub:** Settings → Secrets and variables → Actions.
