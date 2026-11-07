@@ -44,7 +44,7 @@ RUN test -f /usr/share/zoneinfo/Asia/Dushanbe \
 # equivalent "verify instead of install" option here.
 # Без конвейера запросов: Docker Desktop обрывает конвейерные ответы, и apt падает с «unexpected size».
 RUN apt-get -o Acquire::http::Pipeline-Depth=0 -o Acquire::Retries=5 update \
- && apt-get -o Acquire::http::Pipeline-Depth=0 -o Acquire::Retries=5 install -y --no-install-recommends wget \
+ && apt-get -o Acquire::http::Pipeline-Depth=0 -o Acquire::Retries=5 install -y --no-install-recommends wget apt \
  && rm -rf /var/lib/apt/lists/*
 
 # Never run as root.
