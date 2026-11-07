@@ -20,7 +20,7 @@
 # Переменные (там же → Variables):
 #   DEPLOY_ENABLED=true          без неё job deploy пропускается, образы только собираются
 #   VITE_API_BASE_URL            адрес API без /api/v1, например https://tmsapi.softclub.tj
-#   PUBLIC_WEB_URL (необяз.)     например https://tms.softclub.tj — проверка снаружи
+#   PUBLIC_WEB_URL (необяз.)     например https://ravand.softclub.tj — проверка снаружи
 
 name: deploy
 
