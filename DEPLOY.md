@@ -6,7 +6,7 @@
 домены и HTTPS настраиваются отдельно хостовым nginx.
 
 ```
-пользователи ─▶ https://tms.softclub.tj          ─▶ 127.0.0.1:8092   mentora-web
+пользователи ─▶ https://ravand.softclub.tj          ─▶ 127.0.0.1:8092   mentora-web
         SPA  ─▶ https://tmsapi.softclub.tj      ─▶ 127.0.0.1:8093   mentora-api
      браузер ─▶ https://tmsstorage.softclub.tj  ─▶ 127.0.0.1:9092   mentora-minio
 
@@ -21,7 +21,7 @@
 | `docker-compose.api.yml` | `.env.api` | `mentora-db` `mentora-minio` `mentora-migrator` `mentora-api` `mentora-worker` | `mentora` |
 | `docker-compose.web.yml` | `.env.web` | `mentora-web` | `mentora-web` |
 
-Общей сети им не нужно: маршрутизацию между `tms.softclub.tj` и `tmsapi.softclub.tj` делает хостовый
+Общей сети им не нужно: маршрутизацию между `ravand.softclub.tj` и `tmsapi.softclub.tj` делает хостовый
 nginx, контейнеры друг о друге не знают и деплоятся независимо. Правка или удаление
 строки в одном `.env` не может сломать другую половину.
 
@@ -51,7 +51,7 @@ docker compose --env-file .env.web  -f docker-compose.web.yml  <команда>
   и IP они не передаются, и первый же refresh выкинет пользователя;
 - страница по `https` не может обращаться к `http`-адресу — браузер блокирует запрос.
 
-`https://tms.softclub.tj` + `https://tmsapi.softclub.tj` — рабочая пара. `https://tms.softclub.tj` +
+`https://ravand.softclub.tj` + `https://tmsapi.softclub.tj` — рабочая пара. `https://ravand.softclub.tj` +
 `http://IP:8093` — нет.
 
 ---
@@ -140,11 +140,10 @@ Npgsql, второй начинает комментарий в `.env`. Сген
 Домены уже проставлены, менять не нужно — строки для справки:
 
 ```
-Auth__AppBaseUrl=https://tms.softclub.tj
+Auth__AppBaseUrl=https://ravand.softclub.tj
 Auth__CsrfCookieDomain=softclub.tj
-Notifications__AppBaseUrl=https://tms.softclub.tj
-Cors__AllowedOrigins__0=https://tms.softclub.tj
-Cors__AllowedOrigins__1=https://ravand.softclub.tj
+Notifications__AppBaseUrl=https://ravand.softclub.tj
+Cors__AllowedOrigins__0=https://ravand.softclub.tj
 Storage__PublicEndpoint=https://tmsstorage.softclub.tj
 ```
 
@@ -154,7 +153,7 @@ Storage__PublicEndpoint=https://tmsstorage.softclub.tj
 
 `Auth__CsrfCookieDomain` — общий регистрируемый домен (`softclub.tj`, без поддомена и без
 точки впереди), **не** адрес API. Фронт и API живут на разных поддоменах
-(`tms.` / `tmsapi.`), а кука `mtf_csrf` без `Domain` — host-only: API её видит, а
+(`ravand.` / `tmsapi.`), а кука `mtf_csrf` без `Domain` — host-only: API её видит, а
 `document.cookie` на странице SPA — нет, `X-CSRF-Token` не уходит, и каждый `/auth/refresh`
 (то есть каждое обновление страницы) отвечает `CSRF_VALIDATION_FAILED`. Пустое значение
 годится только если фронт и API когда-нибудь окажутся на одном хосте.
@@ -256,7 +255,7 @@ map $http_upgrade $connection_upgrade {
 }
 
 server {
-    server_name tms.softclub.tj;                      # пользователи заходят сюда
+    server_name ravand.softclub.tj;                      # пользователи заходят сюда
     location / {
         proxy_pass         http://127.0.0.1:8092;
         proxy_http_version 1.1;
@@ -304,7 +303,7 @@ server {
 ```
 
 ```bash
-sudo certbot --nginx -d tms.softclub.tj -d tmsapi.softclub.tj -d tmsstorage.softclub.tj
+sudo certbot --nginx -d ravand.softclub.tj -d tmsapi.softclub.tj -d tmsstorage.softclub.tj
 ```
 
 Все три поддомена обязаны быть под одним корнем — иначе `SameSite=Strict` разведёт
@@ -393,7 +392,7 @@ Variables:
 |---|---|
 | `DEPLOY_ENABLED` | `true` (без неё образы собираются, но сервер не трогается) |
 | `VITE_API_BASE_URL` | `https://tmsapi.softclub.tj` — без `/api/v1` |
-| `PUBLIC_WEB_URL` | `https://tms.softclub.tj` (необязательно — проверка сайта снаружи) |
+| `PUBLIC_WEB_URL` | `https://ravand.softclub.tj` (необязательно — проверка сайта снаружи) |
 
 ---
 
