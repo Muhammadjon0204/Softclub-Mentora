@@ -2,7 +2,8 @@
 # Linux base only: the deadline and scheduler calculations of TZ 14.2 and 20.1 depend on the IANA
 # tzdata that ships with the official Linux images (DEPLOY-011).
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Сборка идёт на платформе машины: результат — переносимый IL, а dotnet под эмуляцией (QEMU) падает.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Restore first, with only the project graph copied, so a source-only change reuses the layer.

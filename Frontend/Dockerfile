@@ -2,7 +2,8 @@
 # The resulting image weighs ~30 MB and serves the compiled bundle over port 80.
 
 # ---- build stage ------------------------------------------------------------
-FROM node:20-alpine AS build
+# Сборка идёт на платформе машины: результат — статика, ей архитектура не важна.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS build
 WORKDIR /app
 
 # Install dependencies first (layer cache: only re-runs when lock file changes).
