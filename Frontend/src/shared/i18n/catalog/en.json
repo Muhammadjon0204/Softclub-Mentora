@@ -225,7 +225,6 @@
  "Без администратора": "No administrator",
  "Без комментария": "No comment",
  "Без руководителя": "Without a lead",
- "Без филиала (Администрация)": "No branch (Administration)",
  "Безопасность": "Security",
  "Безопасность и вход": "Security and sign-in",
  "Безопасность и фоновые процессы из журнала аудита": "Security and background processes from the audit log",
@@ -1773,7 +1772,6 @@
  "Требуется доработка": "Rework required",
  "Требуют внимания": "Need attention",
  "Трекер дедлайнов": "Deadline tracker",
- "Тёмная (скоро)": "Dark (soon)",
  "У вас нет групп с таким статусом.": "You have no groups with this status.",
  "У всех есть администратор": "All have an administrator",
  "У всех есть руководитель": "All have a lead",
@@ -2131,5 +2129,8 @@
  "— не связан —": "— not linked —",
  "— нет заданий": "— no assignments",
  "— остальные действия недоступны.": "— other actions are unavailable.",
- "— открыть все задания": "— open all assignments"
+ "— открыть все задания": "— open all assignments",
+ "В филиалах пока нет пользователей": "No users in branches yet",
+ "Тёмная": "Dark",
+ "Применяется сразу и запоминается на этом устройстве": "Applies right away and is remembered on this device"
 }
