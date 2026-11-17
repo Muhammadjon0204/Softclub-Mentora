@@ -170,8 +170,9 @@ export function BranchesPage(): JSX.Element {
     const counts = new Map<string, number>();
     const nameById = new Map(allBranches.map((branch) => [branch.id, branch.name]));
     usersQuery.users.forEach((user) => {
-      if (user.status === 'Deactivated') return;
-      const label = user.branchId === null || user.role === 'OrgAdmin' ? 'Без филиала (Администрация)' : (nameById.get(user.branchId) ?? (user.branchName.length > 1 ? user.branchName : 'Не привязан'));
+      // Администрация организации не числится ни в одном филиале — в разбивке по филиалам её нет.
+      if (user.status === 'Deactivated' || user.branchId === null || user.role === 'OrgAdmin') return;
+      const label = nameById.get(user.branchId) ?? (user.branchName.length > 1 ? user.branchName : 'Не привязан');
       counts.set(label, (counts.get(label) ?? 0) + 1);
     });
     const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
@@ -339,6 +340,9 @@ export function BranchesPage(): JSX.Element {
             className="h-fit self-start"
             padded
           >
+            {userDistribution.length === 0 ? (
+              <p className="text-[13px] text-ink-muted">В филиалах пока нет пользователей</p>
+            ) : null}
             <ul className="space-y-3">
               {userDistribution.map((entry, index) => (
                 <li key={entry.label} className="flex items-center gap-3">

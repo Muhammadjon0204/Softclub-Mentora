@@ -18,6 +18,9 @@ import { Button } from '../../shared/ui/Button';
 import { Card, SectionCard } from '../../shared/ui/Card';
 import { ErrorState } from '../../shared/ui/ErrorState';
 import { FormField, FormInput, FormSelect, ReadOnlyField } from '../../shared/ui/FormField';
+import { Switch } from '../../shared/ui/Switch';
+import type { Theme } from '../../shared/theme/themeStore';
+import { useTheme } from '../../shared/theme/useTheme';
 
 /** Организация/безопасность/уведомления/интеграции — Organization Admin domain (ADR-001 8.1, ORG-024). */
 const ORG_ADMIN_TABS = [
@@ -40,21 +43,54 @@ function ReadOnlyRow({ label, value }: { label: string; value: string }): JSX.El
 
 function ToggleRow({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (value: boolean) => void }): JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-divider py-3 last:border-0">
-      <div>
+    <div className="flex items-center justify-between gap-4 border-b border-divider py-3.5 first:pt-0 last:border-0 last:pb-0">
+      <div className="min-w-0">
         <p className="text-[13.5px] font-medium text-ink">{label}</p>
-        <p className="text-[12px] text-ink-muted">{description}</p>
+        <p className="mt-0.5 text-[12px] text-ink-muted">{description}</p>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => { onChange(!checked); }}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? 'bg-brand' : 'bg-surface-muted'}`}
-      >
-        <span aria-hidden="true" className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-      </button>
+      <Switch checked={checked} onChange={onChange} label={label} />
     </div>
+  );
+}
+
+/** Мини-макет экрана в цветах темы. Цвета фиксированы, а не токены: карточка «Тёмная» должна
+ *  выглядеть тёмной и в светлой теме, и наоборот. Значения — из `index.css`. */
+const THEME_PREVIEW: Record<Theme, { app: string; surface: string; line: string; text: string; brand: string }> = {
+  light: { app: '#f7f8fc', surface: '#ffffff', line: '#e7eaf2', text: '#061a3d', brand: '#027095' },
+  dark: { app: '#0b1b3a', surface: '#122a52', line: '#1e3561', text: '#eaf1f8', brand: '#01c6be' },
+};
+
+function ThemeOption({ value, label, selected, onSelect }: { value: Theme; label: string; selected: boolean; onSelect: (value: Theme) => void }): JSX.Element {
+  const colors = THEME_PREVIEW[value];
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={() => { onSelect(value); }}
+      className={`w-44 rounded-control border p-2.5 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand ${
+        selected ? 'border-brand ring-1 ring-brand' : 'border-line hover:border-line-strong'
+      }`}
+    >
+      <div aria-hidden="true" className="flex h-[72px] gap-1.5 overflow-hidden rounded-control-sm p-1.5" style={{ backgroundColor: colors.app }}>
+        <div className="w-5 rounded-[3px]" style={{ backgroundColor: colors.surface, boxShadow: `inset 0 0 0 1px ${colors.line}` }} />
+        <div className="flex flex-1 flex-col gap-1 rounded-[3px] p-1.5" style={{ backgroundColor: colors.surface, boxShadow: `inset 0 0 0 1px ${colors.line}` }}>
+          <div className="h-1.5 w-3/5 rounded-full" style={{ backgroundColor: colors.text, opacity: 0.85 }} />
+          <div className="h-1 w-4/5 rounded-full" style={{ backgroundColor: colors.text, opacity: 0.25 }} />
+          <div className="h-1 w-2/3 rounded-full" style={{ backgroundColor: colors.text, opacity: 0.25 }} />
+          <div className="mt-auto h-2 w-8 rounded-full" style={{ backgroundColor: colors.brand }} />
+        </div>
+      </div>
+      <span className="mt-2 flex items-center gap-2 px-0.5">
+        <span
+          aria-hidden="true"
+          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-brand' : 'border-line-strong'}`}
+        >
+          {selected ? <span className="h-2 w-2 rounded-full bg-brand" /> : null}
+        </span>
+        <span className={`text-[12.5px] font-medium ${selected ? 'text-ink' : 'text-ink-muted'}`}>{label}</span>
+      </span>
+    </button>
   );
 }
 
@@ -137,6 +173,7 @@ export function SettingsPage(): JSX.Element {
   const [emailConnected, setEmailConnected] = useState(true);
   const [telegramConnected, setTelegramConnected] = useState(true);
 
+  const { theme, setTheme } = useTheme();
   const [compactMode, setCompactMode] = useState(false);
   const [sidebarDefault, setSidebarDefault] = useState('expanded');
   const [uiLanguage, setUiLanguage] = useState('ru');
@@ -310,21 +347,15 @@ export function SettingsPage(): JSX.Element {
               />
             </FormField>
           </div>
-          <div className="mt-1">
+          <div className="mt-5 border-t border-divider pt-4">
             <ToggleRow label="Компактный режим" description="Плотнее строки таблиц и меньше отступы карточек" checked={compactMode} onChange={setCompactMode} />
           </div>
         </SectionCard>
 
-        <SectionCard title="Тема">
-          <div className="flex flex-wrap gap-3">
-            <div className="w-40 rounded-control border-2 border-brand p-2.5">
-              <div className="h-16 rounded-control-sm bg-app" />
-              <p className="mt-1.5 text-center text-[12px] font-medium text-ink">Светлая</p>
-            </div>
-            <div className="w-40 rounded-control border border-line p-2.5 opacity-60">
-              <div className="h-16 rounded-control-sm bg-ink" />
-              <p className="mt-1.5 text-center text-[12px] font-medium text-ink-muted">Тёмная (скоро)</p>
-            </div>
+        <SectionCard title="Тема" description="Применяется сразу и запоминается на этом устройстве">
+          <div role="radiogroup" aria-label="Тема" className="flex flex-wrap gap-3">
+            <ThemeOption value="light" label="Светлая" selected={theme === 'light'} onSelect={setTheme} />
+            <ThemeOption value="dark" label="Тёмная" selected={theme === 'dark'} onSelect={setTheme} />
           </div>
         </SectionCard>
 
