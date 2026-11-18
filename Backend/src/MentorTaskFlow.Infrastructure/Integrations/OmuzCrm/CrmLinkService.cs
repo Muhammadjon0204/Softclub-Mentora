@@ -59,7 +59,7 @@ public sealed class CrmLinkService(
                     m.Id,
                     fullName,
                     MaskPhone(m.PhoneNumber),
-                    m.Branch?.Name.Trim(),
+                    m.Branch?.DisplayName,
                     m.Status.Id == 0,
                     (m.Groups ?? []).Count(g => g.IsCurrent && g.MentorStatus.Id != CrmValues.MentorRemoved),
                     linked?.Id,
@@ -71,15 +71,15 @@ public sealed class CrmLinkService(
 
         var branchByCrm = branches.Where(b => b.CrmBranchId is not null).ToDictionary(b => b.CrmBranchId!.Value);
         var branchLinks = crmBranches
-            .OrderBy(b => b.Name)
+            .OrderBy(b => b.DisplayName)
             .Select(b =>
             {
                 branchByCrm.TryGetValue(b.Id, out var linked);
-                var key = NameKey(b.Name);
+                var key = NameKey(b.DisplayName);
                 var matches = linked is null
                     ? branches.Where(x => x.CrmBranchId is null && NameKey(x.Name).SetEquals(key)).ToList()
                     : [];
-                return new CrmBranchLinkDto(b.Id, b.Name.Trim(), linked?.Id, linked?.Name, matches.Count == 1 ? matches[0].Id : null);
+                return new CrmBranchLinkDto(b.Id, b.DisplayName, linked?.Id, linked?.Name, matches.Count == 1 ? matches[0].Id : null);
             })
             .ToList();
 

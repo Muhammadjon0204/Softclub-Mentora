@@ -52,8 +52,8 @@ public sealed class OmuzCrmClient(
     public async Task<IReadOnlyList<CrmRef>> GetCoursesAsync(CancellationToken cancellationToken) =>
         await GetAsync<List<CrmRef>>("courses", cancellationToken) ?? [];
 
-    public async Task<IReadOnlyList<CrmRef>> GetBranchesAsync(CancellationToken cancellationToken) =>
-        await GetAsync<List<CrmRef>>("branches", cancellationToken) ?? [];
+    public async Task<IReadOnlyList<CrmBranch>> GetBranchesAsync(CancellationToken cancellationToken) =>
+        await GetAsync<List<CrmBranch>>("branches", cancellationToken) ?? [];
 
     /// <summary>Groups of one status — every page. Without a status the CRM returns only running groups.</summary>
     public Task<IReadOnlyList<CrmGroup>> ListGroupsAsync(int status, CancellationToken cancellationToken) =>

@@ -17,6 +17,17 @@ public sealed record CrmEnvelope<T>(
 /// <summary>A value from a CRM list or a reference to another entity: <c>{ id, name }</c>.</summary>
 public sealed record CrmRef(int Id, string Name);
 
+/// <summary>
+/// A CRM branch. The CRM used to send one <c>name</c>; it now sends <c>nameRu</c>/<c>nameEn</c>/<c>nameTg</c>
+/// instead (seen on the test server, 17.11.2026). Both shapes are read, so a switch back or a mixed
+/// rollout between the test and production CRM never turns a branch name into <c>null</c>.
+/// </summary>
+public sealed record CrmBranch(int Id, string? Name = null, string? NameRu = null, string? NameEn = null, string? NameTg = null)
+{
+    public string DisplayName =>
+        new[] { NameRu, Name, NameEn, NameTg }.FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))?.Trim() ?? $"#{Id}";
+}
+
 public sealed record CrmPing(string KeyName, DateTimeOffset ServerTime);
 
 public sealed record CrmMentor(
@@ -30,14 +41,14 @@ public sealed record CrmMentor(
     DateTimeOffset? RegisteredDate,
     int? Experience,
     CrmRef Status,
-    CrmRef? Branch,
+    CrmBranch? Branch,
     IReadOnlyList<CrmRef>? Positions,
     IReadOnlyList<CrmMentorGroup>? Groups);
 
 public sealed record CrmMentorGroup(
     int Id,
     string Name,
-    CrmRef? Branch,
+    CrmBranch? Branch,
     CrmRef Status,
     CrmRef MentorStatus,
     DateTimeOffset StartDate,
@@ -50,7 +61,7 @@ public sealed record CrmGroup(
     int Id,
     string Name,
     CrmRef Course,
-    CrmRef Branch,
+    CrmBranch Branch,
     CrmRef Status,
     CrmRef ExamInterval,
     DateTimeOffset StartsAt,
