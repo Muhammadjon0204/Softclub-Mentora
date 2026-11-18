@@ -324,7 +324,11 @@ public sealed class CrmIntegrationService(
         g.RequiredStudents,
         (g.Mentors ?? []).Where(m => m.Status.Id != CrmValues.MentorRemoved).Select(m => CrmJournalScoring.NormalizeName(m.FullName)).ToList());
 
-    private static CrmRefDto ToDto(CrmRef r) => new(r.Id, r.Name.Trim());
+    // `Name` is non-nullable in the model, but the JSON reader does not enforce that: a renamed field
+    // arrives as null, and a NullReferenceException here would take the whole CRM screen down.
+    private static CrmRefDto ToDto(CrmRef r) => new(r.Id, r.Name?.Trim() ?? string.Empty);
+
+    private static CrmRefDto ToDto(CrmBranch b) => new(b.Id, b.DisplayName);
 
     private static CrmStudentScoreDto ToDto(CrmStudentPeriodScore s) => new(
         s.StudentId, s.FullName, s.Total, s.AttendancePoints, s.HomeworkPoints, s.BonusPoints, s.ExamGrade,

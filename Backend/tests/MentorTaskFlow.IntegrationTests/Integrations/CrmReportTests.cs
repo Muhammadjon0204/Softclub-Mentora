@@ -42,7 +42,7 @@ public sealed class CrmReportTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed class FakeCrm : HttpMessageHandler
     {
         private const string Group = """
-            {"statusCode":200,"errors":[],"data":{"id":500,"name":"React - 1","course":{"id":4,"name":"React"},"branch":{"id":1,"name":"Profsouz"},
+            {"statusCode":200,"errors":[],"data":{"id":500,"name":"React - 1","course":{"id":4,"name":"React"},"branch":{"id":1,"nameRu":"Профсоюз","nameEn":"Profsouz","nameTg":"Профсаюз"},
              "status":{"id":1,"name":"Started"},"examInterval":{"id":1,"name":"Weekly"},"startsAt":"2026-09-30T19:00:00+00:00","finishedAt":"2099-01-01T19:00:00+00:00",
              "durationMonths":4,"requiredStudents":10,"enrolledStudents":2,"timeTables":[],
              "mentors":[{"id":7,"fullName":"Mirzoev Muhammadjon","startedAt":"2026-09-30T19:00:00+00:00","endedAt":null,"status":{"id":0,"name":"Teaching"}},
