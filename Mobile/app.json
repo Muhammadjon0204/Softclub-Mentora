@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "RAVAND",
+    "slug": "ravand-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/brand/icon-512.png",
+    "scheme": "ravand",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "tj.softclub.ravand",
+      "icon": "./assets/brand/icon-512.png",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "tj.softclub.ravand",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/brand/icon-512.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/brand/icon-512.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/brand/icon-512.png",
+          "imageWidth": 96,
+          "dark": {
+            "backgroundColor": "#0b1b3a",
+            "image": "./assets/brand/icon-512.png"
+          }
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
