@@ -3,6 +3,7 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Radius, Space } from '@/constants/theme';
+import { roleLabel } from '@/features/journal/api';
 import { WEB_URL } from '@/lib/config';
 import { setLanguage, useT, type Language } from '@/lib/i18n';
 import { useSession, useUser } from '@/lib/session';
@@ -57,8 +58,8 @@ export default function ProfileScreen(): JSX.Element {
         </View>
 
         <View style={[styles.group, { backgroundColor: c.surface, borderColor: c.border }]}>
-          <InfoRow label={t('Роль')} value={t('Ментор')} />
-          {user.branch ? <InfoRow label={t('Филиал')} value={user.branch.name} /> : null}
+          <InfoRow label={t('Роль')} value={t(roleLabel(user))} last={!user.branch && !user.category} />
+          {user.branch ? <InfoRow label={t('Филиал')} value={user.branch.name} last={!user.category} /> : null}
           {user.category ? <InfoRow label={t('Направление')} value={user.category.name} last /> : null}
         </View>
 

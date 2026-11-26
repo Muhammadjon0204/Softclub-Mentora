@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentRef, ReactNode, Ref } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { Radius, Space } from '@/constants/theme';
@@ -41,17 +41,29 @@ export function SecondaryButton({ label, onPress, tone = 'neutral' }: { label: s
   );
 }
 
-export function Field({ label, error, ...input }: TextInputProps & { label: string; error?: string | null }): JSX.Element {
+export function Field({ label, error, inputRef, trailing, multiline, ...input }: TextInputProps & {
+  label: string;
+  error?: string | null;
+  inputRef?: Ref<ComponentRef<typeof TextInput>>;
+  /** A control inside the field's right edge, e.g. «Показать» for a password. */
+  trailing?: ReactNode;
+}): JSX.Element {
   const c = useColors();
   return (
     <View style={{ gap: Space.xs + 2 }}>
       <Text style={[styles.label, { color: c.textSecondary }]}>{label}</Text>
-      <TextInput
-        accessibilityLabel={label}
-        placeholderTextColor={c.textMuted}
-        {...input}
-        style={[styles.input, { color: c.text, backgroundColor: c.surface, borderColor: error ? c.danger : c.border }]}
-      />
+      <View style={[styles.inputBox, { backgroundColor: c.surface, borderColor: error ? c.danger : c.border }]}>
+        <TextInput
+          ref={inputRef}
+          accessibilityLabel={label}
+          placeholderTextColor={c.textMuted}
+          multiline={multiline}
+          {...input}
+          style={[styles.input, multiline && styles.inputMultiline, { color: c.text }]}
+        />
+        {trailing}
+      </View>
+      {error ? <Text style={{ color: c.danger, fontSize: 13 }}>{error}</Text> : null}
     </View>
   );
 }
@@ -89,7 +101,9 @@ const styles = StyleSheet.create({
   button: { minHeight: 48, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: Space.lg },
   buttonText: { fontSize: 16, fontWeight: '600' },
   label: { fontSize: 13, fontWeight: '500' },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: Radius.md, paddingHorizontal: Space.md, fontSize: 16 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: Radius.md },
+  input: { flex: 1, minHeight: 48, paddingHorizontal: Space.md, fontSize: 16 },
+  inputMultiline: { minHeight: 96, paddingVertical: Space.md, textAlignVertical: 'top' },
   pill: { alignSelf: 'flex-start', borderRadius: 999, paddingHorizontal: Space.sm, paddingVertical: 2 },
   pillText: { fontSize: 12, fontWeight: '600' },
   state: { alignItems: 'center', justifyContent: 'center', gap: Space.sm, padding: Space.xl, paddingTop: Space.xxl * 2 },

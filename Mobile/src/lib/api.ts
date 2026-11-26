@@ -12,6 +12,8 @@ export interface AuthUser {
   branch?: { id: string; name: string } | null;
   category?: { id: string; name: string } | null;
   avatarUrl?: string | null;
+  /** What the owner has left open to this person; absent means «everything the role allows». */
+  permissions?: string[] | null;
 }
 
 /** `MobileLoginResponse` — like the web login, plus the refresh token the app keeps in the Keychain. */

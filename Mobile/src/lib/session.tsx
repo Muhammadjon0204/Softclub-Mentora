@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { onSessionLost, restoreSession, signIn as apiSignIn, signOut as apiSignOut, ApiError, type AuthUser } from './api';
+import { onSessionLost, restoreSession, signIn as apiSignIn, signOut as apiSignOut, type AuthUser } from './api';
 
 type SessionState =
   | { status: 'loading' }
@@ -15,10 +15,6 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-/** Only mentors for now; leads and admins keep using the site until their screens exist here. */
-export const MOBILE_ROLES = ['Mentor'] as const;
-const WRONG_ROLE = 'Приложение пока работает только для менторов. Лидам и администраторам — сайт RAVAND.';
-
 export function SessionProvider({ children }: { children: ReactNode }): JSX.Element {
   const [state, setState] = useState<SessionState>({ status: 'loading' });
 
@@ -28,12 +24,7 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
     });
 
     restoreSession()
-      .then(async (user) => {
-        if (user && !MOBILE_ROLES.includes(user.role as 'Mentor')) {
-          await apiSignOut();
-          setState({ status: 'signedOut', notice: WRONG_ROLE });
-          return;
-        }
+      .then((user) => {
         setState(user ? { status: 'signedIn', user } : { status: 'signedOut', notice: null });
       })
       .catch(() => {
@@ -44,10 +35,6 @@ export function SessionProvider({ children }: { children: ReactNode }): JSX.Elem
 
   const signIn = useCallback(async (email: string, password: string) => {
     const user = await apiSignIn(email, password);
-    if (!MOBILE_ROLES.includes(user.role as 'Mentor')) {
-      await apiSignOut();
-      throw new ApiError(403, 'ROLE_NOT_SUPPORTED', WRONG_ROLE);
-    }
     setState({ status: 'signedIn', user });
   }, []);
 
