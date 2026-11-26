@@ -4,19 +4,22 @@
     "slug": "ravand-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/brand/icon-512.png",
+    "icon": "./assets/brand/icon.png",
     "scheme": "ravand",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "tj.softclub.ravand",
-      "icon": "./assets/brand/icon-512.png",
-      "supportsTablet": false
+      "icon": "./assets/brand/icon.png",
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "tj.softclub.ravand",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
-        "foregroundImage": "./assets/brand/icon-512.png"
+        "foregroundImage": "./assets/brand/adaptive-foreground.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -30,11 +33,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/brand/icon-512.png",
-          "imageWidth": 96,
+          "image": "./assets/brand/splash.png",
+          "imageWidth": 120,
           "dark": {
             "backgroundColor": "#0b1b3a",
-            "image": "./assets/brand/icon-512.png"
+            "image": "./assets/brand/splash.png"
           }
         }
       ],
