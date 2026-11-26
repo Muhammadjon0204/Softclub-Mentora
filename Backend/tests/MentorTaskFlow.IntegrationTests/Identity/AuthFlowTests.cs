@@ -601,6 +601,103 @@ public sealed class AuthFlowTests(PostgresFixture fixture) : IAsyncLifetime
     // Helpers
     // -----------------------------------------------------------------
 
+    // -----------------------------------------------------------------
+    // Mobile app: refresh token in the body, no cookies, no CSRF
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Mobile_login_returns_the_refresh_token_in_the_body_and_sets_no_cookies()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/mobile/login",
+            new LoginRequest("mentor-head@mentortaskflow.test", ValidPassword));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<MobileLoginResponse>(response);
+        body.User.Email.ShouldBe("mentor-head@mentortaskflow.test");
+        body.AccessToken.ShouldNotBeNullOrWhiteSpace();
+        body.RefreshToken.ShouldNotBeNullOrWhiteSpace();
+        body.RefreshTokenExpiresAt.ShouldBeGreaterThan(DateTimeOffset.UtcNow);
+
+        response.Headers.Contains("Set-Cookie").ShouldBeFalse();
+        response.Headers.CacheControl!.NoStore.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Mobile_login_with_a_wrong_password_is_rejected_like_the_web()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/mobile/login",
+            new LoginRequest("mentor-head@mentortaskflow.test", "WrongPassword2026"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.InvalidCredentials);
+    }
+
+    [Fact]
+    public async Task Mobile_refresh_rotates_the_token_without_csrf_and_the_new_access_token_works()
+    {
+        using var client = CreateClient();
+        var login = await MobileSignInAsync(client, "mentor-head@mentortaskflow.test");
+
+        var refreshed = await client.PostAsJsonAsync("/api/v1/auth/mobile/refresh", new MobileRefreshRequest(login.RefreshToken));
+
+        refreshed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await ReadAsync<MobileLoginResponse>(refreshed);
+        body.RefreshToken.ShouldNotBe(login.RefreshToken);
+
+        using var me = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
+        me.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", body.AccessToken);
+        (await client.SendAsync(me)).StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Mobile_replay_of_a_rotated_token_revokes_the_family()
+    {
+        using var client = CreateClient();
+        var login = await MobileSignInAsync(client, "mentor-head@mentortaskflow.test");
+
+        (await client.PostAsJsonAsync("/api/v1/auth/mobile/refresh", new MobileRefreshRequest(login.RefreshToken)))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var replay = await client.PostAsJsonAsync("/api/v1/auth/mobile/refresh", new MobileRefreshRequest(login.RefreshToken));
+
+        replay.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        (await ReadCodeAsync(replay)).ShouldBe(ErrorCodes.RefreshTokenReuseDetected);
+    }
+
+    [Fact]
+    public async Task Mobile_logout_revokes_the_token()
+    {
+        using var client = CreateClient();
+        var login = await MobileSignInAsync(client, "mentor-head@mentortaskflow.test");
+
+        (await client.PostAsJsonAsync("/api/v1/auth/mobile/logout", new MobileRefreshRequest(login.RefreshToken)))
+            .StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        (await client.PostAsJsonAsync("/api/v1/auth/mobile/refresh", new MobileRefreshRequest(login.RefreshToken)))
+            .StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Mobile_refresh_with_an_unknown_token_is_rejected()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/v1/auth/mobile/refresh", new MobileRefreshRequest("not-a-real-token"));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    private static async Task<MobileLoginResponse> MobileSignInAsync(HttpClient client, string email)
+    {
+        var response = await client.PostAsJsonAsync("/api/v1/auth/mobile/login", new LoginRequest(email, ValidPassword));
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return await ReadAsync<MobileLoginResponse>(response);
+    }
+
     private HttpClient CreateClient() =>
         _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
