@@ -44,7 +44,7 @@ public sealed class NotificationOptions
     public string FromAddress { get; init; } = "noreply@mentortaskflow.local";
 
     [Required]
-    public string FromName { get; init; } = "MentorTaskFlow";
+    public string FromName { get; init; } = "Ravand Softclub";
 
     /// <summary>Where the links in messages point. Never a storage URL (<c>NTF-017</c>).</summary>
     [Required]
