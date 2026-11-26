@@ -35,6 +35,9 @@ const MentorProposalsPage = lazyPage(() => import('../pages/mentor/ProposalsPage
 const AdminCalendarPage = lazyPage(() => import('../pages/admin/CalendarPage'), (m) => m.CalendarPage);
 const AdminReportsPage = lazyPage(() => import('../pages/admin/ReportsPage'), (m) => m.ReportsPage);
 const AdminAuditPage = lazyPage(() => import('../pages/admin/AuditPage'), (m) => m.AuditPage);
+const AdminJournalPage = lazyPage(() => import('../pages/admin/JournalPage'), (m) => m.JournalPage);
+const LeadJournalPage = lazyPage(() => import('../pages/lead/JournalPage'), (m) => m.JournalPage);
+const MentorJournalPage = lazyPage(() => import('../pages/mentor/JournalPage'), (m) => m.JournalPage);
 const AdminNotificationsPage = lazyPage(() => import('../pages/admin/NotificationsPage'), (m) => m.NotificationsPage);
 const AdminHealthPage = lazyPage(() => import('../pages/admin/HealthPage'), (m) => m.HealthPage);
 const AdminCrmIntegrationPage = lazyPage(() => import('../pages/admin/CrmIntegrationPage'), (m) => m.CrmIntegrationPage);
@@ -140,6 +143,7 @@ export function AppRouter(): JSX.Element {
         <Route path="calendar" element={page(AdminCalendarPage)} />
         <Route path="reports" element={page(AdminReportsPage)} />
         <Route path="audit" element={page(AdminAuditPage)} />
+        <Route path="journal" element={page(AdminJournalPage)} />
         <Route path="notifications" element={page(AdminNotificationsPage)} />
         <Route path="health" element={page(AdminHealthPage)} />
         <Route path="integrations/crm" element={page(AdminCrmIntegrationPage)} />
@@ -173,6 +177,7 @@ export function AppRouter(): JSX.Element {
         <Route path="my-tasks" element={page(MentorAssignmentsPage)} />
         <Route path="proposals" element={page(ProposalsReviewPage)} />
         <Route path="team" element={page(LeadTeamPage)} />
+        <Route path="journal" element={page(LeadJournalPage)} />
         <Route path="calendar" element={page(LeadCalendarPage)} />
         <Route path="reports" element={page(LeadReportsPage)} />
         <Route path="crm" element={page(CrmGroupsPage)} />
@@ -199,6 +204,7 @@ export function AppRouter(): JSX.Element {
         <Route path="proposals" element={page(MentorProposalsPage)} />
         <Route path="calendar" element={page(MentorCalendarPage)} />
         <Route path="history" element={page(MentorHistoryPage)} />
+        <Route path="journal" element={page(MentorJournalPage)} />
         <Route path="reports" element={page(MentorReportsPage)} />
         <Route path="notifications" element={page(MentorNotificationsPage)} />
         <Route path="crm" element={page(CrmGroupsPage)} />

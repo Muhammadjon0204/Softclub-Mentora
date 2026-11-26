@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, Inbox, LayoutDashboard, Lightbulb, School, Users } from 'lucide-react';
+import { BarChart3, CalendarDays, ClipboardCheck, ClipboardList, Inbox, LayoutDashboard, Lightbulb, ListChecks, School, Users } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 import { PERMISSION } from '../../auth/usePermissions';
@@ -35,6 +35,7 @@ export const LEAD_NAV_ITEMS: LeadNavItem[] = [
   { key: 'proposals', path: '/lead/proposals', icon: Lightbulb },
   { key: 'calendar', path: '/lead/calendar', icon: CalendarDays },
   { key: 'team', path: '/lead/team', icon: Users },
+  { key: 'journal', path: '/lead/journal', icon: ListChecks },
   { key: 'reports', path: '/lead/reports', icon: BarChart3, permission: PERMISSION.reportsView },
   { key: 'crm', path: '/lead/crm', icon: School, permission: PERMISSION.crmUse },
 ];

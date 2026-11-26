@@ -125,6 +125,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<IAssignmentService, AssignmentService>();
+        services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<IProposalService, ProposalService>();
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddSingleton<IDeadlineCalculator, DeadlineCalculator>();

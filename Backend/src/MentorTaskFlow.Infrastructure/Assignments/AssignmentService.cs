@@ -447,6 +447,8 @@ public sealed class AssignmentService(
             {
                 previousTitle,
                 newTitle = assignment.Title,
+                previousDescription,
+                newDescription = assignment.Description,
                 descriptionChanged,
             }));
 
@@ -661,25 +663,8 @@ public sealed class AssignmentService(
             : throw new ForbiddenException(ErrorCodes.Forbidden, "Операция недоступна ментору.");
     }
 
-    private static IQueryable<Assignment> ApplyVisibility(IQueryable<Assignment> source, ICurrentUserContext actor) => actor switch
-    {
-        // Level 4 of TZ 9.1: a Mentor sees their own tasks, and never the drafts or suggestions of
-        // their category — a suggestion is a proposal the Lead has not yet accepted.
-        { Role: UserRole.Mentor } => source.Where(a =>
-            a.AssignedToId == actor.UserId
-            && a.Status != AssignmentStatus.Draft
-            && a.Status != AssignmentStatus.Suggested),
-
-        // A Lead can be an executor too, and an administrator's unpublished draft for them is no more
-        // theirs to see than a Mentor's is.
-        { Role: UserRole.Lead } => source.Where(a =>
-            a.CategoryId == actor.CategoryId
-            && !(a.AssignedToId == actor.UserId
-                && (a.Status == AssignmentStatus.Draft || a.Status == AssignmentStatus.Suggested))),
-
-        { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => source.Where(a => a.BranchId == actor.BranchId),
-        _ => source,
-    };
+    private static IQueryable<Assignment> ApplyVisibility(IQueryable<Assignment> source, ICurrentUserContext actor) =>
+        AssignmentVisibility.Apply(source, actor);
 
     private async Task<AssignmentRow> FindReadableAsync(Guid assignmentId, CancellationToken cancellationToken)
     {
