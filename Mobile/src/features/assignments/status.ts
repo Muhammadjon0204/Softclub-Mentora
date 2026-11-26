@@ -64,4 +64,5 @@ export const EVENT_LABEL: Record<string, string> = {
   SuggestionAccepted: 'Предложение принято',
   Reassigned: 'Переназначено',
   DeadlineChanged: 'Срок изменён',
+  DetailsEdited: 'Текст задания исправлен',
 };
