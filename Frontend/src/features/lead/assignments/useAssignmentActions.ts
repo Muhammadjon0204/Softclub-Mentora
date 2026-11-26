@@ -9,6 +9,7 @@ import {
   publishAssignment,
   reassignAssignment,
   rescheduleAssignment,
+  editAssignmentDetails,
   startAssignmentReview,
   updateAssignment as updateAssignmentApi,
 } from '../../../api/lead/assignments';
@@ -51,6 +52,7 @@ export interface UseAssignmentActionsResult {
   acceptSuggestion: (id: string, concurrencyToken: string) => Promise<LeadAssignmentRecord>;
   reassign: (id: string, concurrencyToken: string, mentorId: string) => Promise<LeadAssignmentRecord>;
   reschedule: (id: string, concurrencyToken: string, dueAtMs: number, reason: string) => Promise<LeadAssignmentRecord>;
+  editDetails: (id: string, concurrencyToken: string, title: string, description: string | null) => Promise<LeadAssignmentRecord>;
   startReview: (id: string, concurrencyToken: string) => Promise<LeadAssignmentRecord>;
   /** LA10. Also used for "reject suggestion" — same endpoint, same cancel reason validation (ASN-012 is just a cancel of a Suggested-status assignment). */
   cancel: (id: string, concurrencyToken: string, reason: string) => Promise<LeadAssignmentRecord>;
@@ -165,6 +167,14 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
     [run, applyUpdate],
   );
 
+  const editDetails = useCallback(
+    async (id: string, concurrencyToken: string, title: string, description: string | null): Promise<LeadAssignmentRecord> => {
+      const updated = await run(() => editAssignmentDetails(id, { title, description, concurrencyToken }));
+      return applyUpdate(updated);
+    },
+    [run, applyUpdate],
+  );
+
   const startReview = useCallback(
     async (id: string, concurrencyToken: string): Promise<LeadAssignmentRecord> => {
       const updated = await run(() => startAssignmentReview(id, { concurrencyToken }));
@@ -181,5 +191,5 @@ export function useAssignmentActions(): UseAssignmentActionsResult {
     [run, applyUpdate],
   );
 
-  return { isSubmitting, createDraft, updateAssignment, publish, acceptSuggestion, reassign, reschedule, startReview, cancel };
+  return { isSubmitting, createDraft, updateAssignment, publish, acceptSuggestion, reassign, reschedule, editDetails, startReview, cancel };
 }

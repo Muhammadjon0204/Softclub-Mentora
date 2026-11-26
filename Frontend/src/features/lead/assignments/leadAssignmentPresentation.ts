@@ -66,6 +66,14 @@ export function canEdit(a: LeadAssignmentRecord): boolean {
   return a.status === 'Draft' || a.status === 'Suggested';
 }
 
+/**
+ * PUT /assignments/{id}/details — исправить название и описание выданного задания можно, пока
+ * исполнитель ничего не сдал: дальше текст — это то, по чему сделана работа.
+ */
+export function canEditDetails(a: LeadAssignmentRecord): boolean {
+  return (a.status === 'Assigned' || a.status === 'Overdue') && a.submissions.length === 0;
+}
+
 /** Переназначение — Draft/Suggested/Assigned, и только до первой Submission (ASN-005, 10.6.3). */
 export function canReassign(a: LeadAssignmentRecord): boolean {
   if (a.status === 'Draft' || a.status === 'Suggested') return true;
@@ -111,6 +119,7 @@ export interface AssignmentCapabilities {
   canAcceptSuggestion: boolean;
   canReject: boolean;
   canEdit: boolean;
+  canEditDetails: boolean;
   canReassign: boolean;
   canReschedule: boolean;
   canCancel: boolean;
@@ -129,6 +138,7 @@ export function assignmentCapabilities(a: LeadAssignmentRecord): AssignmentCapab
     canAcceptSuggestion: owns && canAcceptSuggestion(a),
     canReject: owns && canReject(a),
     canEdit: owns && canEdit(a),
+    canEditDetails: owns && canEditDetails(a),
     canReassign: owns && canReassign(a),
     canReschedule: owns && canReschedule(a),
     canCancel: owns && canCancel(a),
@@ -149,11 +159,12 @@ export function averageVersionsLabel(a: LeadAssignmentRecord): string {
   return `${String(n)} ${pluralizeRu(n, 'версия', 'версии', 'версий')}`;
 }
 
-const EXTRA_EVENT_LABEL: Record<'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged', string> = {
+const EXTRA_EVENT_LABEL: Record<'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged' | 'DetailsEdited', string> = {
   SuggestedCreated: 'Предложено планировщиком',
   SuggestionAccepted: 'Предложение принято',
   Reassigned: 'Переназначено',
   DeadlineChanged: 'Срок изменён',
+  DetailsEdited: 'Текст задания исправлен',
 };
 
 export function taskEventLabel(event: LeadTaskEventRecord): string {

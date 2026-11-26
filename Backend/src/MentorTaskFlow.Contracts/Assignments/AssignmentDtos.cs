@@ -90,6 +90,9 @@ public sealed record ReassignAssignmentRequest(Guid AssignedToId, string Concurr
 /// <remarks>The reason is mandatory: the executor is told why, and it stays in the task's history.</remarks>
 public sealed record RescheduleAssignmentRequest(DateTimeOffset DueAt, string Reason, string ConcurrencyToken);
 
+/// <summary>Body of <c>PUT /assignments/{id}/details</c>: the corrected title and description.</summary>
+public sealed record EditAssignmentDetailsRequest(string Title, string? Description, string ConcurrencyToken);
+
 /// <summary>
 /// <c>POST /assignments/{id}/cancel</c> (<c>ASN-006</c>).
 /// </summary>

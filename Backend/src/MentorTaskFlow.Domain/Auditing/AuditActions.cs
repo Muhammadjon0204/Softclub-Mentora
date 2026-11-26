@@ -75,6 +75,7 @@ public static class AuditActions
     public const string AssignmentPublish = "assignment.publish";
     public const string AssignmentReassign = "assignment.reassign";
     public const string AssignmentDeadlineChange = "assignment.deadline_change";
+    public const string AssignmentDetailsEdit = "assignment.details_edit";
     public const string ReviewDecide = "review.decide";
     public const string ProposalApprove = "proposal.approve";
     public const string ProposalReject = "proposal.reject";

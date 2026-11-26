@@ -33,10 +33,11 @@ public sealed class NotificationCatalogTests
 
     /// <summary>
     /// The 19 of Приложение E, counted so an addition to one list without the other is caught — plus
-    /// the submission receipt and the two password-reset deliveries.
+    /// the submission receipt, the two password-reset deliveries and the later additions (deadline
+    /// change, proposals, CRM reports, corrected assignment text).
     /// </summary>
     [Fact]
-    public void The_catalog_holds_the_nineteen_events_and_the_additions() => EventTypes.Length.ShouldBe(28);
+    public void The_catalog_holds_the_nineteen_events_and_the_additions() => EventTypes.Length.ShouldBe(29);
 
     [Fact]
     public void The_submission_receipt_never_becomes_an_email() =>

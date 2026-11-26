@@ -48,6 +48,7 @@ public static class ErrorCodes
     public const string PermissionDenied = "PERMISSION_DENIED";
     public const string AssignmentNotOwner = "ASSIGNMENT_NOT_OWNER";
     public const string DeadlineChangeNotAllowed = "DEADLINE_CHANGE_NOT_ALLOWED";
+    public const string DetailsChangeNotAllowed = "DETAILS_CHANGE_NOT_ALLOWED";
     public const string ProposalNotPending = "PROPOSAL_NOT_PENDING";
     public const string InsufficientSampleSize = "INSUFFICIENT_SAMPLE_SIZE";
 
@@ -145,6 +146,7 @@ public static class ErrorCodes
         [ResourceNotFound] = 404,
 
         [DeadlineChangeNotAllowed] = 409,
+        [DetailsChangeNotAllowed] = 409,
         [ProposalNotPending] = 409,
         [ConcurrencyConflict] = 409,
         [CrossScopeReference] = 409,

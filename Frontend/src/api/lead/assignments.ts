@@ -116,6 +116,13 @@ export interface RescheduleAssignmentRequest {
   concurrencyToken: string;
 }
 
+/** `PUT /assignments/{id}/details` — исправление текста выданного задания до первой сдачи. */
+export interface EditAssignmentDetailsRequest {
+  title: string;
+  description: string | null;
+  concurrencyToken: string;
+}
+
 export interface CancelAssignmentRequest {
   cancelReason: string;
   concurrencyToken: string;
@@ -201,6 +208,11 @@ export async function rescheduleAssignment(id: string, request: RescheduleAssign
 }
 
 /** LA9: `POST /assignments/{id}/start-review` — Submitted -> InReview, explicit action only (`REV-001`). */
+export async function editAssignmentDetails(id: string, request: EditAssignmentDetailsRequest): Promise<AssignmentDto> {
+  const { data } = await apiClient.put<AssignmentDto>(`/api/v1/assignments/${id}/details`, request);
+  return data;
+}
+
 export async function startAssignmentReview(id: string, request: AssignmentActionRequest): Promise<AssignmentDto> {
   const { data } = await apiClient.post<AssignmentDto>(`/api/v1/assignments/${id}/start-review`, request);
   return data;

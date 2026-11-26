@@ -378,6 +378,49 @@ public sealed class Assignment : AuditableEntity
     }
 
     /// <summary>
+    /// Corrects the wording of published work — a typo in the title, a link missing from the
+    /// description — while the executor has not handed anything in yet.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Before publishing, <see cref="Edit"/> changes everything. After it, the text is what the executor
+    /// was given, so it may be fixed only until the first submission: from then on it is what the work
+    /// was done against, and rewriting it would move the goalposts after the fact.
+    /// </para>
+    /// <para>
+    /// The deadline is not touched here — it moves only through <see cref="Reschedule"/>, with a reason.
+    /// </para>
+    /// </remarks>
+    /// <returns>The title that was in force, for the event and the audit log.</returns>
+    public string EditDetails(string title, string? description, DateTimeOffset now)
+    {
+        EnsureNotTerminal();
+
+        if (Status is not (AssignmentStatus.Assigned or AssignmentStatus.Overdue) || FirstSubmittedAt is not null)
+        {
+            throw new DomainException(
+                DomainErrorCodes.DetailsChangeNotAllowed,
+                "Название и описание можно исправить, только пока работа ещё не сдана.",
+                new Dictionary<string, object?> { ["currentStatus"] = Status.ToString() });
+        }
+
+        var newTitle = ValidateTitle(title);
+        var newDescription = ValidateDescription(description);
+
+        if (newTitle == Title && newDescription == Description)
+        {
+            throw new DomainException(DomainErrorCodes.ValidationFailed, "Изменений нет: название и описание те же.");
+        }
+
+        var previousTitle = Title;
+        Title = newTitle;
+        Description = newDescription;
+        UpdatedAt = now;
+
+        return previousTitle;
+    }
+
+    /// <summary>
     /// Transitions 5, 13 and 16: a version was uploaded.
     /// </summary>
     /// <remarks>

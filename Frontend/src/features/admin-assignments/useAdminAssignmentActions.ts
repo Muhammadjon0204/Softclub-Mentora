@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   cancelAssignment,
   createAssignmentDraft,
+  editAssignmentDetails,
   publishAssignment,
   reassignAssignment,
   rescheduleAssignment,
@@ -22,6 +23,7 @@ export interface NewAdminAssignment {
 export interface AdminAssignmentActions {
   assign: (input: NewAdminAssignment) => Promise<AssignmentDto>;
   reschedule: (assignment: AssignmentDto, dueAtMs: number, reason: string) => Promise<AssignmentDto>;
+  editDetails: (assignment: AssignmentDto, title: string, description: string | null) => Promise<AssignmentDto>;
   reassign: (assignment: AssignmentDto, assigneeId: string) => Promise<AssignmentDto>;
   startReview: (assignment: AssignmentDto) => Promise<AssignmentDto>;
   cancel: (assignment: AssignmentDto, reason: string) => Promise<AssignmentDto>;
@@ -60,6 +62,8 @@ export function useAdminAssignmentActions(listQueryKey: readonly unknown[]): Adm
     reschedule: (assignment, dueAtMs, reason) =>
       mutation.mutateAsync(() =>
         rescheduleAssignment(assignment.id, { dueAt: new Date(dueAtMs).toISOString(), reason, concurrencyToken: assignment.concurrencyToken })),
+    editDetails: (assignment, title, description) =>
+      mutation.mutateAsync(() => editAssignmentDetails(assignment.id, { title, description, concurrencyToken: assignment.concurrencyToken })),
     reassign: (assignment, assigneeId) =>
       mutation.mutateAsync(() => reassignAssignment(assignment.id, { assignedToId: assigneeId, concurrencyToken: assignment.concurrencyToken })),
     startReview: (assignment) =>

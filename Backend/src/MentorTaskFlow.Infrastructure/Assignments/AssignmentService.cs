@@ -424,6 +424,52 @@ public sealed class AssignmentService(
         return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
     }
 
+    public async Task<AssignmentDto> EditDetailsAsync(Guid assignmentId, EditAssignmentDetailsRequest request, CancellationToken cancellationToken)
+    {
+        var actor = RequireManager();
+        var assignment = await FindOwnedAsync(actor, assignmentId, cancellationToken);
+        dbContext.Expect(assignment, request.ConcurrencyToken);
+
+        var now = clock.UtcNow;
+        var previousDescription = assignment.Description;
+        var previousTitle = assignment.EditDetails(request.Title, request.Description, now);
+        var descriptionChanged = previousDescription != assignment.Description;
+
+        // A correction, not a change of state: no NewStatus.
+        RecordEvent(
+            assignment,
+            TaskEventType.DetailsEdited,
+            actor.UserId,
+            assignment.Status,
+            null,
+            now,
+            JsonSerializer.SerializeToDocument(new
+            {
+                previousTitle,
+                newTitle = assignment.Title,
+                descriptionChanged,
+            }));
+
+        // The executor is working from the old text, so they are told — keyed by sequence, so a second
+        // correction is not deduplicated away.
+        await NotifyAssigneeAsync(
+            assignment,
+            NotificationEventTypes.AssignmentDetailsChanged,
+            cancellationToken,
+            assignment.LastEventSequence.ToString());
+
+        WriteAudit(AuditActions.AssignmentDetailsEdit, assignment, new
+        {
+            previousTitle,
+            title = assignment.Title,
+            descriptionChanged,
+        });
+
+        await dbContext.SaveWithConcurrencyCheckAsync(assignment, cancellationToken);
+
+        return await ToDtoAsync(assignment, dbContext.Read(assignment), cancellationToken);
+    }
+
     public async Task<AssignmentDto> StartReviewAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken)
     {
         var actor = RequireManager();

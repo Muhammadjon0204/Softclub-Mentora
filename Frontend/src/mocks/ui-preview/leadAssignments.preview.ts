@@ -51,7 +51,7 @@ export interface LeadSubmissionRecord {
 
 export interface LeadTaskEventRecord {
   id: string;
-  kind: TaskEventKind | 'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged';
+  kind: TaskEventKind | 'SuggestionAccepted' | 'Reassigned' | 'SuggestedCreated' | 'DeadlineChanged' | 'DetailsEdited';
   occurredAt: number;
   actorName: string;
   detail?: string;

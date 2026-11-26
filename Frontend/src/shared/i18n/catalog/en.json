@@ -2132,5 +2132,12 @@
  "— открыть все задания": "— open all assignments",
  "В филиалах пока нет пользователей": "No users in branches yet",
  "Тёмная": "Dark",
- "Применяется сразу и запоминается на этом устройстве": "Applies right away and is remembered on this device"
+ "Применяется сразу и запоминается на этом устройстве": "Applies right away and is remembered on this device",
+ "Текст задания исправлен": "Assignment text corrected",
+ "Исправьте название или описание": "Correct the title or description",
+ "Исполнитель получит уведомление": "The assignee will be notified",
+ "Правка останется в истории задания. После первой сдачи работы текст изменить будет нельзя.": "The edit stays in the assignment history. Once work is handed in, the text can no longer be changed.",
+ "Задание исправлено, исполнитель получит уведомление": "Assignment corrected; the assignee will be notified",
+ "Не удалось сохранить изменения": "Could not save the changes",
+ "Задание исправлено": "Assignment corrected"
 }

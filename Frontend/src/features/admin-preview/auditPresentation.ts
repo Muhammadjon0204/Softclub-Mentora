@@ -43,6 +43,7 @@ const AUDIT_ACTION_LABEL: Record<string, string> = {
   'assignment.publish': 'Задание выдано',
   'assignment.reassign': 'Задание переназначено',
   'assignment.deadline_change': 'Срок задания изменён',
+  'assignment.details_edit': 'Текст задания исправлен',
   'review.decide': 'Вынесено решение по работе',
   'proposal.approve': 'Предложение принято',
   'proposal.reject': 'Предложение отклонено',

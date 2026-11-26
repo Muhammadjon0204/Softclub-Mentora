@@ -46,6 +46,7 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
   AssignmentOverdue: 'Задание просрочено',
   AssignmentCancelled: 'Задание отменено',
   AssignmentDeadlineChanged: 'Срок задания изменён',
+  AssignmentDetailsChanged: 'Задание исправлено',
   ProposalSubmitted: 'Новое предложение ментора',
   ProposalApproved: 'Предложение принято',
   ProposalRejected: 'Предложение отклонено',

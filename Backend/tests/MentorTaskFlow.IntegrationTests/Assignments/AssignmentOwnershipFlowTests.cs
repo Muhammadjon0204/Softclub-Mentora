@@ -297,6 +297,64 @@ public sealed class AssignmentOwnershipFlowTests(PostgresFixture postgres, Minio
     }
 
     // -----------------------------------------------------------------
+    // Correcting the text of published work
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task The_owner_fixes_a_typo_the_mentor_is_told_and_the_history_keeps_it()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await PublishedAsync(lead, _mentorId);
+
+        var response = await lead.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Исправленное название", "Теперь со ссылкой на репозиторий", work.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var edited = await ReadAsync<AssignmentDto>(response);
+        edited.Title.ShouldBe("Исправленное название");
+        edited.Description.ShouldBe("Теперь со ссылкой на репозиторий");
+        edited.Status.ShouldBe(nameof(AssignmentStatus.Assigned));
+        edited.CurrentDueAt.ShouldBe(work.CurrentDueAt);
+
+        var history = await ReadAsync<List<TaskEventDto>>(await lead.GetAsync($"/api/v1/assignments/{work.Id}/history"));
+        history.ShouldContain(e => e.EventType == nameof(TaskEventType.DetailsEdited));
+
+        await using var context = postgres.CreateContext(suppressTenantFilter: true);
+        (await context.NotificationOutbox.CountAsync(n =>
+            n.UserId == _mentorId && n.EventType == Domain.Notifications.NotificationEventTypes.AssignmentDetailsChanged)).ShouldBeGreaterThan(0);
+        (await context.AuditLogs.CountAsync(a => a.Action == Domain.Auditing.AuditActions.AssignmentDetailsEdit)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Nobody_else_edits_the_text()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await PublishedAsync(lead, _mentorId);
+
+        using var admin = await SignInAsync(BranchAdmin);
+
+        var response = await admin.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Чужая правка", null, work.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.AssignmentNotOwner);
+    }
+
+    [Fact]
+    public async Task Work_that_was_handed_in_keeps_its_text()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await SubmittedAsync(lead, _mentorId, Mentor);
+        var fresh = await ReadAsync<AssignmentDto>(await lead.GetAsync($"/api/v1/assignments/{work.Id}"));
+
+        var response = await lead.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Поздняя правка", null, fresh.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.DetailsChangeNotAllowed);
+    }
+
+    // -----------------------------------------------------------------
     // Proposals
     // -----------------------------------------------------------------
 

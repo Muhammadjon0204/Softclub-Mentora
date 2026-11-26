@@ -43,6 +43,7 @@ internal static class NotificationPayloadEnricher
         NotificationEventTypes.AssignmentOverdue,
         NotificationEventTypes.AssignmentCancelled,
         NotificationEventTypes.AssignmentDeadlineChanged,
+        NotificationEventTypes.AssignmentDetailsChanged,
     };
 
     private static readonly HashSet<string> ProposalEvents = new(StringComparer.Ordinal)

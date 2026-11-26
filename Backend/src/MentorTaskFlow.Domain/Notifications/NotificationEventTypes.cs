@@ -37,6 +37,9 @@ public static class NotificationEventTypes
     /// <summary>The deadline of published work moved. Told to the executor, with the new date.</summary>
     public const string AssignmentDeadlineChanged = "AssignmentDeadlineChanged";
 
+    /// <summary>The title or description of published work was corrected. Told to the executor.</summary>
+    public const string AssignmentDetailsChanged = "AssignmentDetailsChanged";
+
     /// <summary>A mentor put forward an idea: whoever decides it in the category is told.</summary>
     public const string ProposalSubmitted = "ProposalSubmitted";
 

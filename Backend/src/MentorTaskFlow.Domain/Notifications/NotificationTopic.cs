@@ -32,6 +32,7 @@ public static class NotificationTopics
             or NotificationEventTypes.AssignmentSuggested
             or NotificationEventTypes.AssignmentReassigned
             or NotificationEventTypes.AssignmentCancelled
+            or NotificationEventTypes.AssignmentDetailsChanged
             or NotificationEventTypes.ProposalSubmitted
             or NotificationEventTypes.ProposalApproved
             or NotificationEventTypes.ProposalRejected => NotificationTopic.Assignments,

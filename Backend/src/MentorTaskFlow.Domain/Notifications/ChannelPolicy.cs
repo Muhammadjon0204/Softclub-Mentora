@@ -49,6 +49,7 @@ public static class ChannelPolicies
             [NotificationEventTypes.AssignmentOverdue] = ChannelPolicy.Both,
             [NotificationEventTypes.AssignmentCancelled] = ChannelPolicy.Both,
             [NotificationEventTypes.AssignmentDeadlineChanged] = ChannelPolicy.Both,
+            [NotificationEventTypes.AssignmentDetailsChanged] = ChannelPolicy.Both,
             [NotificationEventTypes.ProposalSubmitted] = ChannelPolicy.Both,
             [NotificationEventTypes.ProposalApproved] = ChannelPolicy.Both,
             [NotificationEventTypes.ProposalRejected] = ChannelPolicy.Both,

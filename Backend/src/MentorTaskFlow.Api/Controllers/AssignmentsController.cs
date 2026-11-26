@@ -158,6 +158,25 @@ public sealed class AssignmentsController(IAssignmentService assignmentService) 
         Ok(await assignmentService.RescheduleAsync(id, request, cancellationToken));
 
     /// <summary>
+    /// <c>PUT /assignments/{id}/details</c> — fixes the title or description of published work.
+    /// </summary>
+    /// <remarks>
+    /// Only while the executor has not handed anything in (<c>Assigned</c>, or <c>Overdue</c> without a
+    /// submission); otherwise 409 <c>DETAILS_CHANGE_NOT_ALLOWED</c>. The executor is notified and the
+    /// correction stays in the task's history. Drafts are edited with <c>PUT /assignments/{id}</c>.
+    /// </remarks>
+    [HttpPut("{id:guid}/details")]
+    [Authorize(Policy = MtfPolicies.LeadOrAdmin)]
+    [RequirePermission(Permissions.AssignmentsAssign)]
+    [ProducesResponseType<AssignmentDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AssignmentDto>> EditDetailsAsync(
+        Guid id,
+        EditAssignmentDetailsRequest request,
+        CancellationToken cancellationToken) =>
+        Ok(await assignmentService.EditDetailsAsync(id, request, cancellationToken));
+
+    /// <summary>
     /// <c>POST /assignments/{id}/start-review</c> (<c>REV-001</c>).
     /// </summary>
     /// <remarks>
