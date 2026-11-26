@@ -37,6 +37,9 @@ public interface IAssignmentService
     /// <summary>Moves the deadline of published work that is still with its executor.</summary>
     Task<AssignmentDto> RescheduleAsync(Guid assignmentId, RescheduleAssignmentRequest request, CancellationToken cancellationToken);
 
+    /// <summary>Corrects the title and description of published work before anything is handed in.</summary>
+    Task<AssignmentDto> EditDetailsAsync(Guid assignmentId, EditAssignmentDetailsRequest request, CancellationToken cancellationToken);
+
     /// <summary>Transition 8: <c>Submitted → InReview</c> (<c>REV-001</c>).</summary>
     Task<AssignmentDto> StartReviewAsync(Guid assignmentId, AssignmentActionRequest request, CancellationToken cancellationToken);
 

@@ -162,7 +162,7 @@ export function LeadAssignmentDetailsDrawer(props: LeadAssignmentDetailsDrawerPr
               {caps.canCancel ? <Button variant="secondary" onClick={() => { props.onCancel(assignment); }}>Отменить</Button> : null}
               {caps.canReassign ? <Button variant="secondary" onClick={() => { props.onReassign(assignment); }}>Переназначить</Button> : null}
               {caps.canReschedule ? <Button variant="secondary" onClick={() => { props.onReschedule(assignment); }}>Изменить срок</Button> : null}
-              {caps.canEdit ? <Button variant="secondary" onClick={() => { props.onEdit(assignment); }}>Редактировать</Button> : null}
+              {caps.canEdit || caps.canEditDetails ? <Button variant="secondary" onClick={() => { props.onEdit(assignment); }}>Редактировать</Button> : null}
               {caps.canStartReview ? <Button variant="primary" onClick={() => { props.onStartReview(assignment); }}>Начать проверку</Button> : null}
               {assignment.status === 'InReview' && caps.canDecideReview ? <Button variant="primary" onClick={() => { props.onOpenReview(assignment); }}>Перейти к проверке</Button> : null}
               {caps.canAcceptSuggestion ? <Button variant="primary" onClick={() => { props.onAcceptSuggestion(assignment); }}>Принять</Button> : null}

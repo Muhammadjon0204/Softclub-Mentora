@@ -12,6 +12,7 @@ import { ReassignAssignmentDialog } from '../../features/lead-assignments/Reassi
 import { assignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
 import type { AssignmentCapabilities } from '../../features/lead/assignments/leadAssignmentPresentation';
 import { RescheduleAssignmentDialog } from '../../features/assignment-deadline/RescheduleAssignmentDialog';
+import { EditAssignmentDetailsDialog } from '../../features/assignment-details/EditAssignmentDetailsDialog';
 import { PERMISSION, usePermissions } from '../../auth/usePermissions';
 import type { KanbanDragAction } from '../../features/lead/assignments/leadAssignmentKanban';
 import { useAssignmentActions } from '../../features/lead/assignments/useAssignmentActions';
@@ -82,6 +83,7 @@ export function AssignmentsPage(): JSX.Element {
   const [cancelDialog, setCancelDialog] = useState<CancelDialogState | null>(null);
   const [reassignDialog, setReassignDialog] = useState<LeadAssignmentRecord | null>(null);
   const [rescheduleDialog, setRescheduleDialog] = useState<LeadAssignmentRecord | null>(null);
+  const [detailsDialog, setDetailsDialog] = useState<LeadAssignmentRecord | null>(null);
 
   const assignmentId = searchParams.get('assignmentId');
   const selected = useResolvedLeadAssignment(assignmentId);
@@ -145,12 +147,18 @@ export function AssignmentsPage(): JSX.Element {
     return a.concurrencyToken ?? '';
   }
 
+  /** Черновик правится целиком в форме; у выданного задания — только текст, в отдельном диалоге. */
+  function openEditor(a: LeadAssignmentRecord): void {
+    if (permittedCapabilities(a).canEdit) setFormDrawer({ mode: 'edit', assignmentId: a.id });
+    else setDetailsDialog(a);
+  }
+
   /** Единственное место, где строится список действий карточки (раздел I промпта: только реально применимые). */
   function buildActionItems(a: LeadAssignmentRecord): PreviewActionMenuItem[] {
     const caps = permittedCapabilities(a);
     return [
       { label: 'Открыть', onClick: () => { openRow(a.id); } },
-      ...(caps.canEdit ? [{ label: 'Редактировать', onClick: () => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); } }] : []),
+      ...(caps.canEdit || caps.canEditDetails ? [{ label: 'Редактировать', onClick: () => { openEditor(a); } }] : []),
       ...(caps.canPublish ? [{ label: 'Опубликовать', onClick: () => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); } }] : []),
       ...(caps.canAcceptSuggestion ? [{ label: 'Принять', onClick: () => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); } }] : []),
       ...(caps.canReschedule ? [{ label: 'Изменить срок', onClick: () => { setRescheduleDialog(a); } }] : []),
@@ -168,6 +176,7 @@ export function AssignmentsPage(): JSX.Element {
       ...caps,
       canPublish: caps.canPublish && can(PERMISSION.assignmentsAssign),
       canEdit: caps.canEdit && can(PERMISSION.assignmentsAssign),
+      canEditDetails: caps.canEditDetails && can(PERMISSION.assignmentsAssign),
       canAcceptSuggestion: caps.canAcceptSuggestion && can(PERMISSION.assignmentsAssign),
       canReassign: caps.canReassign && can(PERMISSION.assignmentsReassign),
       canReschedule: caps.canReschedule && can(PERMISSION.assignmentsReschedule),
@@ -253,7 +262,7 @@ export function AssignmentsPage(): JSX.Element {
         mentorNameOf={mentorNameOf}
         capabilitiesOf={permittedCapabilities}
         onReschedule={(a) => { setRescheduleDialog(a); }}
-        onEdit={(a) => { setFormDrawer({ mode: 'edit', assignmentId: a.id }); }}
+        onEdit={openEditor}
         onPublish={(a) => { void runAction(() => actions.publish(a.id, token(a)), 'Задание опубликовано'); }}
         onAcceptSuggestion={(a) => { void runAction(() => actions.acceptSuggestion(a.id, token(a)), 'Предложение принято'); }}
         onReject={(a) => { setCancelDialog({ assignment: a, kind: 'reject' }); }}
@@ -264,6 +273,23 @@ export function AssignmentsPage(): JSX.Element {
       />
 
       <AssignmentFormDrawer state={formDrawer} onClose={() => { setFormDrawer(null); }} />
+
+      <EditAssignmentDetailsDialog
+        open={detailsDialog !== null}
+        onOpenChange={(next) => { if (!next) setDetailsDialog(null); }}
+        title={detailsDialog?.title ?? ''}
+        description={detailsDialog?.description ?? null}
+        onConfirm={async (title, description) => {
+          if (detailsDialog === null) return;
+          try {
+            await actions.editDetails(detailsDialog.id, token(detailsDialog), title, description);
+            toast.success('Задание исправлено, исполнитель получит уведомление');
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+            throw error;
+          }
+        }}
+      />
 
       <RescheduleAssignmentDialog
         open={rescheduleDialog !== null}

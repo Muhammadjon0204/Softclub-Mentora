@@ -19,9 +19,10 @@ import { AdminReassignDialog } from '../../features/admin-assignments/AdminReass
 import { useAdminAssignmentActions } from '../../features/admin-assignments/useAdminAssignmentActions';
 import { useAdminReview } from '../../features/admin-assignments/useAdminReview';
 import { RescheduleAssignmentDialog } from '../../features/assignment-deadline/RescheduleAssignmentDialog';
+import { EditAssignmentDetailsDialog } from '../../features/assignment-details/EditAssignmentDetailsDialog';
 import { AssignmentCancelDialog } from '../../features/lead-assignments/AssignmentCancelDialog';
 import { ReviewWorkspaceDrawer } from '../../features/lead-reviews/ReviewWorkspaceDrawer';
-import { canReassign, canReschedule } from '../../features/lead/assignments/leadAssignmentPresentation';
+import { canEditDetails, canReassign, canReschedule } from '../../features/lead/assignments/leadAssignmentPresentation';
 import { toAssignmentRecord } from '../../features/lead/assignments/assignmentAdapter';
 import { useCategoryTimeZone } from '../../features/proposals/useProposals';
 import { AdminAssignmentsKanban } from '../../features/admin-assignments/AdminAssignmentsKanban';
@@ -108,6 +109,7 @@ export function AssignmentsPage(): JSX.Element {
   const [formOpen, setFormOpen] = useState(false);
   const [givenByMe, setGivenByMe] = useState(false);
   const [rescheduling, setRescheduling] = useState<AssignmentDto | null>(null);
+  const [editing, setEditing] = useState<AssignmentDto | null>(null);
   const [reassigning, setReassigning] = useState<AssignmentDto | null>(null);
   const [cancelling, setCancelling] = useState<AssignmentDto | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -178,6 +180,9 @@ export function AssignmentsPage(): JSX.Element {
     if (open && can(PERMISSION.assignmentsCancel)) result.push({ label: 'Отменить', onClick: () => { setCancelling(item); } });
     if (owns && canReassign(record) && !item.firstSubmittedAt && can(PERMISSION.assignmentsReassign)) {
       result.push({ label: 'Переназначить', onClick: () => { setReassigning(item); } });
+    }
+    if (owns && canEditDetails(record) && !item.firstSubmittedAt && can(PERMISSION.assignmentsAssign)) {
+      result.push({ label: 'Редактировать', onClick: () => { setEditing(item); } });
     }
     if (owns && canReschedule(record) && can(PERMISSION.assignmentsReschedule)) {
       result.push({ label: 'Изменить срок', onClick: () => { setRescheduling(item); } });
@@ -391,6 +396,23 @@ export function AssignmentsPage(): JSX.Element {
         categoryName={(id) => categoryName.get(id)}
         actions={actions}
         onAssigned={setOpenId}
+      />
+
+      <EditAssignmentDetailsDialog
+        open={editing !== null}
+        onOpenChange={(next) => { if (!next) setEditing(null); }}
+        title={editing?.title ?? ''}
+        description={editing?.description ?? null}
+        onConfirm={async (title, description) => {
+          if (editing === null) return;
+          try {
+            await actions.editDetails(editing, title, description);
+            toast.success('Задание исправлено, исполнитель получит уведомление');
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Не удалось сохранить изменения');
+            throw error;
+          }
+        }}
       />
 
       <RescheduleAssignmentDialog

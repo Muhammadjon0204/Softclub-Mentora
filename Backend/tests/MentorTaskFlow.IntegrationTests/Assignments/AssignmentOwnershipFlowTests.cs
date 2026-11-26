@@ -7,6 +7,7 @@ using MentorTaskFlow.Contracts.Access;
 using MentorTaskFlow.Contracts.Assignments;
 using MentorTaskFlow.Contracts.Auth;
 using MentorTaskFlow.Contracts.Common;
+using MentorTaskFlow.Contracts.Journal;
 using MentorTaskFlow.Contracts.Proposals;
 using MentorTaskFlow.Contracts.Reviews;
 using MentorTaskFlow.Contracts.Submissions;
@@ -294,6 +295,147 @@ public sealed class AssignmentOwnershipFlowTests(PostgresFixture postgres, Minio
         await using var context = postgres.CreateContext(suppressTenantFilter: true);
 
         (await context.AuditLogs.CountAsync(a => a.Action == Domain.Auditing.AuditActions.AssignmentDeadlineChange)).ShouldBe(1);
+    }
+
+    // -----------------------------------------------------------------
+    // Correcting the text of published work
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task The_owner_fixes_a_typo_the_mentor_is_told_and_the_history_keeps_it()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await PublishedAsync(lead, _mentorId);
+
+        var response = await lead.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Исправленное название", "Теперь со ссылкой на репозиторий", work.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var edited = await ReadAsync<AssignmentDto>(response);
+        edited.Title.ShouldBe("Исправленное название");
+        edited.Description.ShouldBe("Теперь со ссылкой на репозиторий");
+        edited.Status.ShouldBe(nameof(AssignmentStatus.Assigned));
+        edited.CurrentDueAt.ShouldBe(work.CurrentDueAt);
+
+        var history = await ReadAsync<List<TaskEventDto>>(await lead.GetAsync($"/api/v1/assignments/{work.Id}/history"));
+        history.ShouldContain(e => e.EventType == nameof(TaskEventType.DetailsEdited));
+
+        await using var context = postgres.CreateContext(suppressTenantFilter: true);
+        (await context.NotificationOutbox.CountAsync(n =>
+            n.UserId == _mentorId && n.EventType == Domain.Notifications.NotificationEventTypes.AssignmentDetailsChanged)).ShouldBeGreaterThan(0);
+        (await context.AuditLogs.CountAsync(a => a.Action == Domain.Auditing.AuditActions.AssignmentDetailsEdit)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Nobody_else_edits_the_text()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await PublishedAsync(lead, _mentorId);
+
+        using var admin = await SignInAsync(BranchAdmin);
+
+        var response = await admin.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Чужая правка", null, work.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.AssignmentNotOwner);
+    }
+
+    [Fact]
+    public async Task Work_that_was_handed_in_keeps_its_text()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await SubmittedAsync(lead, _mentorId, Mentor);
+        var fresh = await ReadAsync<AssignmentDto>(await lead.GetAsync($"/api/v1/assignments/{work.Id}"));
+
+        var response = await lead.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Поздняя правка", null, fresh.ConcurrencyToken));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        (await ReadCodeAsync(response)).ShouldBe(ErrorCodes.DetailsChangeNotAllowed);
+    }
+
+    // -----------------------------------------------------------------
+    // Journal: who did what to a task, scoped like the task itself
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task The_mentor_sees_who_changed_their_task_and_how()
+    {
+        using var lead = await SignInAsync(Lead);
+        var work = await PublishedAsync(lead, _mentorId);
+        await lead.PutAsJsonAsync($"/api/v1/assignments/{work.Id}/details",
+            new EditAssignmentDetailsRequest("Отчёт за неделю", "С графиками", work.ConcurrencyToken));
+
+        using var mentor = await SignInAsync(Mentor);
+        var journal = await ReadAsync<PagedResult<JournalEntryDto>>(await mentor.GetAsync("/api/v1/journal"));
+
+        var edit = journal.Items.Single(e => e.EventType == nameof(TaskEventType.DetailsEdited));
+        edit.Actor.ShouldNotBeNull();
+        edit.Actor.Role.ShouldBe("Lead");
+        edit.Assignee!.Id.ShouldBe(_mentorId);
+        edit.Changes.ShouldContain(c => c.Field == "title" && c.Before == "Подготовить отчёт" && c.After == "Отчёт за неделю");
+        edit.Changes.ShouldContain(c => c.Field == "description" && c.Before == null && c.After == "С графиками");
+
+        // Newest first: the correction comes before the publication it corrected.
+        journal.Items.First().EventType.ShouldBe(nameof(TaskEventType.DetailsEdited));
+    }
+
+    [Fact]
+    public async Task A_mentor_does_not_see_a_colleagues_tasks()
+    {
+        using var lead = await SignInAsync(Lead);
+        await PublishedAsync(lead, _secondMentorId);
+
+        using var mentor = await SignInAsync(Mentor);
+        var journal = await ReadAsync<PagedResult<JournalEntryDto>>(await mentor.GetAsync("/api/v1/journal"));
+
+        journal.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task The_lead_sees_the_team_and_their_own_actions()
+    {
+        using var lead = await SignInAsync(Lead);
+        var first = await PublishedAsync(lead, _mentorId);
+        var second = await PublishedAsync(lead, _secondMentorId);
+        await lead.PostAsJsonAsync($"/api/v1/assignments/{first.Id}/reschedule",
+            new RescheduleAssignmentRequest(InAWeek.AddDays(2), Reason, first.ConcurrencyToken));
+
+        var journal = await ReadAsync<PagedResult<JournalEntryDto>>(await lead.GetAsync("/api/v1/journal?eventTypes=DeadlineChanged,Assigned"));
+
+        journal.Items.Select(e => e.AssignmentId).Distinct().ShouldBe([first.Id, second.Id], ignoreOrder: true);
+        var moved = journal.Items.Single(e => e.EventType == nameof(TaskEventType.DeadlineChanged));
+        moved.Actor!.Id.ShouldBe(_leadId);
+        moved.Note.ShouldBe(Reason);
+        moved.Changes.ShouldContain(c => c.Field == "dueAt" && c.Before != null && c.After != null);
+    }
+
+    [Fact]
+    public async Task The_branch_admin_sees_the_branch_and_the_owner_sees_every_branch()
+    {
+        using var owner = await SignInAsync(OrganizationAdmin);
+        var elsewhere = await PublishedAsync(owner, _khujandMentorId);
+
+        using var lead = await SignInAsync(Lead);
+        var here = await PublishedAsync(lead, _mentorId);
+
+        using var branchAdmin = await SignInAsync(BranchAdmin);
+        var branchJournal = await ReadAsync<PagedResult<JournalEntryDto>>(await branchAdmin.GetAsync("/api/v1/journal"));
+        branchJournal.Items.ShouldContain(e => e.AssignmentId == here.Id);
+        branchJournal.Items.ShouldNotContain(e => e.AssignmentId == elsewhere.Id);
+
+        var ownerJournal = await ReadAsync<PagedResult<JournalEntryDto>>(await owner.GetAsync("/api/v1/journal"));
+        ownerJournal.Items.ShouldContain(e => e.AssignmentId == here.Id);
+        ownerJournal.Items.ShouldContain(e => e.AssignmentId == elsewhere.Id);
+    }
+
+    [Fact]
+    public async Task An_unknown_event_type_is_a_validation_error()
+    {
+        using var mentor = await SignInAsync(Mentor);
+
+        (await mentor.GetAsync("/api/v1/journal?eventTypes=Nonsense")).StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     // -----------------------------------------------------------------

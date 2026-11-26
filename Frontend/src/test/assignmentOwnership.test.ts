@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assignmentCapabilities, canReschedule } from '../features/lead/assignments/leadAssignmentPresentation';
+import { assignmentCapabilities, canEditDetails, canReschedule } from '../features/lead/assignments/leadAssignmentPresentation';
 import type { LeadAssignmentRecord } from '../mocks/ui-preview/leadAssignments.preview';
 
 function record(overrides: Partial<LeadAssignmentRecord>): LeadAssignmentRecord {
@@ -61,5 +61,26 @@ describe('смена срока', () => {
 
   it.each(['Draft', 'Suggested', 'Submitted', 'InReview', 'Approved', 'Cancelled'] as const)('недоступна в статусе %s', (status) => {
     expect(canReschedule(record({ status }))).toBe(false);
+  });
+});
+
+describe('исправление текста выданного задания', () => {
+  it.each(['Assigned', 'Overdue'] as const)('доступно, пока ничего не сдано: %s', (status) => {
+    expect(canEditDetails(record({ status }))).toBe(true);
+  });
+
+  it('недоступно после первой сдачи, даже на доработке', () => {
+    const handedIn = { submissions: [{} as LeadAssignmentRecord['submissions'][number]] };
+    expect(canEditDetails(record({ status: 'Assigned', ...handedIn }))).toBe(false);
+    expect(canEditDetails(record({ status: 'NeedsRework', ...handedIn }))).toBe(false);
+  });
+
+  it.each(['Draft', 'Suggested', 'Submitted', 'InReview', 'Approved', 'Cancelled'] as const)('недоступно в статусе %s', (status) => {
+    expect(canEditDetails(record({ status }))).toBe(false);
+  });
+
+  it('только тому, кто выдал задание', () => {
+    expect(assignmentCapabilities(record({ canManage: true })).canEditDetails).toBe(true);
+    expect(assignmentCapabilities(record({ canManage: false })).canEditDetails).toBe(false);
   });
 });

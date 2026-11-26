@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, ClipboardList, History, LayoutDashboard, Lightbulb, School, TrendingUp } from 'lucide-react';
+import { Bell, CalendarDays, ClipboardList, History, LayoutDashboard, Lightbulb, ListChecks, School, TrendingUp } from 'lucide-react';
 import type { ComponentType } from 'react';
 
 import { PERMISSION } from '../../auth/usePermissions';
@@ -27,6 +27,7 @@ export const MENTOR_NAV_ITEMS: MentorNavItem[] = [
   { key: 'proposals', path: '/mentor/proposals', icon: Lightbulb },
   { key: 'calendar', path: '/mentor/calendar', icon: CalendarDays },
   { key: 'history', path: '/mentor/history', icon: History },
+  { key: 'journal', path: '/mentor/journal', icon: ListChecks },
   { key: 'reports', path: '/mentor/reports', icon: TrendingUp, permission: PERMISSION.reportsView },
   { key: 'notifications', path: '/mentor/notifications', icon: Bell },
   { key: 'crm', path: '/mentor/crm', icon: School, permission: PERMISSION.crmUse },

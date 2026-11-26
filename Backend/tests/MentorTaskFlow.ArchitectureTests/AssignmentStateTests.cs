@@ -87,7 +87,8 @@ public sealed class AssignmentStateTests
     public void The_enums_match_the_specification()
     {
         Enum.GetValues<AssignmentStatus>().Length.ShouldBe(9);
-        Enum.GetValues<TaskEventType>().Length.ShouldBe(13);
+        Enum.GetValues<TaskEventType>().Length.ShouldBe(14);
         Enum.GetNames<TaskEventType>().ShouldContain(nameof(TaskEventType.DeadlineChanged));
+        Enum.GetNames<TaskEventType>().ShouldContain(nameof(TaskEventType.DetailsEdited));
     }
 }

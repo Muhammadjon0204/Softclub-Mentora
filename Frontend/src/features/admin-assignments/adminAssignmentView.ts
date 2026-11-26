@@ -47,6 +47,7 @@ const EXTRA_EVENT_LABEL: Record<string, string> = {
   SuggestionAccepted: 'Предложение принято',
   Reassigned: 'Переназначено',
   DeadlineChanged: 'Срок изменён',
+  DetailsEdited: 'Текст задания исправлен',
 };
 
 export function assignmentSourceLabel(source: string): string {

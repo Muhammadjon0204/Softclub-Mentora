@@ -58,6 +58,9 @@ public static class NotificationTemplates
             NotificationEventTypes.AssignmentDeadlineChanged =>
                 ("Срок задания изменён", $"Изменён срок задания {quotedTitle}.", "Открыть задание"),
 
+            NotificationEventTypes.AssignmentDetailsChanged =>
+                ("Задание исправлено", $"В задании {quotedTitle} исправлены название или описание. Проверьте актуальный текст.", "Открыть задание"),
+
             NotificationEventTypes.ProposalSubmitted =>
                 ("Новое предложение от ментора",
                     $"{mentor ?? "Ментор"} предлагает: «{TryGetString(body, "proposalTitle")}». Посмотрите и примите решение.",
