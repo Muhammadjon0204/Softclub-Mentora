@@ -5,6 +5,7 @@ import type { CategoryDto, CategorySettingsDto } from '../../api/admin/categorie
 import { listUsers } from '../../api/admin/users';
 import type { UserDto } from '../../api/admin/users';
 import { useAuth } from '../../auth/useAuth';
+import { teamRoleOf } from '../teams/teamRoleOf';
 import { usersListQueryKey } from '../admin-users/useUsersQuery';
 import { branchScopedKey } from '../branch-context/queryKeys';
 import { useBranchContext } from '../branch-context/useBranchContext';
@@ -36,14 +37,20 @@ function formatDateLabel(iso: string): string {
 export interface CategoryLeadInfo {
   leadUserId: string | null;
   leadName: string | null;
+  leadIsMember?: boolean;
   mentorsCount: number;
 }
 
-/** У `Category` в backend нет поля «руководитель» вообще — это факт о `User.CategoryId`+`User.Role=Lead` (см. промпт интеграции). Единственный активный Lead на категорию гарантирован партиальным уникальным индексом `ux_users_active_lead_per_category`. */
+/** У `Category` в backend нет поля «руководитель»: это тот, кто в команде тимлид, — по аккаунту или по участию. Он один на команду (это держит база). */
 export function resolveLeadInfo(categoryId: string, users: readonly UserDto[]): CategoryLeadInfo {
-  const lead = users.find((candidate) => candidate.role === 'Lead' && candidate.categoryId === categoryId && candidate.isActive);
-  const mentorsCount = users.filter((candidate) => candidate.role === 'Mentor' && candidate.categoryId === categoryId && candidate.isActive).length;
-  return { leadUserId: lead?.id ?? null, leadName: lead?.fullName ?? null, mentorsCount };
+  const lead = users.find((candidate) => candidate.isActive && teamRoleOf(candidate, categoryId) === 'Lead');
+  const mentorsCount = users.filter((candidate) => candidate.isActive && teamRoleOf(candidate, categoryId) === 'Mentor').length;
+  return {
+    leadUserId: lead?.id ?? null,
+    leadName: lead?.fullName ?? null,
+    leadIsMember: lead !== undefined && !(lead.role === 'Lead' && lead.categoryId === categoryId),
+    mentorsCount,
+  };
 }
 
 /** Собирает `CategoryDto` -> `PreviewCategoryDetails`. Экспортируется для переиспользования в `useCategoryActions.ts`. */
@@ -68,6 +75,7 @@ export function toCategoryDetails(
     isActive: dto.isActive,
     description: dto.description,
     leadUserId: leadInfo.leadUserId,
+    leadIsMember: leadInfo.leadIsMember,
     createdLabel: formatDateLabel(dto.createdAt),
     timezone: settings?.timeZoneId ?? DEFAULT_TIMEZONE,
     defaultDueTimeLocal: settings?.defaultDueTimeLocal ?? DEFAULT_DUE_TIME,

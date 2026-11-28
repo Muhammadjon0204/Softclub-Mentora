@@ -3,6 +3,7 @@ import { AlignLeft, Building2, CalendarClock, CalendarPlus, CheckCircle2, Eye, F
 
 import { getAssignmentHistory } from '../../api/lead/assignments';
 import type { AssignmentDto } from '../../api/lead/assignments';
+import { useAuth } from '../../auth/useAuth';
 import { Drawer } from '../../shared/overlays';
 import { Badge, StatusDot } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
@@ -70,6 +71,8 @@ export function AdminAssignmentDrawer({ assignment, mentorName, categoryName, na
 }
 
 function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<AdminAssignmentDrawerProps, 'onClose' | 'assignment' | 'actions'> & { assignment: AssignmentDto }): JSX.Element {
+  const { account } = useAuth();
+  const mine = assignment.assignedToId === account?.id;
   const deadlineMoved = assignment.currentDueAt !== assignment.initialDueAt;
   const hint = deadlineHint(assignment.status, new Date(assignment.currentDueAt).getTime(), Date.now());
 
@@ -101,7 +104,8 @@ function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<Ad
       {assignment.status === 'Cancelled' ? (
         <Notice tone="danger" icon={XCircle} title="Задание отменено">{assignment.cancelReason ?? 'Причина не указана.'}</Notice>
       ) : null}
-      {assignment.canManage === false ? (
+      {mine ? <OwnTaskNotice assignment={assignment} /> : null}
+      {assignment.canManage === false && !mine ? (
         <Notice tone="info" icon={Eye} title="Вы видите ход работы">
           Проверяет работу и ведёт задание тот, кто его выдал{present(assignment.assignedById) && nameOf(assignment.assignedById) !== null ? `: ${nameOf(assignment.assignedById) ?? ''}` : ''}.
         </Notice>
@@ -110,6 +114,27 @@ function DrawerContent({ assignment, mentorName, categoryName, nameOf }: Omit<Ad
       <MetaTiles items={items} />
       <AssignmentTimeline assignmentId={assignment.id} nameOf={nameOf} />
     </div>
+  );
+}
+
+/** Своё задание администратор сдаёт не отсюда, а из своего места в команде — туда и ведёт кнопка. */
+function OwnTaskNotice({ assignment }: { assignment: AssignmentDto }): JSX.Element | null {
+  const { account, switchTeam } = useAuth();
+  const team = account?.teams?.find((candidate) => candidate.categoryId === assignment.categoryId);
+  if (team === undefined || assignment.status === 'Approved' || assignment.status === 'Cancelled') return null;
+
+  const path = team.role === 'Lead' ? '/lead/my-tasks' : '/mentor/tasks';
+
+  return (
+    <Notice tone="info" icon={Send} title="Это ваше задание">
+      <span className="block">Сдать работу можно из команды, в которой его выдали.</span>
+      <span className="mt-1.5 block">
+        <span className="mr-2 font-medium text-ink">{team.name}</span>
+        <Button size="sm" variant="secondary" onClick={() => { switchTeam(team.categoryId, `${path}?assignmentId=${assignment.id}`); }}>
+          Перейти в команду
+        </Button>
+      </span>
+    </Notice>
   );
 }
 

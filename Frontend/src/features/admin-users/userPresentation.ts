@@ -63,6 +63,7 @@ export interface PreviewUserDetails extends PreviewUser {
    */
   branchId: string | null;
   categoryId: string | null;
+  teams?: { categoryId: string; name: string; role: string; isMain: boolean }[];
   /** `undefined` у preview-фикстур (мутаций не будет), реальная строка у данных с backend. */
   concurrencyToken?: string;
   activity: UserActivityEntry[];

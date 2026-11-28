@@ -82,6 +82,7 @@ export const tg: TranslationTree = {
       mentor: 'Ментор',
       orgAdmin: 'Маъмури ташкилот',
       branchAdmin: 'Маъмури филиал',
+      member: 'Иштирокчии даста',
     },
     allBranches: 'Ҳамаи филиалҳо',
     branchSelected: 'Филиал интихоб шуд',

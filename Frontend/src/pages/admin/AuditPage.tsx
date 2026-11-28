@@ -219,11 +219,11 @@ export function AuditPage(): JSX.Element {
                 const object = objectOf(entry);
                 return (
                   <tr key={entry.id} className="h-14 border-b border-divider text-sm transition-colors duration-150 last:border-0 hover:bg-surface-hover">
-                    <PreviewTd className="whitespace-nowrap py-2.5 tabular-nums">
+                    <PreviewTd label="Время" className="whitespace-nowrap py-2.5 tabular-nums max-md:order-[-1]">
                       <span className="block text-[13px] text-ink">{at.date}</span>
                       <span className="block text-[11.5px] text-ink-muted">{at.time}</span>
                     </PreviewTd>
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd card="wide" label="Кто" className="py-2.5">
                       <span className="flex min-w-0 items-center gap-2.5">
                         <Avatar name={actor.name} size="sm"/>
                         <span className="min-w-0">
@@ -232,18 +232,18 @@ export function AuditPage(): JSX.Element {
                         </span>
                       </span>
                     </PreviewTd>
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd card="title" className="py-2.5">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <Badge tone={auditActionTone(entry.action)}>{auditActionLabel(entry.action)}</Badge>
                         {count > 1 ? <span className="rounded-full bg-surface-muted px-1.5 text-[11.5px] font-semibold tabular-nums text-ink-secondary">×{count}</span> : null}
                       </span>
                       {count > 1 ? <span className="mt-0.5 block text-[11px] text-ink-muted">первое — {new Date(firstAt).toLocaleString(intlLocale(), { hour12: false })}</span> : null}
                     </PreviewTd>
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd card="wide" label="Объект" className="py-2.5">
                       <span className="block truncate text-[13px] text-ink">{object.name ?? object.type}</span>
                       {object.name !== null ? <span className="block truncate text-[11.5px] text-ink-muted">{object.type}</span> : null}
                     </PreviewTd>
-                    <PreviewTd>
+                    <PreviewTd label="Результат" className="max-md:order-[-1]">
                       <AuditResultBadge result={entry.result} reason={entry.failureReason} />
                     </PreviewTd>
                   </tr>

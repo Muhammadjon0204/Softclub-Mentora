@@ -9,12 +9,15 @@ import { FormBannerError, FormCheckbox, FormField, FormInput, FormSection, FormS
 import { fieldA11yProps } from '../../shared/ui/fieldA11y';
 import { useCategoriesForBranch } from '../admin-categories/useCategoriesQuery';
 import { useBranchContext } from '../branch-context/useBranchContext';
-import { ASSIGNABLE_ROLE_VALUES, userCreateSchema, userEditSchema } from './userForm.schema';
+import { CREATABLE_ROLE_VALUES, userCreateSchema, userEditSchema } from './userForm.schema';
 import type { UserCreateFormValues, UserEditFormValues } from './userForm.schema';
 import { NOTIFICATION_LANGUAGES, NOTIFICATION_LANGUAGE_LABEL } from './userPresentation';
 import type { PreviewUserDetails } from './userPresentation';
 
-const ROLE_SELECT_OPTIONS = ASSIGNABLE_ROLE_VALUES.map((value) => ({ value, label: ROLE_LABEL[value] }));
+const ROLE_SELECT_OPTIONS = CREATABLE_ROLE_VALUES.map((value) => ({
+  value,
+  label: value === 'Member' ? 'Участник команды' : ROLE_LABEL[value],
+}));
 
 export interface UserCreateFormProps {
   formId: string;
@@ -62,7 +65,7 @@ export function UserCreateForm({ formId, isOrgAdmin, bannerError, onDirtyChange,
 
   const role = watch('role');
   const branchId = watch('branchId');
-  const needsCategory = role === 'Lead' || role === 'Mentor';
+  const needsCategory = role === 'Lead' || role === 'Mentor' || role === 'Member';
   const categoriesForBranch = useCategoriesForBranch(branchId.length > 0 ? branchId : null, isOrgAdmin);
 
   // Раздел 13 промпта: смена Branch сбрасывает несовместимую Category, не оставляя скрытое значение.

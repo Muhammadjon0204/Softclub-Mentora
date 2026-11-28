@@ -480,6 +480,7 @@ components:
         - VALIDATION_FAILED
         - SECURITY_TOKEN_INVALID
         - USER_DEACTIVATED
+        - SCOPE_OVERRIDE_FORBIDDEN
 
     ProblemDetails:
       type: object
@@ -547,6 +548,35 @@ components:
             - type: 'null'
         permissions:
           description: Что человеку разрешено сейчас. Подсказка для интерфейса; решает всегда сервер.
+          type: array
+          items:
+            type: string
+        teams:
+          description: |
+            Все команды (направления) человека, основная первой. Чтобы работать в другой команде,
+            клиент присылает её идентификатор в заголовке `X-MTF-Team-Id`.
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamSummary'
+
+    TeamSummary:
+      type: object
+      required: [categoryId, name, timeZoneId, role, isMain, permissions]
+      properties:
+        categoryId:
+          type: string
+        name:
+          type: string
+        timeZoneId:
+          type: string
+        role:
+          description: Кем человек является именно в этой команде.
+          type: string
+          enum: [Lead, Mentor, Member]
+        isMain:
+          description: Команда, в которой аккаунт открывается без заголовка.
+          type: boolean
+        permissions:
           type: array
           items:
             type: string

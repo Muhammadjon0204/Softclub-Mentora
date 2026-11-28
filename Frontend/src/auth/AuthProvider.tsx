@@ -4,6 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { authApi, type AuthUser, type ChangePasswordRequest, type LoginRequest } from '../api/auth';
+import {
+  getActiveTeamId,
+  rememberedTeamId,
+  rememberTeamId,
+  setActiveTeamId,
+  subscribeActiveTeam,
+} from './activeTeam';
 import { authEvents, sessionEndReasonFromError, type SessionEndReason } from './authEvents';
 import {
   AUTH_ME_QUERY_KEY,
@@ -13,6 +20,8 @@ import {
 } from './authContext';
 // Импорт координатора обязателен: он регистрирует single-flight refresh в apiClient.
 import { refreshAccessToken } from './refreshCoordinator';
+import { dashboardPathForRole } from './roleRedirect';
+import { switchableTeams, teamForPath, userInTeam } from './teams';
 import { clearAccessToken, getAccessToken, setAccessToken, subscribe } from './tokenStore';
 
 interface AuthProviderProps {
@@ -29,14 +38,29 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const queryClient = useQueryClient();
 
   const [status, setStatus] = useState<AuthStatus>('bootstrapping');
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [account, setAccount] = useState<AuthUser | null>(null);
 
   const accessToken = useSyncExternalStore(subscribe, getAccessToken, getServerSnapshot);
+  const activeTeamId = useSyncExternalStore(subscribeActiveTeam, getActiveTeamId, getServerSnapshot);
+  const user = useMemo(
+    () => (account === null ? null : userInTeam(account, activeTeamId)),
+    [account, activeTeamId],
+  );
+
+  /** Первый профиль сессии: сначала выбирается команда, потом рисуются страницы. */
+  const openSession = useCallback((next: AuthUser, path: string): AuthUser => {
+    const teamId = teamForPath(next, path, rememberedTeamId(next.id));
+    setActiveTeamId(teamId);
+    setAccount(next);
+    setStatus('authenticated');
+    return userInTeam(next, teamId);
+  }, []);
 
   /** Полная локальная очистка. Сетевые вызовы сюда не входят. */
   const clearSession = useCallback(() => {
     clearAccessToken();
-    setUser(null);
+    setActiveTeamId(null);
+    setAccount(null);
     setStatus('anonymous');
     // В кэше могли осесть данные защищённых эндпоинтов — вычищаем целиком.
     queryClient.clear();
@@ -63,8 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
     const bootstrap = async (): Promise<void> => {
       try {
         await refreshAccessToken();
-        setUser(await fetchCurrentUser());
-        setStatus('authenticated');
+        openSession(await fetchCurrentUser(), window.location.pathname + window.location.search);
       } catch (error: unknown) {
         clearSession();
 
@@ -81,7 +104,41 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
     // StrictMode в dev монтирует эффект дважды — второй раз переиспользуем промис.
     bootstrapRef.current ??= bootstrap();
-  }, [clearSession, fetchCurrentUser, navigate]);
+  }, [clearSession, fetchCurrentUser, navigate, openSession]);
+
+  /* ---------------------------------------------------------------- */
+  /* Команды                                                           */
+  /* ---------------------------------------------------------------- */
+
+  const switchTeam = useCallback(
+    (teamId: string | null, to?: string): void => {
+      if (account === null) return;
+      const next = userInTeam(account, teamId);
+      // Всё, что уже загружено, принадлежит прежней команде.
+      setActiveTeamId(next === account ? null : teamId);
+      rememberTeamId(account.id, getActiveTeamId());
+      queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== AUTH_ME_QUERY_KEY[0] });
+      navigate(to ?? dashboardPathForRole(next.role), { replace: to !== undefined });
+    },
+    [account, navigate, queryClient],
+  );
+
+  // Профиль обновился, а выбранной команды в нём больше нет — заголовок слать нельзя.
+  useEffect(() => {
+    if (account === null || activeTeamId === null) return;
+    if (!switchableTeams(account).some((team) => team.categoryId === activeTeamId)) {
+      switchTeam(null);
+    }
+  }, [account, activeTeamId, switchTeam]);
+
+  useEffect(
+    () =>
+      authEvents.on('teamLost', () => {
+        switchTeam(null);
+        authApi.getMe().then(setAccount).catch(() => undefined);
+      }),
+    [switchTeam],
+  );
 
   /* ---------------------------------------------------------------- */
   /* Подписка на события auth-шины                                     */
@@ -116,15 +173,14 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   /* ---------------------------------------------------------------- */
 
   const login = useCallback(
-    async (credentials: LoginRequest): Promise<AuthUser> => {
+    async (credentials: LoginRequest, requestedPath = '/'): Promise<AuthUser> => {
+      setActiveTeamId(null);
       const result = await authApi.login(credentials);
       setAccessToken(result.accessToken);
       queryClient.setQueryData(AUTH_ME_QUERY_KEY, result.user);
-      setUser(result.user);
-      setStatus('authenticated');
-      return result.user;
+      return openSession(result.user, requestedPath);
     },
-    [queryClient],
+    [openSession, queryClient],
   );
 
   const logout = useCallback(async (): Promise<void> => {
@@ -139,7 +195,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
 
   const refreshSession = useCallback(async (): Promise<void> => {
     await refreshAccessToken();
-    setUser(await fetchCurrentUser());
+    setAccount(await fetchCurrentUser());
     setStatus('authenticated');
   }, [fetchCurrentUser]);
 
@@ -155,7 +211,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
   const updateUser = useCallback(
     (next: AuthUser): void => {
       queryClient.setQueryData(AUTH_ME_QUERY_KEY, next);
-      setUser(next);
+      setAccount(next);
     },
     [queryClient],
   );
@@ -165,6 +221,9 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       status,
       accessToken,
       user,
+      account,
+      activeTeamId,
+      switchTeam,
       isAuthenticated: status === 'authenticated' && user !== null,
       login,
       logout,
@@ -172,7 +231,7 @@ export function AuthProvider({ children }: AuthProviderProps): JSX.Element {
       changePassword,
       updateUser,
     }),
-    [status, accessToken, user, login, logout, refreshSession, changePassword, updateUser],
+    [status, accessToken, user, account, activeTeamId, switchTeam, login, logout, refreshSession, changePassword, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

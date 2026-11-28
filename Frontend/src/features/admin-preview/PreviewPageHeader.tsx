@@ -14,7 +14,8 @@ export function PreviewPageHeader({ title, subtitle, action }: PreviewPageHeader
         <h1 className="text-[28px] font-bold leading-9 tracking-tight text-ink">{title}</h1>
         <p className="mt-1 text-sm text-ink-muted">{subtitle}</p>
       </div>
-      {action !== undefined ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+      {/* На телефоне кнопки переносятся, а не уезжают за край. */}
+      {action !== undefined ? <div className="flex max-w-full flex-wrap items-center gap-2 sm:shrink-0">{action}</div> : null}
     </div>
   );
 }

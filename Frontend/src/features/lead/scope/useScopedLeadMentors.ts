@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { useUsersQuery } from '../../admin-users/useUsersQuery';
+import { teamRoleOf } from '../../teams/teamRoleOf';
 import type { MentorDirectoryEntry, MentorStatus } from './leadWorkspace';
 import { useLeadScope } from './useLeadScope';
 
@@ -10,14 +11,13 @@ import { useLeadScope } from './useLeadScope';
  * those are out of this pass's scope, see the integration report for the resulting Dashboard/Reports
  * mismatch this leaves behind, logged in `docs/INTEGRATION_UI_ISSUES.md`).
  *
- * `GET /users` (`useUsersQuery`, already wired by the prior Users integration pass) scopes a Lead
- * caller server-side to exactly their own category (`UserService.ApplyVisibility`:
- * `{ Role: Lead } => source.Where(u => u.CategoryId == actor.CategoryId)`) — filtering to
- * `role === 'Mentor'` here only drops the Lead's own row from that same response. Reused rather than
- * rebuilt: Users domain is out of scope to touch, but it's already real and already gives a Lead
- * exactly this roster.
+ * `GET /users` (`useUsersQuery`) scopes a Lead caller server-side to their own team, including the
+ * people added to it from other teams. Filtering by the role in this team drops the Lead's own row
+ * and keeps mentors and participants alike: both receive work here.
  */
 export interface RealLeadMentor extends MentorDirectoryEntry {
+  /** `Mentor` или `Member` — участник работает в команде, но не преподаёт. */
+  teamRole: string;
   /** Real `UserDto.lastLoginAt`, already formatted by `useUsersQuery.ts` — the real replacement for `lastActiveOffsetHours` (always `null` here, see below). */
   lastLoginLabel: string;
 }
@@ -36,12 +36,16 @@ export function useScopedLeadMentors(): RealLeadMentor[] {
   return useMemo(
     () =>
       users
-        .filter((user) => user.role === 'Mentor' && user.categoryId === scope.categoryId)
-        .map((user): RealLeadMentor => ({
+        .flatMap((user) => {
+          const teamRole = teamRoleOf(user, scope.categoryId);
+          return teamRole === 'Mentor' || teamRole === 'Member' ? [{ user, teamRole }] : [];
+        })
+        .map(({ user, teamRole }): RealLeadMentor => ({
+          teamRole,
           id: user.id,
           fullName: user.fullName,
           email: user.email,
-          categoryId: user.categoryId ?? scope.categoryId,
+          categoryId: scope.categoryId,
           branchId: scope.branchId,
           status: toMentorStatus(user.status),
           // Real UserDto has no "hours since last activity", only an absolute `lastLoginAt` — already

@@ -23,6 +23,7 @@ import { useLeadScope } from '../scope/useLeadScope';
 export interface CreateMentorInput {
   fullName: string;
   email: string;
+  teamRole: 'Mentor' | 'Member';
 }
 
 export interface UseTeamActionsResult {
@@ -44,7 +45,13 @@ export function useTeamActions(): UseTeamActionsResult {
         // Role/categoryId are also enforced server-side from the Lead's own claims — this call can
         // only ever create a Mentor of the Lead's own category, matching what the form already told
         // the Lead would happen ("Роль (Ментор), филиал и направление определяются автоматически").
-        await createUser({ fullName: input.fullName, email: input.email, role: 'Mentor', categoryId: scope.categoryId });
+        await createUser({
+          fullName: input.fullName,
+          email: input.email,
+          role: 'Mentor',
+          categoryId: scope.categoryId,
+          ...(input.teamRole === 'Member' ? { teamRole: 'Member' as const } : {}),
+        });
         void queryClient.invalidateQueries({ queryKey: usersListQueryKey(organizationId) });
       } catch (error) {
         throw new Error(getGenericErrorMessage(error));

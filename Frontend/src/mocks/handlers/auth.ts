@@ -59,6 +59,7 @@ const PROBLEM_TITLE: Record<AuthErrorCode, string> = {
   VALIDATION_FAILED: 'Validation failed',
   SECURITY_TOKEN_INVALID: 'Security token invalid',
   USER_DEACTIVATED: 'User deactivated',
+  SCOPE_OVERRIDE_FORBIDDEN: 'Scope override forbidden',
 };
 
 interface ProblemInit {

@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
+import { getActiveTeamId, TEAM_HEADER_NAME } from '../auth/activeTeam';
 import { authEvents, notifySessionEnded } from '../auth/authEvents';
 import { clearAccessToken, getAccessToken } from '../auth/tokenStore';
 import { createCorrelationId } from '../lib/correlationId';
@@ -28,6 +29,12 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAccessToken();
   if (token !== null) config.headers.set('Authorization', `Bearer ${token}`);
   config.headers.set('X-Correlation-Id', createCorrelationId());
+
+  // Профиль, пароль и фото — дела аккаунта, а не команды: их спрашиваем без заголовка.
+  const teamId = getActiveTeamId();
+  if (teamId !== null && !(config.url ?? '').startsWith('/api/v1/auth/')) {
+    config.headers.set(TEAM_HEADER_NAME, teamId);
+  }
   return config;
 });
 
@@ -61,6 +68,12 @@ apiClient.interceptors.response.use(
     const config = error.config;
     const status = error.response?.status;
     const code = getProblemCode(error);
+
+    // Из команды успели убрать: возвращаемся «как в аккаунте» вместо экрана ошибок.
+    if (status === 403 && code === AUTH_ERROR_CODE.SCOPE_OVERRIDE_FORBIDDEN && config.headers.has(TEAM_HEADER_NAME)) {
+      authEvents.emit('teamLost', {});
+      throw error;
+    }
 
     // CSRF-провал на любом защищённом запросе (не только /auth/refresh) — например,
     // ключи DataProtection перегенерировались при перезапуске API, и старая cookie

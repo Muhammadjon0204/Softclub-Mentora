@@ -54,14 +54,15 @@ export function PriorityQueueCard({ items }: { items: PriorityQueueItem[] }): JS
                 <button
                   type="button"
                   onClick={() => { navigate(item.targetPath); }}
-                  className="group flex w-full items-center gap-3.5 px-5 py-3.5 text-left transition-colors duration-150 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand sm:px-6"
+                  className="group flex w-full flex-wrap items-center gap-x-3.5 gap-y-2 px-5 py-3.5 text-left sm:flex-nowrap transition-colors duration-150 hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand sm:px-6"
                 >
                   <UserAvatar userId={item.mentorId} name={item.mentorName} size={null} className="h-9 w-9 text-[11px]" fallbackClassName="bg-brand-soft text-brand" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-semibold leading-5 text-ink" title={item.title}>{item.title}</p>
+                    <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-ink sm:line-clamp-1" title={item.title}>{item.title}</p>
                     <p className="mt-0.5 truncate text-[12px] text-ink-muted">{item.mentorName}</p>
                   </div>
-                  <div className="shrink-0 text-right">
+                  {/* На телефоне статус и причина — второй строкой под названием, во всю ширину. */}
+                  <div className="order-last flex w-full items-center gap-2 pl-[50px] sm:order-none sm:block sm:w-auto sm:shrink-0 sm:pl-0 sm:text-right">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 ${STATUS_PILL_BG[item.status]}`}
                       role="status"
@@ -70,7 +71,7 @@ export function PriorityQueueCard({ items }: { items: PriorityQueueItem[] }): JS
                       <span aria-hidden="true" className={`h-[6px] w-[6px] shrink-0 rounded-full ${meta.dot}`} />
                       <span className={`text-[12px] font-medium ${meta.text}`}>{LEAD_ASSIGNMENT_STATUS_LABEL[item.status]}</span>
                     </span>
-                    <p className={`mt-1 text-[11.5px] font-medium ${REASON_ICON_TONE[item.reason]}`}>{item.detailLabel}</p>
+                    <p className={`text-[11.5px] font-medium sm:mt-1 ${REASON_ICON_TONE[item.reason]}`}>{item.detailLabel}</p>
                   </div>
                   <ChevronRight
                     className="h-4 w-4 shrink-0 text-ink-disabled transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-ink-muted"

@@ -4,8 +4,10 @@ import type { AuthUser } from '../../api/auth';
 import { useAuth } from '../../auth/useAuth';
 import { profilePathForRole } from '../../auth/roleRedirect';
 import { useBranchContext } from '../../features/branch-context/useBranchContext';
+import { LanguageSwitcher } from '../../shared/i18n/LanguageSwitcher';
 import { useTranslation } from '../../shared/i18n/useTranslation';
 import type { UseTranslationResult } from '../../shared/i18n/useTranslation';
+import { ThemeToggle } from '../../shared/theme/ThemeToggle';
 import { Popover } from '../../shared/ui/Popover';
 import { ProfileMenuItem } from './ProfileMenuItem';
 import { Avatar } from '../../shared/ui/Avatar';
@@ -37,12 +39,15 @@ function scopeLabelOf(user: AuthUser, t: UseTranslationResult['t']): string {
  * (раздел 3–4 задачи ребрендинга UX).
  */
 export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
-  const { logout } = useAuth();
+  const { logout, activeTeamId } = useAuth();
   const { t } = useTranslation();
   const avatarClass = avatarColorClass(useAvatarColor(user.id));
   const { isAllBranches, selectedBranchId, availableBranches } = useBranchContext();
 
-  const scopeLabel = scopeLabelOf(user, t);
+  // Участник пользуется страницами ментора, но ментором в этой команде не является.
+  const teamId = activeTeamId ?? user.category?.id;
+  const isMember = user.role === 'Mentor' && user.teams?.some((team) => team.categoryId === teamId && team.role === 'Member') === true;
+  const scopeLabel = isMember ? t('profile.role.member') : scopeLabelOf(user, t);
   const isOrgAdmin = user.role === 'Admin' && user.adminScope === 'Organization';
   const organizationContextLine = isOrgAdmin
     ? isAllBranches
@@ -53,7 +58,7 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
   return (
     <Popover
       align="right"
-      panelClassName="w-80 rounded-card p-3 shadow-[0_12px_32px_rgba(20,28,58,0.12),0_2px_8px_rgba(20,28,58,0.06)]"
+      panelClassName="max-h-[calc(100dvh-96px)] w-80 max-w-[calc(100vw-16px)] overflow-y-auto rounded-card p-3 shadow-[0_12px_32px_rgba(20,28,58,0.12),0_2px_8px_rgba(20,28,58,0.06)]"
       trigger={({ onClick, ref, isOpen }) => (
         <button
           type="button"
@@ -116,6 +121,18 @@ export function ProfileMenu({ user }: { user: AuthUser }): JSX.Element {
                 </div>
               </div>
             ) : null}
+          </div>
+
+          {/* На телефоне в шапке им не хватает места, поэтому язык и тема живут здесь. */}
+          <div className="flex flex-col gap-2.5 rounded-control border border-line px-3 py-3 lg:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[13px] font-medium text-ink">Язык</span>
+              <LanguageSwitcher pillId="lang-switcher-menu" />
+            </div>
+            <div className="flex items-center justify-between gap-3 border-t border-divider pt-2.5">
+              <span className="text-[13px] font-medium text-ink">Тема оформления</span>
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* 5.3 — действия. */}

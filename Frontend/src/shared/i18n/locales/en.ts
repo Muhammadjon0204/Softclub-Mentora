@@ -76,6 +76,7 @@ export const en: TranslationTree = {
       mentor: 'Mentor',
       orgAdmin: 'Organization admin',
       branchAdmin: 'Branch admin',
+      member: 'Team member',
     },
     allBranches: 'All branches',
     branchSelected: 'Branch selected',

@@ -30,7 +30,7 @@ export function CategoryActionMenu({ category, context, canManage, onOpenDetails
 
     if (category.leadUserId === null) {
       items.push({ id: 'assign-lead', label: 'Назначить руководителя', icon: <UserPlus className="h-full w-full" aria-hidden="true" />, onSelect: onAssignLead });
-    } else {
+    } else if (category.leadIsMember !== true) {
       items.push({ id: 'change-lead', label: 'Сменить руководителя', icon: <UserCog className="h-full w-full" aria-hidden="true" />, onSelect: onChangeLead });
     }
 

@@ -116,7 +116,8 @@ export function PreviewMetricCard({
     <>
       <div className="flex items-start justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1 text-[12px] font-medium leading-4 text-ink-muted">
-          <span className="truncate">{label}</span>
+          {/* В половине экрана телефона подпись переносится: «Всего пользовател…» ничего не говорит. */}
+          <span className="min-w-0 sm:truncate">{label}</span>
           {tooltip !== undefined ? (
             <Tooltip content={tooltip}>
               <span className="inline-flex shrink-0 text-ink-disabled hover:text-ink-muted">
@@ -137,7 +138,7 @@ export function PreviewMetricCard({
           </span>
         ) : null}
       </div>
-      {hint !== undefined ? <p className="mt-1 truncate text-[11.5px] text-ink-muted">{hint}</p> : null}
+      {hint !== undefined ? <p className="mt-1 text-[11.5px] text-ink-muted sm:truncate">{hint}</p> : null}
     </>
   );
 

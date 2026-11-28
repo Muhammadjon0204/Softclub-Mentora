@@ -6,6 +6,7 @@ import type { PreviewUserDetails } from './userPresentation';
 import { UserWorkStats } from './UserWorkStats';
 import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import { UserAvatar } from '../avatars/UserAvatar';
+import { teamRoleLabel } from '../teams/teamLabels';
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }): JSX.Element {
   return (
@@ -30,6 +31,29 @@ function scopeRows(user: PreviewUserDetails): { label: string; value: ReactNode 
     { label: 'Филиал', value: branchDisplayName(user.branchName) },
     { label: 'Направление', value: emptyOrValue(user.categoryName) },
   ];
+}
+
+/** Все команды человека — когда это не просто «своё направление в своей роли». */
+function UserTeams({ user }: { user: PreviewUserDetails }): JSX.Element | null {
+  const teams = user.teams ?? [];
+  if (!teams.some((team) => !team.isMain || team.role === 'Member')) return null;
+
+  return (
+    <section className="space-y-2 px-0.5">
+      <h4 className="text-[12.5px] font-semibold text-ink-secondary">Команды</h4>
+      <ul className="divide-y divide-divider rounded-control border border-line">
+        {teams.map((team) => (
+          <li key={team.categoryId} className="flex items-center justify-between gap-3 px-3 py-2">
+            <span className="min-w-0 truncate text-[13px] font-medium text-ink">{team.name}</span>
+            <span className="shrink-0 text-[12px] text-ink-muted">
+              <span>{teamRoleLabel(team.role)}</span>
+              {team.isMain ? <span> · основная</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /** Профильный summary — строгий блок, не цветная hero-card (раздел 7 промпта). */
@@ -76,6 +100,8 @@ export function UserOverviewSection({ user }: { user: PreviewUserDetails }): JSX
           <DetailRow key={row.label} label={row.label} value={row.value} />
         ))}
       </dl>
+
+      <UserTeams user={user} />
     </div>
   );
 }

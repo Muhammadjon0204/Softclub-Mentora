@@ -3,6 +3,7 @@ import { HelpCircle, Menu as MenuIcon, WifiOff } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { ProfileMenu } from '../admin/ProfileMenu';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { TeamSwitcher } from '../../features/teams/TeamSwitcher';
 import { LanguageSwitcher } from '../../shared/i18n/LanguageSwitcher';
 import { useTranslation } from '../../shared/i18n/useTranslation';
 import { ThemeToggle } from '../../shared/theme/ThemeToggle';
@@ -31,18 +32,21 @@ export function LeadTopbar({ onOpenMobileSidebar }: LeadTopbarProps): JSX.Elemen
       <div className="hidden min-w-0 flex-1 lg:block">
         <LeadBreadcrumbs />
       </div>
-      <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3 lg:flex-none">
         {!isOnline ? (
-          <span className="hidden items-center gap-1.5 rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 text-[12px] font-medium text-warning sm:flex">
+          <span className="hidden items-center gap-1.5 rounded-full border border-warning-border bg-warning-soft px-2.5 py-1 text-[12px] font-medium text-warning lg:flex">
             <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />
             {t('topbar.offline')}
           </span>
         ) : null}
 
-        <LanguageSwitcher />
-        <ThemeToggle />
+        <TeamSwitcher />
+        <div className="hidden items-center gap-3 lg:flex">
+          <LanguageSwitcher />
+          <ThemeToggle />
+        </div>
 
-        <IconButton label={t('topbar.help')} size="md" className="hidden sm:inline-flex">
+        <IconButton label={t('topbar.help')} size="md" className="hidden lg:inline-flex">
           <HelpCircle className="h-[18px] w-[18px]" aria-hidden="true" />
         </IconButton>
 

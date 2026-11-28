@@ -143,24 +143,24 @@ export function ReportsPage(): JSX.Element {
             {report.mentorBreakdown.map((row) => {
               const approvedShare = row.total === 0 ? 0 : Math.round((row.approved / row.total) * 100);
               return (
-                <li key={row.mentorId} className="flex items-center gap-3.5 px-5 py-3.5 sm:px-6">
+                <li key={row.mentorId} className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 px-5 py-3.5 sm:flex-nowrap sm:px-6">
                   <UserAvatar userId={row.mentorId} name={row.fullName} size={null} className="h-8 w-8 text-[11px]" fallbackClassName="bg-brand-soft text-brand" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-medium text-ink">{row.fullName}</p>
+                    <p className="line-clamp-2 text-[13.5px] font-medium text-ink sm:line-clamp-1">{row.fullName}</p>
                     <div className="mt-1.5 h-1 w-full max-w-[160px] overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
                       <div className="h-full rounded-full bg-brand" style={{ width: `${String(approvedShare)}%` }} />
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-5 text-[13px] tabular-nums">
-                    <div className="w-14 text-right">
+                  <div className="flex w-full shrink-0 items-center gap-6 pl-[46px] text-[13px] tabular-nums sm:w-auto sm:gap-5 sm:pl-0">
+                    <div className="sm:w-14 sm:text-right">
                       <p className="font-semibold text-ink">{row.total}</p>
                       <p className="text-[11px] text-ink-muted">задач</p>
                     </div>
-                    <div className="w-14 text-right">
+                    <div className="sm:w-14 sm:text-right">
                       <p className="font-semibold text-success">{row.approved}</p>
                       <p className="text-[11px] text-ink-muted">одобрено</p>
                     </div>
-                    <div className="w-14 text-right">
+                    <div className="sm:w-14 sm:text-right">
                       <p className={`font-semibold ${row.overdue > 0 ? 'text-danger' : 'text-ink-disabled'}`}>{row.overdue}</p>
                       <p className="text-[11px] text-ink-muted">просрочено</p>
                     </div>

@@ -89,6 +89,8 @@ export interface AssignmentListQuery {
 /** LA4: `POST /assignments/drafts` — Lead only, scope derived from the caller's own category. */
 export interface CreateAssignmentDraftRequest {
   assignedToId: string;
+  /** Для администратора: в какой команде человека задание. Тимлид выдаёт только в своей. */
+  categoryId?: string;
   topicAssignmentId?: string | null;
   title?: string | null;
   description?: string | null;

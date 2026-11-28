@@ -24,7 +24,7 @@ export function LeadLayout(): JSX.Element {
 
   return (
     <BranchProvider>
-      <div className="flex h-screen min-w-[360px] overflow-hidden bg-app">
+      <div className="app-shell flex min-w-[360px] overflow-hidden bg-app">
         <OfflineBanner />
 
         <aside
@@ -49,8 +49,9 @@ export function LeadLayout(): JSX.Element {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <LeadTopbar onOpenMobileSidebar={() => { setMobileOpen(true); }} />
-          <main className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1680px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <main className="flex-1 overflow-y-auto overscroll-contain">
+            {/* На телефоне снизу запас: последний блок не упирается в край и панель браузера. */}
+            <div className="mx-auto w-full max-w-[1680px] px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-8 lg:pt-8">
               <PageTransition key={location.pathname}>
                 <Outlet />
               </PageTransition>

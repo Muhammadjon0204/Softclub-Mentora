@@ -11,6 +11,7 @@ import { useLeadScope } from '../scope/useLeadScope';
 import { useScopedLeadAssignments } from '../scope/useScopedLeadAssignments';
 import type { RealLeadMentor } from '../scope/useScopedLeadMentors';
 import { UserAvatar } from '../../avatars/UserAvatar';
+import { TeamPlace } from '../../teams/TeamPlace';
 
 export interface MentorDetailsDrawerProps {
   mentor: RealLeadMentor | undefined;
@@ -38,9 +39,9 @@ export function MentorDetailsDrawer({ mentor, mentorId, onClose }: MentorDetails
   const approved = assignments.filter((a) => a.status === 'Approved');
 
   return (
-    <Drawer open={open} onOpenChange={(next) => { if (!next) onClose(); }} title={mentor?.fullName ?? 'Ментор'} size="md">
+    <Drawer open={open} onOpenChange={(next) => { if (!next) onClose(); }} title={mentor?.fullName ?? 'Участник'} size="md">
       {mentorId === null ? null : mentor === undefined ? (
-        <EmptyState icon={<UserX className="h-5 w-5" aria-hidden="true" />} title="Ментор недоступен" description="Он не найден в вашем направлении." />
+        <EmptyState icon={<UserX className="h-5 w-5" aria-hidden="true" />} title="Участник недоступен" description="Он не найден в вашей команде." />
       ) : (
         <div className="space-y-6">
           <div className="flex items-center gap-3">
@@ -74,6 +75,8 @@ export function MentorDetailsDrawer({ mentor, mentorId, onClose }: MentorDetails
               <p className="mt-0.5 text-[13px] font-medium text-ink">{mentor.lastLoginLabel}</p>
             </div>
           </div>
+
+          <TeamPlace categoryId={scope.categoryId} userId={mentor.id} onRemoved={onClose} />
 
           <div>
             <h3 className="mb-2 text-[13.5px] font-semibold text-ink">Задания ({assignments.length})</h3>

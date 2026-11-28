@@ -24,7 +24,8 @@ import type { BranchNameLookup } from './useUsersQuery';
 export interface CreateUserInput {
   fullName: string;
   email: string;
-  role: Exclude<PreviewUserRole, 'OrgAdmin'>;
+  /** `Member` — участник команды (аккаунт ментора, который не преподаёт). */
+  role: Exclude<PreviewUserRole, 'OrgAdmin'> | 'Member';
   categoryId: string | null;
   /**
    * `CreateUserRequest` не несёт `branchId` — сервер решает по `X-MTF-Branch-Id`/claims. Для
@@ -111,7 +112,8 @@ export function useUserActions(): UseUserActionsResult {
 
   const createUser = useCallback(
     async (input: CreateUserInput): Promise<PreviewUserDetails> => {
-      const { role, adminScope } = fromAssignableRole(input.role);
+      const asMember = input.role === 'Member';
+      const { role, adminScope } = fromAssignableRole(input.role === 'Member' ? 'Mentor' : input.role);
       const created = await run(() =>
         createUserApi(
           {
@@ -120,6 +122,7 @@ export function useUserActions(): UseUserActionsResult {
             role,
             adminScope,
             categoryId: input.categoryId,
+            ...(asMember ? { teamRole: 'Member' as const } : {}),
           },
           input.branchId ?? undefined,
         ),

@@ -34,6 +34,8 @@ export interface PreviewCategoryDetails extends PreviewCategory {
   description: string | null;
   /** `null`, если `leadName` не находит соответствия среди пользователей с ролью Lead (несогласованность seed-данных этапа 1) — считаем это отсутствием реальной связи, а не ошибкой. */
   leadUserId: string | null;
+  /** Руководитель добавлен из другой команды: меняется в списке участников, а не сменой роли аккаунта. */
+  leadIsMember?: boolean;
   createdLabel: string;
   timezone: string;
   /** HH:mm — CAT-013, наследуется от Branch.TimeZoneId при создании (раздел 39.4 ТЗ). */

@@ -9,6 +9,7 @@ import { z } from 'zod';
 export const createMentorSchema = z.object({
   fullName: z.string().trim().min(2, 'Введите имя и фамилию').max(120, 'Не более 120 символов'),
   email: z.string().trim().min(1, 'Введите email').email('Введите корректный email'),
+  teamRole: z.enum(['Mentor', 'Member']),
 });
 
 export type CreateMentorFormValues = z.infer<typeof createMentorSchema>;

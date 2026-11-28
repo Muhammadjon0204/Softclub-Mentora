@@ -188,18 +188,18 @@ export function ReportsPage(): JSX.Element {
             ) : (
               rows.map((row) => (
                 <tr key={row.key} className="h-14 border-b border-divider text-sm last:border-0 hover:bg-surface-hover">
-                  <PreviewTd className="truncate font-medium text-ink">{row.category}</PreviewTd>
-                  <PreviewTd className="truncate">{row.branch}</PreviewTd>
-                  <PreviewTd>
+                  <PreviewTd card="title" className="truncate font-medium text-ink">{row.category}</PreviewTd>
+                  <PreviewTd card="wide" label="Филиал" className="truncate">{row.branch}</PreviewTd>
+                  <PreviewTd card="wide" label="Руководитель">
                     {row.lead !== null ? (
                       <span className="flex min-w-0 items-center gap-2"><Avatar name={row.lead} size="xs" /><span className="truncate text-ink">{row.lead}</span></span>
                     ) : (
                       <span className="text-warning">Не назначен</span>
                     )}
                   </PreviewTd>
-                  <PreviewTd className="text-right tabular-nums">{row.mentors}</PreviewTd>
-                  <PreviewTd className="text-right tabular-nums text-ink">{row.stats.total}</PreviewTd>
-                  <PreviewTd>
+                  <PreviewTd label="Менторов" className="text-right tabular-nums">{row.mentors}</PreviewTd>
+                  <PreviewTd label="Всего задач" className="text-right tabular-nums text-ink">{row.stats.total}</PreviewTd>
+                  <PreviewTd card="wide" label="Сдано в срок">
                     {row.stats.onTimePct === null ? (
                       <span className="text-ink-disabled">—</span>
                     ) : (
@@ -211,8 +211,8 @@ export function ReportsPage(): JSX.Element {
                       </span>
                     )}
                   </PreviewTd>
-                  <PreviewTd className={`text-right tabular-nums ${row.stats.overdue > 0 ? 'font-semibold text-danger' : ''}`}>{row.stats.overdue}</PreviewTd>
-                  <PreviewTd className="text-right tabular-nums">{formatHours(row.stats.avgReviewHours)}</PreviewTd>
+                  <PreviewTd label="Просрочено" className={`text-right tabular-nums ${row.stats.overdue > 0 ? 'font-semibold text-danger' : ''}`}>{row.stats.overdue}</PreviewTd>
+                  <PreviewTd label="Ср. проверка" className="text-right tabular-nums">{formatHours(row.stats.avgReviewHours)}</PreviewTd>
                 </tr>
               ))
             )}

@@ -225,7 +225,7 @@ export interface components {
          * @description Единственное поле, по которому frontend принимает решения.
          * @enum {string}
          */
-        AuthErrorCode: "INVALID_CREDENTIALS" | "RATE_LIMIT_EXCEEDED" | "REFRESH_TOKEN_INVALID" | "REFRESH_TOKEN_REUSE_DETECTED" | "CSRF_VALIDATION_FAILED" | "UNAUTHORIZED" | "TOKEN_EXPIRED" | "TOKEN_VERSION_MISMATCH" | "VALIDATION_FAILED" | "SECURITY_TOKEN_INVALID" | "USER_DEACTIVATED";
+        AuthErrorCode: "INVALID_CREDENTIALS" | "RATE_LIMIT_EXCEEDED" | "REFRESH_TOKEN_INVALID" | "REFRESH_TOKEN_REUSE_DETECTED" | "CSRF_VALIDATION_FAILED" | "UNAUTHORIZED" | "TOKEN_EXPIRED" | "TOKEN_VERSION_MISMATCH" | "VALIDATION_FAILED" | "SECURITY_TOKEN_INVALID" | "USER_DEACTIVATED" | "SCOPE_OVERRIDE_FORBIDDEN";
         ProblemDetails: {
             /** Format: uri */
             type: string;
@@ -260,6 +260,24 @@ export interface components {
             avatarUrl?: string | null;
             /** @description Что человеку разрешено сейчас. Подсказка для интерфейса; решает всегда сервер. */
             permissions?: string[];
+            /**
+             * @description Все команды (направления) человека, основная первой. Чтобы работать в другой команде,
+             *     клиент присылает её идентификатор в заголовке `X-MTF-Team-Id`.
+             */
+            teams?: components["schemas"]["TeamSummary"][];
+        };
+        TeamSummary: {
+            categoryId: string;
+            name: string;
+            timeZoneId: string;
+            /**
+             * @description Кем человек является именно в этой команде.
+             * @enum {string}
+             */
+            role: "Lead" | "Mentor" | "Member";
+            /** @description Команда, в которой аккаунт открывается без заголовка. */
+            isMain: boolean;
+            permissions: string[];
         };
         LoginRequest: {
             /** Format: email */

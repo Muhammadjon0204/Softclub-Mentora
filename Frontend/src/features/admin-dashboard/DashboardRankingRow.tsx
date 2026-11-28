@@ -129,7 +129,7 @@ export function DashboardRankingRow({
       {icon ?? avatar ?? null}
 
       <div className="min-w-0">
-        <TruncatableText text={title} className="truncate text-[13.5px] font-semibold leading-[18px] text-ink" />
+        <TruncatableText text={title} className="line-clamp-2 break-words text-[13.5px] font-semibold leading-[18px] text-ink sm:line-clamp-1 sm:break-all" />
         {subtitle !== undefined ? (
           <TruncatableText text={subtitle} className="mt-px truncate text-[11.5px] leading-4 text-ink-muted" />
         ) : null}
