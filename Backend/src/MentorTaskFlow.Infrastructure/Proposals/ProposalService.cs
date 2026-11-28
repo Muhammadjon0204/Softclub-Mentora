@@ -9,9 +9,11 @@ using MentorTaskFlow.Domain.Auditing;
 using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Proposals;
 using MentorTaskFlow.Domain.Tenancy;
+using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Notifications;
 using MentorTaskFlow.Infrastructure.Persistence;
 using MentorTaskFlow.Infrastructure.Persistence.Configurations;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorTaskFlow.Infrastructure.Proposals;
@@ -163,10 +165,12 @@ public sealed class ProposalService(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(u => u.Id == proposal.AuthorId)
-            .Select(u => new { u.IsActive, u.Role, u.CategoryId })
+            .Select(u => new { u.IsActive })
             .FirstAsync(cancellationToken);
 
-        if (author.Role is not UserRole.Mentor || author.CategoryId != proposal.CategoryId)
+        var authorRole = await dbContext.RoleInTeamAsync(proposal.AuthorId, proposal.CategoryId, cancellationToken);
+
+        if (authorRole is not (TeamRole.Mentor or TeamRole.Member))
         {
             throw new ConflictException(
                 ErrorCodes.CrossScopeReference,
@@ -311,7 +315,8 @@ public sealed class ProposalService(
     private Task<bool> HasActiveLeadAsync(Guid categoryId, CancellationToken cancellationToken) =>
         dbContext.Users
             .IgnoreQueryFilters()
-            .AnyAsync(u => u.CategoryId == categoryId && u.Role == UserRole.Lead && u.IsActive, cancellationToken);
+            .LeadingTeam(dbContext, categoryId)
+            .AnyAsync(cancellationToken);
 
     private static ProposalKind ParseKind(string? kind) =>
         Enum.TryParse<ProposalKind>(kind, out var parsed) && Enum.IsDefined(parsed)
@@ -328,7 +333,7 @@ public sealed class ProposalService(
         var recipients = await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(u => u.CategoryId == proposal.CategoryId && u.Role == UserRole.Lead && u.IsActive)
+            .LeadingTeam(dbContext, proposal.CategoryId)
             .Select(u => u.Id)
             .ToListAsync(cancellationToken);
 
@@ -484,7 +489,14 @@ public sealed class ProposalService(
             .Distinct()
             .ToListAsync(cancellationToken);
 
-        return led.ToHashSet();
+        var ledByMembers = await (
+                from membership in dbContext.TeamMemberships.IgnoreQueryFilters()
+                join user in dbContext.Users.IgnoreQueryFilters() on membership.UserId equals user.Id
+                where categoryIds.Contains(membership.CategoryId) && membership.Role == TeamRole.Lead && user.IsActive
+                select membership.CategoryId)
+            .ToListAsync(cancellationToken);
+
+        return led.Concat(ledByMembers).ToHashSet();
     }
 
     private static ProposalDto ToDto(

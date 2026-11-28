@@ -15,6 +15,8 @@ export interface AuthEventPayload {
   sessionExpired: { reason: SessionEndReason };
   tokenReuseDetected: Record<string, never>;
   loggedOut: Record<string, never>;
+  /** Сервер больше не считает человека участником выбранной команды. */
+  teamLost: Record<string, never>;
 }
 
 export type AuthEventName = keyof AuthEventPayload;
@@ -25,6 +27,7 @@ const listeners: { [TName in AuthEventName]: Set<Listener<TName>> } = {
   sessionExpired: new Set(),
   tokenReuseDetected: new Set(),
   loggedOut: new Set(),
+  teamLost: new Set(),
 };
 
 export const authEvents = {

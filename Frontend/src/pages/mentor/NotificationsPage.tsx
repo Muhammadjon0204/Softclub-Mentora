@@ -80,9 +80,9 @@ export function NotificationsPage(): JSX.Element {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         {unread ? <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" /> : null}
-                        <p className={`truncate text-[13.5px] leading-5 ${unread ? 'font-semibold text-ink' : 'font-medium text-ink-secondary'}`}>{n.title}</p>
+                        <p className={`line-clamp-2 text-[13.5px] leading-5 sm:line-clamp-1 ${unread ? 'font-semibold text-ink' : 'font-medium text-ink-secondary'}`}>{n.title}</p>
                       </div>
-                      <p className="mt-0.5 truncate text-[12px] text-ink-muted" title={n.description}>{n.description}</p>
+                      <p className="mt-0.5 line-clamp-2 text-[12px] text-ink-muted sm:line-clamp-1" title={n.description}>{n.description}</p>
                     </div>
                     <span className="shrink-0 whitespace-nowrap text-[11.5px] text-ink-disabled">{formatRelative(n.occurredAt).label}</span>
                   </button>

@@ -38,7 +38,7 @@ export function BranchContextSelector(): JSX.Element | null {
           aria-haspopup="listbox"
           aria-expanded={isOpen}
           disabled={isLoadingBranches}
-          className="flex h-10 min-w-[200px] items-center gap-2 rounded-control border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60"
+          className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-control border border-line bg-surface px-3 text-sm font-medium text-ink transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-60 lg:min-w-[200px] lg:flex-none"
         >
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
             {selectedBranch === null ? (

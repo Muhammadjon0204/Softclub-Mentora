@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { useAuth } from '../../auth/useAuth';
 import type { AssignmentDto } from '../../api/lead/assignments';
 import type { UserDto } from '../../api/admin/users';
 import { ConfirmDialog } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { FormField } from '../../shared/ui/FormField';
-import { assignablePeople, personOption } from './assignablePeople';
+import { assignableSeats, seatOption } from './assignablePeople';
 
 export interface AdminReassignDialogProps {
   assignment: AssignmentDto | null;
@@ -17,15 +18,16 @@ export interface AdminReassignDialogProps {
 
 /** Направление задания не меняется: снимок контура неизменен, поэтому кандидаты только из него. */
 export function AdminReassignDialog({ assignment, users, categoryName, onClose, onConfirm }: AdminReassignDialogProps): JSX.Element {
+  const selfId = useAuth().user?.id ?? null;
   const [assigneeId, setAssigneeId] = useState('');
 
   useEffect(() => { setAssigneeId(''); }, [assignment]);
 
   const options = useMemo(
-    () => assignablePeople(users)
-      .filter((user) => user.categoryId === assignment?.categoryId && user.id !== assignment?.assignedToId)
-      .map((user) => personOption(user, categoryName)),
-    [users, assignment, categoryName],
+    () => assignableSeats(users, selfId)
+      .filter((seat) => seat.categoryId === assignment?.categoryId && seat.user.id !== assignment?.assignedToId)
+      .map((seat) => seatOption(seat, seat.user.id, categoryName)),
+    [users, selfId, assignment, categoryName],
   );
 
   return (

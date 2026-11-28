@@ -1,5 +1,6 @@
 using MentorTaskFlow.Api.Authorization;
 using MentorTaskFlow.Api.Tenancy;
+using MentorTaskFlow.Application.Common.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -13,7 +14,7 @@ namespace MentorTaskFlow.Api.Realtime;
 /// refetches through the ordinary authorized endpoints, so this hub adds no new read path to secure.
 /// </remarks>
 [Authorize(Policy = MtfPolicies.Authenticated)]
-public sealed class RealtimeHub : Hub
+public sealed class RealtimeHub(ITeamContextResolver teams) : Hub
 {
     public const string Path = "/api/v1/realtime";
 
@@ -36,10 +37,17 @@ public sealed class RealtimeHub : Hub
             return;
         }
 
-        foreach (var group in RealtimeGroups.For(user))
+        var memberships = await teams.ListMembershipsAsync(user.UserId, user.OrganizationId, Context.ConnectionAborted);
+
+        var groups = RealtimeGroups.For(user)
+            .Concat(memberships.SelectMany(m => RealtimeGroups.ForMembership(m.TeamId, m.Role)))
+            .Distinct();
+
+        foreach (var group in groups)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, group);
         }
+
         await base.OnConnectedAsync();
     }
 }

@@ -46,7 +46,7 @@ export function RecentBusinessActivityCard({ auditEntries, assignmentEntries }: 
                 >
                   <span aria-hidden="true" className={`mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full ${TONE_DOT_CLASS[entry.tone]}`} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] text-ink">
+                    <p className="line-clamp-2 text-[13px] text-ink sm:line-clamp-1">
                       <span className="font-medium">{entry.actorLabel}</span> <span className="text-ink-secondary">{entry.message}</span>
                     </p>
                     <p className="mt-0.5 text-[11.5px] tabular-nums text-ink-muted">{relativeTimeLabel(entry.at)}</p>

@@ -43,10 +43,10 @@ export function TeamSummaryCard({ team }: { team: TeamSummaryRow[] }): JSX.Eleme
                 <span aria-hidden="true" className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-surface ${STATUS_DOT[mentor.status]}`} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-semibold text-ink">{mentor.fullName}</p>
-                <p className="mt-0.5 truncate text-[11.5px] text-ink-muted">Активность: {mentor.lastActiveLabel}</p>
+                <p className="line-clamp-2 text-[13.5px] font-semibold text-ink sm:line-clamp-1">{mentor.fullName}</p>
+                <p className="mt-0.5 text-[11.5px] text-ink-muted sm:truncate">Активность: {mentor.lastActiveLabel}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
                 {mentor.reworkCount > 0 ? (
                   <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums text-warning">
                     {mentor.reworkCount} на дораб.

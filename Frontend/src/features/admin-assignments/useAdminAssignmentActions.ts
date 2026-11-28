@@ -15,6 +15,8 @@ import { patchAssignmentListCache } from '../lead/assignments/assignmentAdapter'
 
 export interface NewAdminAssignment {
   assignedToId: string;
+  /** В какой из команд человека это задание. */
+  categoryId: string;
   title: string;
   description: string | null;
   dueAtMs: number;
@@ -52,6 +54,7 @@ export function useAdminAssignmentActions(listQueryKey: readonly unknown[]): Adm
       mutation.mutateAsync(async () => {
         const draft = await createAssignmentDraft({
           assignedToId: input.assignedToId,
+          categoryId: input.categoryId,
           title: input.title,
           description: input.description,
           dueAt: new Date(input.dueAtMs).toISOString(),

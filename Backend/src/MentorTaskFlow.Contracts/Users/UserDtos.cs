@@ -26,7 +26,15 @@ public sealed record UserDto(
     DateTimeOffset CreatedAt,
     string ConcurrencyToken,
     BranchSummaryDto? Branch,
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    IReadOnlyList<UserTeamDto>? Teams = null);
+
+/// <summary>
+/// One team of a person: their main one, or one they were added to. <c>role</c> is what they are
+/// there — <c>Lead</c>, <c>Mentor</c> or <c>Member</c> — and can differ from team to team.
+/// </summary>
+/// <remarks>A Lead is given only their own team here, whatever else the person belongs to.</remarks>
+public sealed record UserTeamDto(Guid CategoryId, string Name, string Role, bool IsMain);
 
 /// <summary>
 /// <c>POST /users</c>.
@@ -46,13 +54,18 @@ public sealed record UserDto(
 /// <c>adminScope</c> is accepted only when an Organization Admin creates an administrator. In every
 /// other request its presence is 400 <c>VALIDATION_FAILED</c> (<c>TEN-014</c>).
 /// </para>
+/// <para>
+/// <c>teamRole</c> is accepted only with the role <c>Mentor</c>: <c>Member</c> adds somebody who works
+/// in the team without teaching in it.
+/// </para>
 /// </remarks>
 public sealed record CreateUserRequest(
     string FullName,
     string Email,
     string Role,
     string? AdminScope = null,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    string? TeamRole = null);
 
 /// <summary>
 /// <c>PATCH /users/{id}</c> — the only editable field is the display name.

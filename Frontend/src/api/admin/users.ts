@@ -26,6 +26,16 @@ export interface UserDto {
    * В остальных случаях `null`, имя филиала резолвится на фронте через `useBranchContext()`.
    */
   branch: { id: string; name: string; code: string; isHeadOffice: boolean } | null;
+  /** Команды человека, основная первой. Тимлиду сервер присылает только его команду. */
+  teams?: UserTeamDto[];
+}
+
+export interface UserTeamDto {
+  categoryId: string;
+  name: string;
+  /** Кем человек является именно здесь: `Lead` | `Mentor` | `Member`. */
+  role: string;
+  isMain: boolean;
 }
 
 export interface PagedResult<T> {
@@ -57,6 +67,8 @@ export interface CreateUserRequest {
   role: string;
   adminScope?: string | null;
   categoryId?: string | null;
+  /** `Member` — участник команды: работает в ней, но не преподаёт. Только вместе с ролью `Mentor`. */
+  teamRole?: 'Mentor' | 'Member';
 }
 
 /** PATCH /users/{id} — единственное изменяемое поле, ничего больше (`API-009`). */

@@ -61,6 +61,10 @@ public sealed record TaskEventDto(
 /// organization, branch and category from their own category (<c>SEC-003</c>).
 /// </para>
 /// <para>
+/// <c>categoryId</c> is for an administrator giving work to somebody in several teams: it says which
+/// one, and only the assignee's own teams are accepted. Omitted, it is their main team.
+/// </para>
+/// <para>
 /// <c>dueAt</c> is optional. Omitted, the deadline falls on the category's
 /// <c>DefaultDueTimeLocal</c> that many days ahead; a date without a time of day gets the same
 /// default time (<c>ASN-027</c>).
@@ -71,7 +75,8 @@ public sealed record CreateAssignmentDraftRequest(
     Guid? TopicAssignmentId,
     string? Title,
     string? Description,
-    DateTimeOffset? DueAt);
+    DateTimeOffset? DueAt,
+    Guid? CategoryId = null);
 
 /// <summary>
 /// <c>PUT /assignments/{id}</c> — allowed in <c>Draft</c> and <c>Suggested</c> only (<c>ASN-004</c>).

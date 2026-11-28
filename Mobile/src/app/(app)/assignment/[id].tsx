@@ -1,23 +1,34 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Radius, Space } from '@/constants/theme';
-import { getAssignment, getAssignmentHistory, type TaskEvent } from '@/features/assignments/api';
+import { getAssignment, getAssignmentHistory, listSubmissions, type TaskEvent } from '@/features/assignments/api';
 import { relativeDue } from '@/features/assignments/grouping';
+import { useCan, usePeopleNames } from '@/features/assignments/queries';
+import { AssignmentActions } from '@/features/assignments/AssignmentActions';
+import { ReviewPanel } from '@/features/assignments/ReviewPanel';
+import { SubmitPanel } from '@/features/assignments/SubmitPanel';
 import { EVENT_LABEL, isActionable } from '@/features/assignments/status';
-import { WEB_URL } from '@/lib/config';
+import { Submissions } from '@/features/assignments/Submissions';
 import { useT } from '@/lib/i18n';
+import { useAccount, useSession, useUser } from '@/lib/session';
 import { useColors } from '@/lib/useColors';
-import { PrimaryButton, SecondaryButton, StateMessage, StatusPill } from '@/ui/primitives';
+import { Button, Card } from '@/ui/kit';
+import { SecondaryButton, StateMessage, StatusPill } from '@/ui/primitives';
 
 export default function AssignmentScreen(): JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
   const c = useColors();
   const { t, language, locale } = useT();
+  const headerHeight = useHeaderHeight();
   const assignment = useQuery({ queryKey: ['assignment', id], queryFn: () => getAssignment(id) });
   const history = useQuery({ queryKey: ['assignment', id, 'history'], queryFn: () => getAssignmentHistory(id) });
+  const submissions = useQuery({ queryKey: ['assignment', id, 'submissions'], queryFn: () => listSubmissions(id) });
+  const user = useUser();
+  const can = useCan();
+  const nameOf = usePeopleNames();
 
   if (assignment.isPending) return <StateMessage loading title={t('Загружаем задание…')} />;
   if (assignment.isError) {
@@ -33,24 +44,38 @@ export default function AssignmentScreen(): JSX.Element {
   const a = assignment.data;
   const due = new Date(a.currentDueAt);
   const relative = relativeDue(a.currentDueAt, language);
-  const actionable = isActionable(a.status);
+  const isExecutor = a.assignedToId === user.id;
+  // An administrator hands work in from their place in the team, not from the administrator's one.
+  const outsideTeam = isExecutor && user.role === 'Admin';
+  const actionable = isExecutor && !outsideTeam && isActionable(a.status);
+  const awaiting = a.status === 'Submitted' || a.status === 'InReview';
+  const versions = submissions.data ?? [];
+  const latest = versions.reduce<(typeof versions)[number] | null>((best, s) => (!best || s.versionNumber > best.versionNumber ? s : best), null);
+  const mayReview = awaiting && a.canManage === true && can('assignments.review') && !isExecutor;
+  const assigneeName = isExecutor ? null : nameOf(a.assignedToId);
   const moved = a.currentDueAt !== a.initialDueAt;
 
   return (
-    <ScrollView style={{ backgroundColor: c.background }} contentContainerStyle={styles.container}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.background }} behavior="padding" keyboardVerticalOffset={headerHeight}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={{ gap: Space.sm }}>
         <StatusPill status={a.status} />
         <Text style={[styles.title, { color: c.text }]} accessibilityRole="header">{a.title}</Text>
+        {assigneeName ? (
+          <Text style={{ color: c.textSecondary, fontSize: 15 }}>
+            {t('Исполнитель')}: {assigneeName}
+          </Text>
+        ) : null}
         {a.branch ? <Text style={{ color: c.textMuted, fontSize: 14 }}>{a.branch.name}</Text> : null}
       </View>
 
-      <View style={[styles.panel, { backgroundColor: c.surface, borderColor: relative.overdue && actionable ? c.danger : c.border }]}>
+      <View style={[styles.panel, { backgroundColor: c.surface, borderColor: relative.overdue && isActionable(a.status) ? c.danger : c.border }]}>
         <Text style={[styles.panelLabel, { color: c.textMuted }]}>{t('Срок сдачи')}</Text>
         <Text style={[styles.dueDate, { color: c.text }]}>
           {due.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })},{' '}
           {due.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
         </Text>
-        {actionable ? (
+        {isActionable(a.status) ? (
           <Text style={{ color: relative.overdue ? c.danger : c.textSecondary, fontSize: 14 }}>{relative.text}</Text>
         ) : null}
         {moved ? (
@@ -71,17 +96,21 @@ export default function AssignmentScreen(): JSX.Element {
         <Text style={[styles.body, { color: c.textSecondary }]}>{t('Причина отмены')}: {a.cancelReason}</Text>
       ) : null}
 
-      {actionable ? (
+      {actionable ? <SubmitPanel assignmentId={a.id} /> : null}
+      {outsideTeam && isActionable(a.status) ? <SwitchToTeam categoryId={a.categoryId} assignmentId={a.id} /> : null}
+
+      {versions.length > 0 ? (
         <View style={{ gap: Space.sm }}>
-          {/* Uploading files from the phone is the next stage; until then the site does it. */}
-          <PrimaryButton
-            label={t('Сдать работу на сайте')}
-            onPress={() => void WebBrowser.openBrowserAsync(`${WEB_URL}/mentor/tasks?assignmentId=${encodeURIComponent(a.id)}`)}
-          />
-          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
-            {t('Загрузка файлов прямо из приложения появится в следующей версии.')}
-          </Text>
+          <Text style={[styles.sectionTitle, { color: c.textSecondary }]}>{t('Сданные работы')}</Text>
+          <Submissions items={versions} />
         </View>
+      ) : null}
+      {submissions.isError ? <Text style={{ color: c.danger }}>{t('Не удалось загрузить сданные работы')}</Text> : null}
+
+      {mayReview && latest ? <ReviewPanel assignment={a} submissionId={latest.id} /> : null}
+      {!isExecutor ? <AssignmentActions assignment={a} /> : null}
+      {awaiting && !isExecutor && a.canManage !== true ? (
+        <Text style={{ color: c.textMuted, fontSize: 14 }}>{t('Проверяет тот, кто выдал задание.')}</Text>
       ) : null}
 
       <View style={{ gap: Space.sm }}>
@@ -92,13 +121,47 @@ export default function AssignmentScreen(): JSX.Element {
         {history.data
           ?.slice()
           .reverse()
-          .map((event, index, all) => <HistoryItem key={event.id} event={event} last={index === all.length - 1} />)}
+          .map((event, index, all) => (
+            <HistoryItem key={event.id} event={event} actor={
+                // The server calls every non-admin «Lead», the mentor's own hand-ins included.
+                isExecutor && event.actorLabel && event.eventType.endsWith('SubmissionUploaded')
+                  ? t('Вы')
+                  : event.actorLabel
+                    ? t(ACTOR_ROLE[event.actorLabel] ?? event.actorLabel)
+                    : nameOf(event.actorId)
+              } last={index === all.length - 1} />
+          ))}
       </View>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-function HistoryItem({ event, last }: { event: TaskEvent; last: boolean }): JSX.Element {
+/** The way into the team a task belongs to, for whoever is looking at it from outside. */
+function SwitchToTeam({ categoryId, assignmentId }: { categoryId: string; assignmentId: string }): JSX.Element | null {
+  const { t } = useT();
+  const c = useColors();
+  const account = useAccount();
+  const { switchTeam } = useSession();
+  const team = account.teams?.find((candidate) => candidate.categoryId === categoryId);
+  if (!team) return null;
+  return (
+    <Card style={{ gap: Space.md }}>
+      <Text style={{ color: c.textSecondary, fontSize: 15, lineHeight: 22 }}>
+        {t('Это ваше задание. Чтобы сдать работу, перейдите в команду')} «{team.name}».
+      </Text>
+      <Button
+        label={t('Перейти в команду')}
+        onPress={() => switchTeam(categoryId, { pathname: '/assignment/[id]', params: { id: assignmentId } })}
+      />
+    </Card>
+  );
+}
+
+/** A mentor sees the role of whoever acted, as the server names it. */
+const ACTOR_ROLE: Record<string, string> = { Lead: 'Тимлид', Admin: 'Администратор' };
+
+function HistoryItem({ event, actor, last }: { event: TaskEvent; actor: string | null; last: boolean }): JSX.Element {
   const c = useColors();
   const { t, locale } = useT();
   const when = new Date(event.occurredAt).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -112,7 +175,7 @@ function HistoryItem({ event, last }: { event: TaskEvent; last: boolean }): JSX.
         <Text style={{ color: c.text, fontSize: 15, fontWeight: '500' }}>{t(EVENT_LABEL[event.eventType] ?? event.eventType)}</Text>
         <Text style={{ color: c.textMuted, fontSize: 13 }}>
           {when}
-          {event.actorLabel ? ` · ${t(event.actorLabel)}` : ''}
+          {actor ? ` · ${actor}` : ''}
         </Text>
         {event.reason ? <Text style={{ color: c.textSecondary, fontSize: 14, lineHeight: 20 }}>{event.reason}</Text> : null}
       </View>

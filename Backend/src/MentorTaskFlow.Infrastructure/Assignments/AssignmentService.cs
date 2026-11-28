@@ -12,6 +12,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
 using MentorTaskFlow.Infrastructure.Persistence.Configurations;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorTaskFlow.Infrastructure.Assignments;
@@ -177,7 +178,7 @@ public sealed class AssignmentService(
         CancellationToken cancellationToken)
     {
         var actor = RequireManager();
-        var (branchId, categoryId) = await ResolveNewWorkScopeAsync(actor, request.AssignedToId, cancellationToken);
+        var (branchId, categoryId) = await ResolveNewWorkScopeAsync(actor, request, cancellationToken);
 
         dbContext.ChangeTracker.Clear();
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -726,40 +727,78 @@ public sealed class AssignmentService(
     }
 
     /// <summary>
-    /// Where new work lands: a Lead's own category, or for an administrator the assignee's.
+    /// Where new work lands: the team a Lead is acting in, or for an administrator a team of the
+    /// assignee's.
     /// </summary>
     /// <remarks>
-    /// An administrator has no category of their own, and <c>SEC-003</c> forbids taking scope from the
-    /// client, so it is read from the person the work is for. A Branch Admin reaching past their
-    /// branch gets the same 409 a direct insert would get from the trigger.
+    /// An administrator has no category of their own, so it is read from the person the work is for.
+    /// Somebody in several teams needs the team named — and the name only chooses among the teams the
+    /// database already gives that person (<c>SEC-003</c>). Left out, it is their main team. A Branch
+    /// Admin reaching past their branch gets the same 409 a direct insert would get from the trigger.
     /// </remarks>
     private async Task<(Guid BranchId, Guid CategoryId)> ResolveNewWorkScopeAsync(
         ICurrentUserContext actor,
-        Guid assigneeId,
+        CreateAssignmentDraftRequest request,
         CancellationToken cancellationToken)
     {
+        var requested = request.CategoryId;
+
         if (actor.Role is UserRole.Lead)
         {
-            return (actor.BranchId!.Value, actor.CategoryId!.Value);
+            return requested is null || requested == actor.CategoryId
+                ? (actor.BranchId!.Value, actor.CategoryId!.Value)
+                : throw AssigneeOutOfScope("Выдавать задания можно только в своей команде.");
         }
 
         var assignee = await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(u => u.Id == assigneeId && u.OrganizationId == branchContext.EffectiveOrganizationId)
-            .Select(u => new { u.BranchId, u.CategoryId })
+            .Where(u => u.Id == request.AssignedToId && u.OrganizationId == branchContext.EffectiveOrganizationId)
+            .Select(u => new
+            {
+                u.BranchId,
+                u.CategoryId,
+                Memberships = dbContext.TeamMemberships.IgnoreQueryFilters()
+                    .Where(m => m.UserId == u.Id)
+                    .Select(m => m.CategoryId)
+                    .ToList(),
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var inContour = assignee is { BranchId: not null, CategoryId: not null }
+        var inContour = assignee?.BranchId is not null
             && (actor.AdminScope is AdminScope.Organization || assignee.BranchId == actor.BranchId);
 
-        return inContour
-            ? (assignee!.BranchId!.Value, assignee.CategoryId!.Value)
-            : throw new ConflictException(
-                ErrorCodes.CrossScopeReference,
-                "Исполнитель должен быть ментором или тимлидом в вашем контуре.",
-                new Dictionary<string, object?> { ["relation"] = "assignedToId" });
+        if (!inContour)
+        {
+            throw AssigneeOutOfScope("Исполнитель должен быть участником команды в вашем контуре.");
+        }
+
+        if (requested is { } named)
+        {
+            return assignee!.CategoryId == named || assignee.Memberships.Contains(named)
+                ? (assignee.BranchId!.Value, named)
+                : throw AssigneeOutOfScope("Исполнитель не состоит в этой команде.");
+        }
+
+        if (assignee!.CategoryId is { } main)
+        {
+            return (assignee.BranchId!.Value, main);
+        }
+
+        return assignee.Memberships.Count switch
+        {
+            1 => (assignee.BranchId!.Value, assignee.Memberships[0]),
+            0 => throw AssigneeOutOfScope("Исполнитель не состоит ни в одной команде."),
+            _ => throw new ValidationAppException(
+                "categoryId",
+                "Исполнитель состоит в нескольких командах — укажите, в какой команде задание."),
+        };
     }
+
+    private static ConflictException AssigneeOutOfScope(string detail) => new(
+        ErrorCodes.CrossScopeReference,
+        detail,
+        new Dictionary<string, object?> { ["relation"] = "assignedToId" });
 
     /// <summary>
     /// Loads an assignment the caller may cancel — the Lead of its category, or an administrator
@@ -822,16 +861,17 @@ public sealed class AssignmentService(
     }
 
     /// <summary>
-    /// Verifies the executor is an active person of the same category (<c>ASN-008</c>).
+    /// Verifies the executor is an active member of the assignment's team (<c>ASN-008</c>).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A Lead hands work to their mentors. An administrator can also hand it to the Lead: everyone
-    /// below them, which is why this looks at who is asking.
+    /// A Lead hands work to their mentors and participants. An administrator can also hand it to the
+    /// Lead: everyone below them, which is why this looks at who is asking. Nobody hands work to
+    /// themselves — there would be nobody left to review it.
     /// </para>
     /// <para>
-    /// Somebody from another branch or category answers 409 <c>CROSS_SCOPE_REFERENCE</c>, and the
-    /// trigger <c>trg_assignments_executor_scope</c> refuses the same combination in the database —
+    /// Somebody outside the team answers 409 <c>CROSS_SCOPE_REFERENCE</c>, and the trigger
+    /// <c>trg_assignments_executor_scope</c> refuses the same combination in the database —
     /// application validation is never the only guard (<c>TEN-025</c>).
     /// </para>
     /// </remarks>
@@ -845,20 +885,22 @@ public sealed class AssignmentService(
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(u => u.Id == assigneeId && u.OrganizationId == branchContext.EffectiveOrganizationId)
-            .Select(u => new { u.Role, u.CategoryId, u.IsActive })
+            .Select(u => new { u.IsActive })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var roleAccepted = assignee?.Role is UserRole.Mentor
-            || (assignee?.Role is UserRole.Lead && actor.Role is UserRole.Admin);
+        var teamRole = assignee is null
+            ? null
+            : await dbContext.RoleInTeamAsync(assigneeId, categoryId, cancellationToken);
 
-        if (assignee is null || !roleAccepted || assignee.CategoryId != categoryId)
+        var accepted = assigneeId != actor.UserId
+            && (teamRole is TeamRole.Mentor or TeamRole.Member
+                || (teamRole is TeamRole.Lead && actor.Role is UserRole.Admin));
+
+        if (assignee is null || !accepted)
         {
-            throw new ConflictException(
-                ErrorCodes.CrossScopeReference,
-                actor.Role is UserRole.Admin
-                    ? "Исполнитель должен быть ментором или тимлидом этой категории."
-                    : "Исполнитель должен быть ментором этой категории.",
-                new Dictionary<string, object?> { ["relation"] = "assignedToId" });
+            throw AssigneeOutOfScope(actor.Role is UserRole.Admin
+                ? "Исполнитель должен быть участником этой команды."
+                : "Исполнитель должен быть ментором или участником этой команды.");
         }
 
         if (!assignee.IsActive)

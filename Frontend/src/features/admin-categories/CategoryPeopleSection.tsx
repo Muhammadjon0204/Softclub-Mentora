@@ -4,9 +4,9 @@ import { STATUS_LABEL } from '../../mocks/ui-preview/users.preview';
 import { STATUS_META } from '../admin-users/userPresentation';
 import { useUsersQuery } from '../admin-users/useUsersQuery';
 import { Button } from '../../shared/ui/Button';
-import { EmptyState } from '../../shared/ui/EmptyState';
 import type { PreviewCategoryDetails } from './categoryPresentation';
 import { UserAvatar } from '../avatars/UserAvatar';
+import { TeamMembersPanel } from '../teams/TeamMembersPanel';
 
 export interface CategoryPeopleSectionProps {
   category: PreviewCategoryDetails;
@@ -15,11 +15,10 @@ export interface CategoryPeopleSectionProps {
   onChangeLead: () => void;
 }
 
-/** Только пользователи этого Branch/Category — никакого доступа к чужому филиалу (раздел 7 промпта). */
+/** Руководитель и все участники команды — только люди её филиала. */
 export function CategoryPeopleSection({ category, canManage, onOpenUser, onChangeLead }: CategoryPeopleSectionProps): JSX.Element {
   const { users } = useUsersQuery();
   const lead = category.leadUserId !== null ? users.find((user) => user.id === category.leadUserId) : undefined;
-  const mentors = users.filter((user) => user.role === 'Mentor' && user.categoryId === category.id);
 
   return (
     <div className="space-y-5">
@@ -46,7 +45,9 @@ export function CategoryPeopleSection({ category, canManage, onOpenUser, onChang
               </span>
               <ExternalLink className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
             </button>
-            {canManage ? (
+            {category.leadIsMember === true ? (
+              <p className="text-[12px] text-ink-muted">Руководитель добавлен в команду дополнительно. Сменить его можно в списке участников ниже.</p>
+            ) : canManage ? (
               <Button variant="secondary" size="sm" leadingIcon={<UserCog className="h-3.5 w-3.5" aria-hidden="true" />} onClick={onChangeLead}>
                 Сменить руководителя
               </Button>
@@ -55,34 +56,7 @@ export function CategoryPeopleSection({ category, canManage, onOpenUser, onChang
         )}
       </div>
 
-      <div>
-        <h4 className="mb-2.5 text-[12.5px] font-semibold text-ink-secondary">Менторы ({mentors.length})</h4>
-        {mentors.length === 0 ? (
-          <EmptyState icon={<UserCog className="h-5 w-5" aria-hidden="true" />} title="Менторов пока нет" description="Менторы появятся здесь после назначения в направление." />
-        ) : (
-          <ul className="divide-y divide-divider rounded-control border border-line">
-            {mentors.map((mentor) => (
-              <li key={mentor.id}>
-                <button
-                  type="button"
-                  onClick={() => { onOpenUser(mentor.id); }}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand"
-                >
-                  <UserAvatar userId={mentor.id} name={mentor.fullName} size={null} className="h-8 w-8 text-[11px]" fallbackClassName="bg-surface-muted text-ink-secondary" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-ink">{mentor.fullName}</span>
-                    <span className="mt-0.5 flex items-center gap-1.5 text-[11.5px]">
-                      <span aria-hidden="true" className={`h-[6px] w-[6px] rounded-full ${STATUS_META[mentor.status].dot}`} />
-                      <span className={STATUS_META[mentor.status].text}>{STATUS_LABEL[mentor.status]}</span>
-                      <span className="text-ink-muted">· {mentor.lastLoginLabel}</span>
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <TeamMembersPanel categoryId={category.id} teamName={category.name} onOpenUser={onOpenUser} />
     </div>
   );
 }

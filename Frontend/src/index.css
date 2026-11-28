@@ -121,6 +121,12 @@
     color-scheme: light;
   }
 
+  /* Прокручивается содержимое внутри панели, а не документ: без «резинки» iOS шапка не уезжает. */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
   html[data-theme='dark'] {
     /* Браузерный chrome (скроллбары, автозаполнение, нативные контролы) тоже темнеет. */
     color-scheme: dark;
@@ -241,4 +247,82 @@ html.locale-transition #root {
   table { font-size: 11px; }
   tr, .rounded-card { break-inside: avoid; }
   thead th { position: static !important; }
+}
+
+@layer components {
+  /**
+   * Каркас кабинета занимает ровно видимую часть экрана. `100vh` на телефоне считается без адресной
+   * строки и нижней панели браузера: низ страницы оказывался под ними, а шапка уезжала вверх.
+   */
+  .app-shell {
+    height: 100vh;
+    height: 100dvh;
+  }
+}
+
+/* iOS приближает страницу при фокусе на поле с шрифтом меньше 16px и обратно не отдаляет. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/**
+ * Таблицы на телефоне — список карточек: заголовок строки сверху, остальное подписанными полями в две
+ * колонки. Колонки не сжимаются друг на друга, и ничего не нужно листать вбок. Разметку ставят
+ * `PreviewTable` и `PreviewTd` (`card`, `label`).
+ */
+@media (max-width: 767px) {
+  .data-table,
+  .data-table tbody {
+    display: block;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table.data-table tr {
+    position: relative;
+    display: grid;
+    height: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .data-table.data-table td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+  }
+
+  .data-table.data-table td[colspan],
+  .data-table.data-table td[data-card='title'],
+  .data-table.data-table td[data-card='wide'] {
+    grid-column: 1 / -1;
+  }
+
+  .data-table.data-table td[data-card='title'] {
+    order: -2;
+  }
+
+  .data-table.data-table tr:has(> td[data-card='action']) > td[data-card='title'] {
+    padding-right: 40px;
+  }
+
+  .data-table.data-table td[data-card='action'] {
+    position: absolute;
+    top: 14px;
+    right: 10px;
+  }
+
+  .data-table.data-table td:empty {
+    display: none;
+  }
 }

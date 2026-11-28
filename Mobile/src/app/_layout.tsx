@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { hashKey, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -7,12 +7,22 @@ import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { SessionProvider, useSession } from '@/lib/session';
+import { getActiveTeam } from '@/lib/team';
+import { ToastProvider } from '@/ui/feedback';
 
 // Keep the splash up until we know whether a saved session is still valid — no sign-in flash.
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+      // The same request answers differently in each team, so the cache keeps them apart: switching
+      // never shows the other team's data, and nothing has to be cleared.
+      queryKeyHashFn: (key) => hashKey([getActiveTeam(), ...key]),
+    },
+  },
 });
 
 export default function RootLayout(): JSX.Element {
@@ -29,7 +39,9 @@ export default function RootLayout(): JSX.Element {
       <SessionProvider>
         <ThemeProvider value={theme}>
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-          <RootNavigator />
+          <ToastProvider>
+            <RootNavigator />
+          </ToastProvider>
         </ThemeProvider>
       </SessionProvider>
     </QueryClientProvider>

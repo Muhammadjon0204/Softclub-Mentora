@@ -38,6 +38,7 @@ const MESSAGE_BY_CODE: Record<AuthErrorCode, string> = {
   VALIDATION_FAILED: 'Проверьте правильность заполнения полей.',
   SECURITY_TOKEN_INVALID: 'Ссылка недействительна или устарела',
   USER_DEACTIVATED: 'Учётная запись отключена. Обратитесь к администратору.',
+  SCOPE_OVERRIDE_FORBIDDEN: 'Вы больше не состоите в этой команде.',
 };
 
 interface MessageOptions {

@@ -38,15 +38,17 @@ function MatrixRow({ row, editable, onChange }: {
   const cellOf = (subject: PermissionSubject): RolePermissionCell | undefined => row.cells.find((cell) => cell.subject === subject);
 
   return (
-    <tr className="border-t border-divider">
-      <td className="py-2.5 pl-5 pr-3 sm:pl-6">
+    <tr className="border-t border-divider max-md:grid max-md:grid-cols-3 max-md:gap-x-2 max-md:gap-y-2.5 max-md:px-4 max-md:py-3">
+      <td className="py-2.5 pl-5 pr-3 sm:pl-6 max-md:col-span-3 max-md:p-0">
         <p className="text-[13px] font-medium text-ink">{info?.label ?? row.key}</p>
         <p className="text-[11.5px] text-ink-muted">{info?.hint}</p>
       </td>
       {SUBJECTS.map((subject) => {
         const cell = cellOf(subject);
         return (
-          <td key={subject} className="w-[118px] px-2 py-2.5 text-center">
+          <td key={subject} className="w-[118px] px-2 py-2.5 text-center max-md:w-auto max-md:p-0 max-md:text-left">
+            {/* На телефоне шапки нет: каждый переключатель подписан сам. */}
+            <span className="mb-1 block text-[11.5px] leading-4 text-ink-muted md:hidden">{SUBJECT_LABEL[subject]}</span>
             {cell === undefined ? (
               <span className="text-ink-disabled" aria-label={`${SUBJECT_LABEL[subject]}: не относится`}>—</span>
             ) : (
@@ -157,18 +159,18 @@ export function PermissionsPage(): JSX.Element {
           <div className="px-5 py-2"><ErrorState error={matrix.error} title="Не удалось загрузить права" onRetry={() => { void matrix.refetch(); }} /></div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] border-collapse">
+            <table className="w-full border-collapse max-md:block md:min-w-[640px]">
               <caption className="sr-only">Права по ролям</caption>
-              <thead>
+              <thead className="max-md:hidden">
                 <tr className="text-[12px] font-semibold text-ink-secondary">
                   <th scope="col" className="py-3 pl-5 pr-3 text-left sm:pl-6">Действие</th>
                   {SUBJECTS.map((subject) => <th key={subject} scope="col" className="w-[118px] px-2 py-3 text-center">{SUBJECT_LABEL[subject]}</th>)}
                 </tr>
               </thead>
               {groups.map((group) => (
-                <tbody key={group}>
-                  <tr className="border-t border-divider bg-surface-muted">
-                    <th scope="colgroup" colSpan={SUBJECTS.length + 1} className="py-1.5 pl-5 text-left text-[11.5px] font-semibold text-ink-muted sm:pl-6">
+                <tbody key={group} className="max-md:block">
+                  <tr className="border-t border-divider bg-surface-muted max-md:block">
+                    <th scope="colgroup" colSpan={SUBJECTS.length + 1} className="py-1.5 pl-5 text-left text-[11.5px] font-semibold text-ink-muted sm:pl-6 max-md:block max-md:pl-4">
                       {PERMISSION_GROUP_LABEL[group] ?? group}
                     </th>
                   </tr>

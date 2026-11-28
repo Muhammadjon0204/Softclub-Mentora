@@ -656,7 +656,42 @@ public sealed class AuthService(
             branch,
             category,
             Users.AvatarService.UrlFor(user.AvatarKey),
-            await permissions.GetEffectiveAsync(user.Id, user.Role, user.AdminScope, user.OrganizationId, cancellationToken));
+            await permissions.GetEffectiveAsync(user.Id, user.Role, user.AdminScope, user.OrganizationId, cancellationToken),
+            await MapTeamsAsync(user, cancellationToken));
+    }
+
+    private async Task<IReadOnlyList<TeamSummaryDto>> MapTeamsAsync(User user, CancellationToken cancellationToken)
+    {
+        var roster = await Users.TeamRoster.LoadAsync(dbContext, [user], cancellationToken);
+        var places = roster.Of(user.Id).ToList();
+        var ids = places.Select(p => p.CategoryId).ToArray();
+
+        var categories = await (
+                from c in dbContext.Categories.IgnoreQueryFilters()
+                join s in dbContext.CategorySettings.IgnoreQueryFilters() on c.Id equals s.CategoryId
+                where ids.Contains(c.Id)
+                select new { c.Id, c.Name, s.TimeZoneId })
+            .AsNoTracking()
+            .ToDictionaryAsync(c => c.Id, cancellationToken);
+
+        var teams = new List<TeamSummaryDto>();
+
+        foreach (var place in places.Where(p => categories.ContainsKey(p.CategoryId)))
+        {
+            // A participant acts with the mentor's rights: receiving work and handing it in.
+            var actsAs = place.Role is Domain.Users.TeamRole.Lead ? Domain.Tenancy.UserRole.Lead : Domain.Tenancy.UserRole.Mentor;
+            var category = categories[place.CategoryId];
+
+            teams.Add(new TeamSummaryDto(
+                category.Id,
+                category.Name,
+                category.TimeZoneId,
+                place.Role.ToString(),
+                place.IsMain,
+                await permissions.GetEffectiveAsync(user.Id, actsAs, adminScope: null, user.OrganizationId, cancellationToken)));
+        }
+
+        return teams.OrderByDescending(t => t.IsMain).ThenBy(t => t.Name, StringComparer.Ordinal).ToList();
     }
 
     private static UnauthorizedException InvalidCredentials() =>

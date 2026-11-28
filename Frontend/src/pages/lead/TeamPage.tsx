@@ -1,15 +1,16 @@
-import { Clock3, Plus, Users as UsersIcon } from 'lucide-react';
+import { Clock3, Plus, UserPlus, Users as UsersIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { PreviewPageHeader } from '../../features/admin-preview/PreviewPageHeader';
 import { PreviewSearchInput, PreviewSelect } from '../../features/admin-preview/PreviewToolbar';
+import { AddTeamMemberDialog } from '../../features/teams/AddTeamMemberDialog';
+import { useTeamMembers } from '../../features/teams/useTeamMembers';
 import { CreateMentorDrawer } from '../../features/lead/team/CreateMentorDrawer';
 import { MentorDetailsDrawer } from '../../features/lead/team/MentorDetailsDrawer';
 import { useResolvedLeadMentor, useScopedLeadMentors } from '../../features/lead/scope/useScopedLeadMentors';
 import { useLeadScope } from '../../features/lead/scope/useLeadScope';
 import { useScopedLeadAssignments } from '../../features/lead/scope/useScopedLeadAssignments';
-import { pluralizeRu } from '../../features/lead/assignments/leadAssignmentPresentation';
 import { Badge } from '../../shared/ui/Badge';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
@@ -44,6 +45,8 @@ export function TeamPage(): JSX.Element {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<VisibleStatus>('Active');
   const [createOpen, setCreateOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const team = useTeamMembers(scope.categoryId);
   const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
   const mentorId = searchParams.get('mentorId');
@@ -81,11 +84,11 @@ export function TeamPage(): JSX.Element {
   }, [pool, search]);
 
   const invitedCount = useMemo(() => mentors.filter((m) => m.status === 'Invited').length, [mentors]);
-  const emptyTitle = status === 'Active' ? 'Активных менторов пока нет' : 'Приглашённых менторов нет';
+  const emptyTitle = status === 'Active' ? 'Активных участников пока нет' : 'Приглашённых нет';
   const emptyDescription =
     status === 'Active' && invitedCount > 0
       ? 'Приглашённые ещё не завершили регистрацию — они в фильтре «Приглашённые».'
-      : 'Добавьте ментора кнопкой выше.';
+      : 'Добавьте ментора или участника кнопками выше.';
 
   return (
     <div className="space-y-6">
@@ -93,16 +96,23 @@ export function TeamPage(): JSX.Element {
         title="Команда"
         subtitle={`${scope.categoryName} · ${scope.branchDisplayName}`}
         action={
-          <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setCreateOpen(true); }}>
-            Добавить ментора
-          </Button>
+          team.canManage ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" leadingIcon={<UserPlus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setAddOpen(true); }}>
+                Добавить из филиала
+              </Button>
+              <Button variant="primary" leadingIcon={<Plus className="h-4 w-4" aria-hidden="true" />} onClick={() => { setCreateOpen(true); }}>
+                Новый аккаунт
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
       <Card padded={false} className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5 border-b border-divider px-5 py-3.5 sm:px-6">
           <span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-ink-secondary">
-            {pool.length} {pluralizeRu(pool.length, 'ментор', 'ментора', 'менторов')}
+            <span>В списке:</span> <span>{pool.length}</span>
           </span>
           <PreviewSearchInput placeholder="Поиск по имени или email" value={search} onChange={setSearch} className="!min-w-[260px]" />
           <PreviewSelect
@@ -138,7 +148,7 @@ export function TeamPage(): JSX.Element {
                   >
                     <UserAvatar userId={mentor.id} name={mentor.fullName} size={null} className="h-10 w-10 text-[12.5px]" fallbackClassName="bg-brand-soft text-brand" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-semibold text-ink">{mentor.fullName}</p>
+                      <p className="line-clamp-2 text-[14px] font-semibold text-ink sm:line-clamp-1">{mentor.fullName}</p>
                       <p className="mt-0.5 truncate text-[12px] text-ink-muted">{mentor.email}</p>
                     </div>
                     <span className="hidden shrink-0 items-center gap-1 text-[12px] text-ink-muted lg:inline-flex">
@@ -154,7 +164,10 @@ export function TeamPage(): JSX.Element {
                       <p className="text-[13.5px] font-semibold tabular-nums text-ink">{active}</p>
                       <p className="text-[11px] text-ink-muted">в работе</p>
                     </div>
-                    <Badge tone={STATUS_TONE[mentor.status]}>{STATUS_LABEL[mentor.status]}</Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-3.5">
+                      {mentor.teamRole === 'Member' ? <Badge tone="neutral">Участник</Badge> : null}
+                      <Badge tone={STATUS_TONE[mentor.status]}>{STATUS_LABEL[mentor.status]}</Badge>
+                    </div>
                   </div>
                 </li>
               );
@@ -165,6 +178,14 @@ export function TeamPage(): JSX.Element {
 
       <MentorDetailsDrawer mentor={selected} mentorId={mentorId} onClose={closeMentor} />
       <CreateMentorDrawer open={createOpen} onClose={() => { setCreateOpen(false); }} />
+      <AddTeamMemberDialog
+        categoryId={scope.categoryId}
+        teamName={scope.categoryName}
+        open={addOpen}
+        isSubmitting={team.add.isPending}
+        onClose={() => { setAddOpen(false); }}
+        onAdd={(userId, role) => team.add.mutateAsync({ userId, role })}
+      />
     </div>
   );
 }

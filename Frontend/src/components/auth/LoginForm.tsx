@@ -44,7 +44,10 @@ export function LoginForm(): JSX.Element {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: LoginFormValues) => login(values),
+    mutationFn: (values: LoginFormValues) => {
+      const from = (location.state as { from?: unknown } | null)?.from;
+      return login(values, typeof from === 'string' ? from : undefined);
+    },
     retry: false,
     onSuccess: (user) => {
       // Роль берём исключительно из ответа API; `from` (RequireAuth) лишь возвращает на ту страницу

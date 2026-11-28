@@ -329,13 +329,13 @@ export function AssignmentsPage(): JSX.Element {
                 const category = categoryName.get(item.categoryId);
                 return (
                   <PreviewTr key={item.id} onClick={() => { setOpenId(item.id); }} selected={item.id === openId}>
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd card="title" className="py-2.5">
                       <button type="button" onClick={(event) => { event.stopPropagation(); setOpenId(item.id); }} className="block w-full min-w-0 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
                         <span className="block truncate text-[13.5px] font-medium text-ink" title={item.title}>{item.title}</span>
                         <span className="block truncate text-[12px] text-ink-muted">{assignmentSourceLabel(item.source)}</span>
                       </button>
                     </PreviewTd>
-                    <PreviewTd>
+                    <PreviewTd card="wide">
                       <span className="flex min-w-0 items-center gap-2.5">
                         <Avatar name={mentorOf(item)} size="sm" />
                         <span className="min-w-0">
@@ -344,16 +344,16 @@ export function AssignmentsPage(): JSX.Element {
                         </span>
                       </span>
                     </PreviewTd>
-                    <PreviewTd>
+                    <PreviewTd label="Статус">
                       <Badge tone={tone}>
                         <StatusDot tone={tone} />
                         {ASSIGNMENT_STATUS_LABEL[item.status] ?? item.status}
                       </Badge>
                     </PreviewTd>
                     {showBranch ? (
-                      <PreviewTd className="truncate">{item.branch?.name ?? <span className="text-ink-disabled">Не привязан</span>}</PreviewTd>
+                      <PreviewTd label="Филиал" className="truncate">{item.branch?.name ?? <span className="text-ink-disabled">Не привязан</span>}</PreviewTd>
                     ) : null}
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd label="Дедлайн" className="py-2.5">
                       <span className="block whitespace-nowrap text-[13px] tabular-nums text-ink">
                         {due.date} <span className="text-ink-muted">{due.time}</span>
                       </span>

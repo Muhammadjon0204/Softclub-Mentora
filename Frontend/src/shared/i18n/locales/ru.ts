@@ -79,6 +79,7 @@ export const ru = {
       mentor: 'Ментор',
       orgAdmin: 'Администратор организации',
       branchAdmin: 'Администратор филиала',
+      member: 'Участник команды',
     },
     allBranches: 'Все филиалы',
     branchSelected: 'Филиал выбран',

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type { UserDto } from '../../api/admin/users';
+import { useAuth } from '../../auth/useAuth';
 import { Drawer, useToast } from '../../shared/overlays';
 import { SearchSelect } from '../../shared/select';
 import { Button } from '../../shared/ui/Button';
@@ -10,7 +11,7 @@ import { TimePicker } from '../../shared/ui/TimePicker';
 import { todayKey } from '../../lib/dayKeys';
 import { localInputToUtcMs } from '../lead/scope/leadDateFormat';
 import { useCategoryTimeZone } from '../proposals/useProposals';
-import { assignablePeople, personOption } from './assignablePeople';
+import { assignableSeats, seatOption } from './assignablePeople';
 import type { AdminAssignmentActions } from './useAdminAssignmentActions';
 
 const TITLE_MIN = 3;
@@ -34,7 +35,8 @@ export interface AdminAssignmentFormDrawerProps {
  */
 export function AdminAssignmentFormDrawer({ open, onClose, users, categoryName, actions, onAssigned }: AdminAssignmentFormDrawerProps): JSX.Element {
   const toast = useToast();
-  const [assigneeId, setAssigneeId] = useState('');
+  const selfId = useAuth().user?.id ?? null;
+  const [seatKey, setSeatKey] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
@@ -43,7 +45,7 @@ export function AdminAssignmentFormDrawer({ open, onClose, users, categoryName, 
 
   useEffect(() => {
     if (!open) return;
-    setAssigneeId('');
+    setSeatKey('');
     setTitle('');
     setDescription('');
     setDate('');
@@ -51,13 +53,13 @@ export function AdminAssignmentFormDrawer({ open, onClose, users, categoryName, 
     setTouched(false);
   }, [open]);
 
-  const people = useMemo(() => assignablePeople(users), [users]);
+  const seats = useMemo(() => assignableSeats(users, selfId), [users, selfId]);
   const options = useMemo(
-    () => people.map((user) => personOption(user, user.categoryId !== null ? categoryName(user.categoryId) : undefined)),
-    [people, categoryName],
+    () => seats.map((seat) => seatOption(seat, seat.key, categoryName(seat.categoryId))),
+    [seats, categoryName],
   );
 
-  const assignee = people.find((user) => user.id === assigneeId) ?? null;
+  const assignee = seats.find((seat) => seat.key === seatKey) ?? null;
   const timeZoneId = useCategoryTimeZone(assignee?.categoryId ?? null);
   const dueMs = date.length > 0 ? localInputToUtcMs(date, time, timeZoneId) : null;
 
@@ -71,12 +73,13 @@ export function AdminAssignmentFormDrawer({ open, onClose, users, categoryName, 
 
     try {
       const created = await actions.assign({
-        assignedToId: assignee.id,
+        assignedToId: assignee.user.id,
+        categoryId: assignee.categoryId,
         title: title.trim(),
         description: description.trim().length > 0 ? description.trim() : null,
         dueAtMs: dueMs,
       });
-      toast.success(`Задание выдано: ${assignee.fullName}`);
+      toast.success(`Задание выдано: ${assignee.user.fullName}`);
       onAssigned(created.id);
       onClose();
     } catch (error) {
@@ -102,10 +105,10 @@ export function AdminAssignmentFormDrawer({ open, onClose, users, categoryName, 
         <FormField label="Кому" htmlFor="admin-assign-person" required error={touched ? assigneeError : undefined}>
           <SearchSelect
             id="admin-assign-person"
-            value={assigneeId}
-            onValueChange={setAssigneeId}
+            value={seatKey}
+            onValueChange={setSeatKey}
             options={options}
-            placeholder="Выберите тимлида или ментора"
+            placeholder="Выберите человека и команду"
             searchPlaceholder="Поиск по имени"
             emptyMessage="Никого не нашли"
             invalid={touched && assigneeError !== undefined}

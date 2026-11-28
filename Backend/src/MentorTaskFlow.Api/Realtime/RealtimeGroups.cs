@@ -31,6 +31,13 @@ public static class RealtimeGroups
         _ => [User(user.UserId), Team(user.CategoryId!.Value)],
     };
 
+    /// <summary>
+    /// What membership of one more team adds: its lead hears the team's changes, anybody in it the
+    /// shared schedule. A live connection cannot name a team per message, so it joins them all.
+    /// </summary>
+    public static IReadOnlyList<string> ForMembership(Guid teamId, UserRole role) =>
+        role is UserRole.Lead ? [Category(teamId), Team(teamId)] : [Team(teamId)];
+
     public static IReadOnlyList<string> For(RealtimeSignal signal)
     {
         var groups = new List<string> { Organization(signal.OrganizationId) };

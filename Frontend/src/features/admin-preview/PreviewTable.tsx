@@ -18,7 +18,8 @@ import { Select } from '../../shared/select';
 export function PreviewTable({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div className="min-w-0 w-full overflow-x-auto">
-      <table className="table-stagger w-full table-fixed border-collapse text-left">{children}</table>
+      {/* Уже 760px колонки наезжают друг на друга: на планшете таблица листается, на телефоне это карточки. */}
+      <table className="data-table table-stagger w-full table-fixed border-collapse text-left md:min-w-[760px]">{children}</table>
     </div>
   );
 }
@@ -70,9 +71,21 @@ export const PreviewTr = forwardRef<HTMLTableRowElement, PreviewTrProps>(functio
   );
 });
 
-export function PreviewTd({ children, className = '', ...rest }: TdHTMLAttributes<HTMLTableCellElement>): JSX.Element {
+export interface PreviewTdProps extends TdHTMLAttributes<HTMLTableCellElement> {
+  /** Подпись поля в карточке на телефоне, где шапки таблицы нет. */
+  label?: string;
+  /** Место ячейки в карточке: заголовок строки, поле на всю ширину, действия в углу или скрыта. */
+  card?: 'title' | 'wide' | 'action';
+}
+
+export function PreviewTd({ children, className = '', label, card, ...rest }: PreviewTdProps): JSX.Element {
   return (
-    <td className={`px-3 text-ink-secondary first:pl-5 first:sm:pl-6 last:pr-5 last:sm:pr-6 ${className}`} {...rest}>
+    <td
+      data-card={card}
+      className={`px-3 text-ink-secondary first:pl-5 first:sm:pl-6 last:pr-5 last:sm:pr-6 ${className}`}
+      {...rest}
+    >
+      {label !== undefined ? <span className="mb-1 block text-[11.5px] font-medium text-ink-muted md:hidden">{label}</span> : null}
       {children}
     </td>
   );
@@ -101,7 +114,7 @@ export function PreviewActionCell({
   onClick?: (event: MouseEvent<HTMLTableCellElement>) => void;
 }): JSX.Element {
   return (
-    <PreviewTd className="w-14" onClick={onClick}>
+    <PreviewTd className="w-14" card="action" onClick={onClick}>
       <div className="flex items-center justify-end">{children}</div>
     </PreviewTd>
   );

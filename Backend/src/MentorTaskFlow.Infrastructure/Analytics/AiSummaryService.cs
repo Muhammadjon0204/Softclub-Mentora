@@ -11,6 +11,7 @@ using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Observability;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -193,23 +194,31 @@ public sealed class AiSummaryService(
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException();
 
-        if (subject.BranchId is null || subject.CategoryId is null)
-        {
-            throw new ValidationAppException("mentorId", "Персональный отчёт строится только по ментору или лиду.");
-        }
+        // AI-020: a Lead's remit is their own team. Somebody outside it is answered with 404 rather
+        // than 403, so the request cannot be used to enumerate other categories. For a person who is
+        // in several teams the report stays inside the Lead's: the other teams' work is not theirs.
+        var isLead = actor.Role is UserRole.Lead;
 
-        // AI-020: a Lead's remit is their own team. Another category's mentor is outside it, and the
-        // answer is 404 rather than 403 so the request cannot be used to enumerate other categories.
-        if (actor.Role is UserRole.Lead && subject.CategoryId != actor.CategoryId)
+        if (isLead && await dbContext.RoleInTeamAsync(subjectId, actor.CategoryId!.Value, cancellationToken) is null)
         {
             throw new NotFoundException();
+        }
+
+        // A Lead's and a Mentor's report belongs to the team they are acting in.
+        var inOwnTeam = actor.Role is UserRole.Lead or UserRole.Mentor;
+        var branchId = inOwnTeam ? actor.BranchId : subject.BranchId;
+        var categoryId = inOwnTeam ? actor.CategoryId : subject.CategoryId;
+
+        if (branchId is null || categoryId is null)
+        {
+            throw new ValidationAppException("mentorId", "Персональный отчёт строится только по ментору или лиду.");
         }
 
         return new SummaryScope
         {
             OrganizationId = organizationId,
-            BranchId = subject.BranchId,
-            CategoryId = subject.CategoryId,
+            BranchId = branchId,
+            CategoryId = categoryId,
             SubjectUserId = subjectId,
             Scope = AiSummaryScope.Personal,
         };

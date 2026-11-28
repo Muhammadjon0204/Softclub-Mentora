@@ -13,7 +13,10 @@ const LABEL: Record<string, string> = { ru: 'RU', tg: 'TJ', en: 'EN' };
  * сама смена языка двигала бы topbar — ровно то, что задача просила не допускать. Активная пилюля
  * скользит между кнопками тем же `layoutId`-приёмом, что `NavActivePill` в сайдбаре.
  */
-export function LanguageSwitcher(): JSX.Element {
+export function LanguageSwitcher({ pillId = 'lang-switcher-active' }: {
+  /** У второго переключателя на той же странице (меню профиля) своя пилюля, иначе они «перетекают». */
+  pillId?: string;
+}): JSX.Element {
   const { locale, setLocale, t } = useTranslation();
 
   return (
@@ -38,7 +41,7 @@ export function LanguageSwitcher(): JSX.Element {
           >
             {active ? (
               <motion.span
-                layoutId="lang-switcher-active"
+                layoutId={pillId}
                 aria-hidden="true"
                 className="absolute inset-0 -z-10 rounded-[8px] bg-surface shadow-surface"
                 transition={SPRING_PILL}

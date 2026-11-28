@@ -220,11 +220,11 @@ export function NotificationsPage(): JSX.Element {
                 const created = new Date(item.createdAt);
                 return (
                   <tr key={item.id} className="h-14 border-b border-divider text-sm transition-colors duration-150 last:border-0 hover:bg-surface-hover">
-                    <PreviewTd className="py-2.5">
-                      <span className="block truncate font-medium text-ink">{eventTypeLabel(item.eventType)}</span>
+                    <PreviewTd card="title" className="py-2.5">
+                      <span className="block font-medium text-ink md:truncate">{eventTypeLabel(item.eventType)}</span>
                       {item.isSystemAlert ? <span className="block text-[11.5px] text-ink-muted">Системное оповещение</span> : null}
                     </PreviewTd>
-                    <PreviewTd className="py-2.5">
+                    <PreviewTd card="wide" label="Получатель" className="py-2.5">
                       {recipient !== undefined ? (
                         <span className="flex min-w-0 items-center gap-2.5">
                           <Avatar name={recipient.fullName} size="sm" />
@@ -237,8 +237,8 @@ export function NotificationsPage(): JSX.Element {
                         <span className="text-[13px] text-ink-disabled">Пользователь удалён или вне доступа</span>
                       )}
                     </PreviewTd>
-                    <PreviewTd><ChannelLabel channel={item.channel} /></PreviewTd>
-                    <PreviewTd>
+                    <PreviewTd label="Канал"><ChannelLabel channel={item.channel} /></PreviewTd>
+                    <PreviewTd label="Статус">
                       {item.status === 'DeadLetter' && item.lastError !== null && item.lastError !== undefined ? (
                         <Tooltip content={`Причина: ${item.lastError}`}>
                           <span className="cursor-help"><NotificationStatusBadge status={item.status} /></span>
@@ -248,7 +248,7 @@ export function NotificationsPage(): JSX.Element {
                       )}
                       {item.attempts > 1 ? <span className="mt-0.5 block text-[11px] text-ink-muted">попыток: {item.attempts}</span> : null}
                     </PreviewTd>
-                    <PreviewTd className="whitespace-nowrap tabular-nums">
+                    <PreviewTd label="Создано" className="whitespace-nowrap tabular-nums">
                       <span className="block text-[13px] text-ink">{created.toLocaleDateString(intlLocale(), { day: 'numeric', month: 'short' })}</span>
                       <span className="block text-[11.5px] text-ink-muted">{created.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
                     </PreviewTd>

@@ -344,11 +344,11 @@ export function UsersPage(): JSX.Element {
                   rowUser.id === userId ? 'bg-brand-soft' : 'hover:bg-surface-hover'
                 }`}
               >
-                <PreviewTd><UserCell user={rowUser} /></PreviewTd>
-                <PreviewTd><RoleCell role={rowUser.role} /></PreviewTd>
-                <PreviewTd><ScopeCell user={rowUser} /></PreviewTd>
-                <PreviewTd><StatusCell status={rowUser.status} /></PreviewTd>
-                <PreviewTd className="hidden xl:table-cell"><LastLoginCell label={rowUser.lastLoginLabel} /></PreviewTd>
+                <PreviewTd card="title"><UserCell user={rowUser} /></PreviewTd>
+                <PreviewTd card="wide"><RoleCell role={rowUser.role} /></PreviewTd>
+                <PreviewTd label="Область доступа"><ScopeCell user={rowUser} /></PreviewTd>
+                <PreviewTd label="Статус"><StatusCell status={rowUser.status} /></PreviewTd>
+                <PreviewTd card="wide" label="Последний вход" className="hidden xl:table-cell"><LastLoginCell label={rowUser.lastLoginLabel} /></PreviewTd>
                 <PreviewActionCell
                   onClick={(event) => {
                     event.stopPropagation();

@@ -274,7 +274,7 @@ export function BranchesPage(): JSX.Element {
                     branchRow.id === branchId ? 'bg-brand-soft' : 'hover:bg-surface-hover'
                   }`}
                 >
-                  <PreviewTd className="text-ink">
+                  <PreviewTd card="title" className="text-ink">
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-control bg-brand-soft text-brand">
                         <Building2 className="h-4 w-4" aria-hidden="true" />
@@ -282,7 +282,7 @@ export function BranchesPage(): JSX.Element {
                       <PreviewCellStack primary={branchRow.name} secondary={`${branchRow.code} · ${formatStreet(branchRow.address)}`} tooltip={branchRow.name} />
                     </div>
                   </PreviewTd>
-                  <PreviewTd>
+                  <PreviewTd card="wide" label="Администратор">
                     {branchRow.adminName ?? (isOrgAdmin ? (
                       <button
                         type="button"
@@ -299,16 +299,16 @@ export function BranchesPage(): JSX.Element {
                       </span>
                     ))}
                   </PreviewTd>
-                  <PreviewTd className="tabular-nums">{branchRow.categoriesCount}</PreviewTd>
-                  <PreviewTd className="tabular-nums">{branchRow.mentorsCount}</PreviewTd>
-                  <PreviewTd className="tabular-nums">{branchRow.activeAssignments}</PreviewTd>
-                  <PreviewTd className="whitespace-nowrap">
+                  <PreviewTd label="Направления" className="tabular-nums">{branchRow.categoriesCount}</PreviewTd>
+                  <PreviewTd label="Менторы" className="tabular-nums">{branchRow.mentorsCount}</PreviewTd>
+                  <PreviewTd label="Активные задания" className="tabular-nums">{branchRow.activeAssignments}</PreviewTd>
+                  <PreviewTd label="Статус" className="whitespace-nowrap">
                     <span className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${branchRow.isActive ? 'text-success' : 'text-ink-muted'}`}>
                       <StatusDot tone={branchRow.isActive ? 'success' : 'neutral'} />
                       {branchRow.isActive ? 'Активен' : 'Неактивен'}
                     </span>
                   </PreviewTd>
-                  <PreviewTd className="whitespace-nowrap">
+                  <PreviewTd label="Здоровье" className="whitespace-nowrap">
                     <HealthValue value={branchRow.healthPct} hasWork={branchRow.activeAssignments > 0} />
                   </PreviewTd>
                   <PreviewActionCell

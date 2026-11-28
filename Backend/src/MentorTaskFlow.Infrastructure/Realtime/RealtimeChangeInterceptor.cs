@@ -187,6 +187,13 @@ public sealed class RealtimeChangeInterceptor(ILogger<RealtimeChangeInterceptor>
 
                 break;
 
+            // Added to a team, retitled or removed: the person's profile and the team's list change.
+            case TeamMembership membership:
+                yield return new RealtimeSignal(
+                    RealtimeKinds.User, membership.OrganizationId, membership.BranchId, membership.CategoryId,
+                    membership.UserId, [membership.UserId]);
+                break;
+
             case Category category:
                 yield return new RealtimeSignal(
                     RealtimeKinds.Category, category.OrganizationId, category.BranchId, category.Id, category.Id, []);

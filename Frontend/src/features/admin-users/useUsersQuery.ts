@@ -113,6 +113,7 @@ export function toUserDetails(
     activity: [],
     branchId: dto.branchId,
     categoryId: dto.categoryId,
+    teams: dto.teams,
     concurrencyToken: dto.concurrencyToken,
   };
 }

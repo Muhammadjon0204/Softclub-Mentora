@@ -10,9 +10,17 @@ export interface AuthContextValue {
   status: AuthStatus;
   /** Зеркало tokenStore для UI. Заголовок подставляет интерцептор, не компоненты. */
   accessToken: string | null;
+  /** Кем человек выступает сейчас: аккаунт как есть либо его роль в выбранной команде. */
   user: AuthUser | null;
+  /** Сам аккаунт — для переключателя команд; на выбор команды не меняется. */
+  account: AuthUser | null;
+  /** `null` — основная команда или панель администратора. */
+  activeTeamId: string | null;
+  /** Переключает рабочую команду и открывает `to` (по умолчанию — обзор новой роли). */
+  switchTeam: (teamId: string | null, to?: string) => void;
   isAuthenticated: boolean;
-  login: (credentials: LoginRequest) => Promise<AuthUser>;
+  /** `requestedPath` — куда человек шёл до входа: по нему выбирается команда. */
+  login: (credentials: LoginRequest, requestedPath?: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
   changePassword: (payload: ChangePasswordRequest) => Promise<void>;
