@@ -10,7 +10,6 @@ import { useT } from '@/lib/i18n';
 import { useUser } from '@/lib/session';
 import { useColors } from '@/lib/useColors';
 import { SecondaryButton, StateMessage } from '@/ui/primitives';
-import { Screen } from '@/ui/Screen';
 
 type FilterKey = (typeof JOURNAL_FILTERS)[number]['key'];
 
@@ -50,7 +49,11 @@ export default function JournalScreen(): JSX.Element {
   );
 
   return (
-    <Screen title={t('Журнал')} subtitle={t('Записи нельзя изменить или удалить')} header={chips}>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
+      <View style={styles.head}>
+        <Text style={{ color: c.textMuted, fontSize: 13 }}>{t('Записи нельзя изменить или удалить')}</Text>
+        {chips}
+      </View>
       {query.isPending ? (
         <StateMessage loading title={t('Загрузка…')} />
       ) : query.isError ? (
@@ -74,7 +77,7 @@ export default function JournalScreen(): JSX.Element {
           renderItem={({ item }) => <Entry entry={item} />}
         />
       )}
-    </Screen>
+    </View>
   );
 }
 
@@ -131,7 +134,8 @@ function Change({ change }: { change: JournalChange }): JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  chipsRow: { marginTop: Space.md, marginHorizontal: -Space.lg, flexGrow: 0 },
+  head: { paddingHorizontal: Space.lg, paddingTop: Space.md, gap: Space.sm },
+  chipsRow: { marginHorizontal: -Space.lg, flexGrow: 0 },
   chips: { gap: Space.sm, paddingHorizontal: Space.lg },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: Space.md, minHeight: 36, justifyContent: 'center' },
   list: { padding: Space.lg, gap: Space.sm, paddingBottom: Space.xxl },

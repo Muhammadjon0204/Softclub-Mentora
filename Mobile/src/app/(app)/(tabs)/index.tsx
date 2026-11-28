@@ -1,110 +1,74 @@
-import { useMemo, useState } from 'react';
-import { RefreshControl, SectionList, StyleSheet, Text, View } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { RefreshControl, ScrollView } from 'react-native';
 
+import { listBranches } from '@/api/admin';
 import { Space } from '@/constants/theme';
-import { AssignmentRow, RowSeparator } from '@/features/assignments/AssignmentRow';
-import { groupAssignments, SECTION_TITLE, type SectionKey } from '@/features/assignments/grouping';
-import { useAssignments, usePeopleNames } from '@/features/assignments/queries';
+import { roleLabel } from '@/features/journal/api';
+import { AdminOverview } from '@/features/overview/AdminOverview';
+import { TeamOverview } from '@/features/overview/TeamOverview';
+import { TeamPicker } from '@/features/teams/TeamPicker';
+import { setBranchScope, useBranchScope } from '@/lib/branchScope';
 import { useT } from '@/lib/i18n';
 import { useUser } from '@/lib/session';
 import { useColors } from '@/lib/useColors';
-import { SecondaryButton, StateMessage } from '@/ui/primitives';
-import { Screen, Segmented } from '@/ui/Screen';
+import { Screen } from '@/ui/Screen';
+import { Select } from '@/ui/sheet';
 
-export default function AssignmentsScreen(): JSX.Element {
+export default function OverviewScreen(): JSX.Element {
   const c = useColors();
   const { t } = useT();
   const user = useUser();
-  const query = useAssignments();
-  const nameOf = usePeopleNames();
-  // A lead both hands work out and receives it; the two lists are not mixed.
-  const [scope, setScope] = useState<'team' | 'mine'>('team');
-
-  const items = useMemo(() => {
-    const all = query.data ?? [];
-    if (user.role !== 'Lead') return all;
-    return all.filter((a) => (a.assignedToId === user.id) === (scope === 'mine'));
-  }, [query.data, user, scope]);
-
-  const sections = useMemo(() => groupAssignments(items), [items]);
-  const openCount = sections.filter((s) => s.key !== 'done' && s.key !== 'review').reduce((n, s) => n + s.data.length, 0);
-  const ownWork = user.role === 'Mentor' || (user.role === 'Lead' && scope === 'mine');
-
-  let body: JSX.Element;
-  if (query.isPending) {
-    body = <StateMessage loading title={t('Загружаем задания…')} />;
-  } else if (query.isError) {
-    body = (
-      <StateMessage
-        title={t('Не удалось загрузить задания')}
-        detail={t(query.error.message)}
-        action={<SecondaryButton label={t('Повторить')} onPress={() => void query.refetch()} />}
-      />
-    );
-  } else {
-    body = (
-      <SectionList
-        sections={sections}
-        keyExtractor={(a) => a.id}
-        stickySectionHeadersEnabled={false}
-        contentContainerStyle={{ paddingBottom: Space.xxl }}
-        refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} tintColor={c.brand} />}
-        ListEmptyComponent={
-          <StateMessage
-            title={t('Заданий пока нет')}
-            detail={
-              user.role === 'Mentor'
-                ? t('Когда лид назначит задание, оно появится здесь.')
-                : ownWork
-                  ? t('Здесь будут задания, которые выдали вам.')
-                  : t('Новые задания пока создаются на сайте.')
-            }
-          />
-        }
-        renderSectionHeader={({ section }) => <SectionHeader sectionKey={section.key} count={section.data.length} />}
-        renderItem={({ item, section }) => (
-          <AssignmentRow assignment={item} section={section.key} person={ownWork ? null : nameOf(item.assignedToId)} />
-        )}
-        ItemSeparatorComponent={RowSeparator}
-      />
-    );
-  }
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const orgAdmin = user.role === 'Admin' && user.adminScope === 'Organization';
 
   return (
     <Screen
-      title={user.role === 'Mentor' ? t('Мои задания') : t('Задания')}
-      subtitle={query.isSuccess ? (openCount === 0 ? t('Нет открытых заданий') : `${t('В работе')}: ${openCount}`) : null}
-      header={
-        user.role === 'Lead' ? (
-          <Segmented
-            value={scope}
-            onChange={setScope}
-            options={[
-              { value: 'team', label: t('Команда') },
-              { value: 'mine', label: t('Мои') },
-            ]}
-          />
-        ) : null
-      }
+      title={t('Обзор')}
+      subtitle={[t(roleLabel(user)), user.category?.name, user.branch?.name].filter(Boolean).join(' · ')}
     >
-      {body}
+      <ScrollView
+        contentContainerStyle={{ padding: Space.lg, gap: Space.lg, paddingBottom: Space.xxl * 2 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={c.brand}
+            onRefresh={() => {
+              setRefreshing(true);
+              void queryClient.invalidateQueries().finally(() => setRefreshing(false));
+            }}
+          />
+        }
+      >
+        <TeamPicker />
+        {orgAdmin ? <BranchPicker /> : null}
+        {user.role === 'Admin' ? <AdminOverview /> : <TeamOverview />}
+      </ScrollView>
     </Screen>
   );
 }
 
-function SectionHeader({ sectionKey, count }: { sectionKey: SectionKey; count: number }): JSX.Element {
-  const c = useColors();
+/** The organization administrator's «Все филиалы» switch; it narrows every screen of the app. */
+function BranchPicker(): JSX.Element {
   const { t } = useT();
-  const color = sectionKey === 'overdue' ? c.danger : c.textSecondary;
+  const queryClient = useQueryClient();
+  const scope = useBranchScope();
+  const branches = useQuery({ queryKey: ['branches'], queryFn: listBranches });
+  const options = [
+    { value: 'all', label: t('Все филиалы') },
+    ...(branches.data?.items ?? []).map((b) => ({ value: b.id, label: b.name })),
+  ];
   return (
-    <View style={styles.sectionHeader}>
-      <Text style={[styles.sectionTitle, { color }]}>{t(SECTION_TITLE[sectionKey])}</Text>
-      <Text style={{ fontSize: 13, color: c.textMuted }}>{count}</Text>
-    </View>
+    <Select
+      label={t('Филиал')}
+      value={scope?.id ?? 'all'}
+      options={options}
+      onChange={(id) => {
+        const branch = branches.data?.items.find((b) => b.id === id);
+        setBranchScope(branch ? { id: branch.id, name: branch.name } : null);
+        queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'branches' });
+      }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  sectionHeader: { flexDirection: 'row', alignItems: 'baseline', gap: Space.sm, paddingHorizontal: Space.lg, paddingTop: Space.xl, paddingBottom: Space.sm },
-  sectionTitle: { fontSize: 13, fontWeight: '700' },
-});

@@ -55,7 +55,9 @@ export const CHANGE_LABEL: Record<string, string> = {
   assignee: 'Исполнитель',
 };
 
-export function roleLabel(person: { role: string; adminScope?: string | null }): string {
+export function roleLabel(person: { role: string; adminScope?: string | null; teamRole?: string }): string {
+  // A participant uses a mentor's screens without being one.
+  if (person.teamRole === 'Member') return 'Участник команды';
   if (person.role === 'Admin') return person.adminScope === 'Branch' ? 'Администратор филиала' : 'Администратор организации';
   if (person.role === 'Lead') return 'Тимлид';
   return person.role === 'Mentor' ? 'Ментор' : person.role;

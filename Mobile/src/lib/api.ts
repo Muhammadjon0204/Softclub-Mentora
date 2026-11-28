@@ -1,5 +1,7 @@
+import { branchHeader } from './branchScope';
 import { API_URL } from './config';
 import { secureStorage } from './secureStorage';
+import { teamHeader, type Team } from './team';
 
 /** `AuthUserDto` (`Backend/src/MentorTaskFlow.Contracts/Auth/AuthUserDto.cs`). */
 export interface AuthUser {
@@ -14,6 +16,10 @@ export interface AuthUser {
   avatarUrl?: string | null;
   /** What the owner has left open to this person; absent means «everything the role allows». */
   permissions?: string[] | null;
+  /** Every team the person belongs to, the main one first. */
+  teams?: Team[] | null;
+  /** Set by the app, not the server: what the person is in the team they are working in. */
+  teamRole?: string;
 }
 
 /** `MobileLoginResponse` — like the web login, plus the refresh token the app keeps in the Keychain. */
@@ -46,6 +52,13 @@ let sessionLost: (() => void) | null = null;
 /** The session provider learns here that the refresh token stopped working (revoked, expired). */
 export function onSessionLost(listener: () => void): void {
   sessionLost = listener;
+}
+
+let teamLost: (() => void) | null = null;
+
+/** …and here that the server no longer counts them in the team they were working in. */
+export function onTeamLost(listener: () => void): void {
+  teamLost = listener;
 }
 
 async function toApiError(response: Response): Promise<ApiError> {
@@ -124,6 +137,7 @@ export async function signOut(): Promise<void> {
 /** An authenticated GET/POST/… — renews the access token once on 401 and retries. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   let response: Response;
+  const team = teamHeader(path);
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
@@ -131,6 +145,9 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
         Accept: 'application/json',
         ...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        // An organization admin's chosen branch narrows every request; a call may name another one.
+        ...branchHeader(),
+        ...team,
         ...init.headers,
       },
     });
@@ -147,6 +164,42 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}, retried 
     return apiFetch<T>(path, init, true);
   }
 
-  if (!response.ok) throw await toApiError(response);
+  if (!response.ok) {
+    const error = await toApiError(response);
+    if (error.code === 'SCOPE_OVERRIDE_FORBIDDEN' && 'X-MTF-Team-Id' in team) teamLost?.();
+    throw error;
+  }
   return (response.status === 204 ? undefined : await response.json()) as T;
+}
+
+export function apiGet<T>(path: string): Promise<T> {
+  return apiFetch<T>(path);
+}
+
+/** A change. `branchId` is needed by an organization admin acting on something in one branch. */
+export function apiSend<T>(method: 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, body?: unknown, branchId?: string | null): Promise<T> {
+  return apiFetch<T>(path, {
+    method,
+    headers: branchHeader(branchId),
+    body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
+  });
+}
+
+export interface Paged<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+/** Every page of a list, up to a sane limit for a phone. */
+export async function apiGetAll<T>(path: string, maxPages = 5): Promise<T[]> {
+  const items: T[] = [];
+  const separator = path.includes('?') ? '&' : '?';
+  for (let page = 1; page <= maxPages; page += 1) {
+    const result = await apiFetch<Paged<T>>(`${path}${separator}page=${page}&pageSize=100`);
+    items.push(...result.items);
+    if (items.length >= result.totalCount || result.items.length === 0) break;
+  }
+  return items;
 }

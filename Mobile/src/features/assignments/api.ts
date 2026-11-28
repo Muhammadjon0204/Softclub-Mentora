@@ -1,4 +1,5 @@
 import { apiFetch } from '@/lib/api';
+import { branchHeader } from '@/lib/branchScope';
 
 /** `AssignmentDto` — only the fields the app reads (`Frontend/src/api/lead/assignments.ts` has them all). */
 export interface Assignment {
@@ -16,6 +17,7 @@ export interface Assignment {
   branch: { id: string; name: string } | null;
   assignedByRole?: string | null;
   branchId: string;
+  categoryId: string;
   assignedToId: string;
   assignedById: string | null;
   firstSubmittedAt: string | null;
@@ -125,7 +127,7 @@ export async function decideReview(
   decision: ReviewDecision,
   scopeBranchId: string | null,
 ): Promise<void> {
-  const headers: Record<string, string> = scopeBranchId ? { 'X-MTF-Branch-Id': scopeBranchId } : {};
+  const headers = branchHeader(scopeBranchId);
   let token = assignment.concurrencyToken;
 
   if (assignment.status === 'Submitted') {

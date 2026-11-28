@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { KeyboardAvoidingView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -8,14 +7,16 @@ import { Radius, Space } from '@/constants/theme';
 import { getAssignment, getAssignmentHistory, listSubmissions, type TaskEvent } from '@/features/assignments/api';
 import { relativeDue } from '@/features/assignments/grouping';
 import { useCan, usePeopleNames } from '@/features/assignments/queries';
+import { AssignmentActions } from '@/features/assignments/AssignmentActions';
 import { ReviewPanel } from '@/features/assignments/ReviewPanel';
+import { SubmitPanel } from '@/features/assignments/SubmitPanel';
 import { EVENT_LABEL, isActionable } from '@/features/assignments/status';
 import { Submissions } from '@/features/assignments/Submissions';
-import { WEB_URL } from '@/lib/config';
 import { useT } from '@/lib/i18n';
-import { useUser } from '@/lib/session';
+import { useAccount, useSession, useUser } from '@/lib/session';
 import { useColors } from '@/lib/useColors';
-import { PrimaryButton, SecondaryButton, StateMessage, StatusPill } from '@/ui/primitives';
+import { Button, Card } from '@/ui/kit';
+import { SecondaryButton, StateMessage, StatusPill } from '@/ui/primitives';
 
 export default function AssignmentScreen(): JSX.Element {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,13 +45,14 @@ export default function AssignmentScreen(): JSX.Element {
   const due = new Date(a.currentDueAt);
   const relative = relativeDue(a.currentDueAt, language);
   const isExecutor = a.assignedToId === user.id;
-  const actionable = isExecutor && isActionable(a.status);
+  // An administrator hands work in from their place in the team, not from the administrator's one.
+  const outsideTeam = isExecutor && user.role === 'Admin';
+  const actionable = isExecutor && !outsideTeam && isActionable(a.status);
   const awaiting = a.status === 'Submitted' || a.status === 'InReview';
   const versions = submissions.data ?? [];
   const latest = versions.reduce<(typeof versions)[number] | null>((best, s) => (!best || s.versionNumber > best.versionNumber ? s : best), null);
   const mayReview = awaiting && a.canManage === true && can('assignments.review') && !isExecutor;
   const assigneeName = isExecutor ? null : nameOf(a.assignedToId);
-  const handInPath = user.role === 'Lead' ? '/lead/my-tasks' : '/mentor/tasks';
   const moved = a.currentDueAt !== a.initialDueAt;
 
   return (
@@ -94,18 +96,8 @@ export default function AssignmentScreen(): JSX.Element {
         <Text style={[styles.body, { color: c.textSecondary }]}>{t('Причина отмены')}: {a.cancelReason}</Text>
       ) : null}
 
-      {actionable ? (
-        <View style={{ gap: Space.sm }}>
-          {/* Uploading files from the phone is the next stage; until then the site does it. */}
-          <PrimaryButton
-            label={t('Сдать работу на сайте')}
-            onPress={() => void WebBrowser.openBrowserAsync(`${WEB_URL}${handInPath}?assignmentId=${encodeURIComponent(a.id)}`)}
-          />
-          <Text style={{ color: c.textMuted, fontSize: 13, textAlign: 'center' }}>
-            {t('Загрузка файлов прямо из приложения появится в следующей версии.')}
-          </Text>
-        </View>
-      ) : null}
+      {actionable ? <SubmitPanel assignmentId={a.id} /> : null}
+      {outsideTeam && isActionable(a.status) ? <SwitchToTeam categoryId={a.categoryId} assignmentId={a.id} /> : null}
 
       {versions.length > 0 ? (
         <View style={{ gap: Space.sm }}>
@@ -116,6 +108,7 @@ export default function AssignmentScreen(): JSX.Element {
       {submissions.isError ? <Text style={{ color: c.danger }}>{t('Не удалось загрузить сданные работы')}</Text> : null}
 
       {mayReview && latest ? <ReviewPanel assignment={a} submissionId={latest.id} /> : null}
+      {!isExecutor ? <AssignmentActions assignment={a} /> : null}
       {awaiting && !isExecutor && a.canManage !== true ? (
         <Text style={{ color: c.textMuted, fontSize: 14 }}>{t('Проверяет тот, кто выдал задание.')}</Text>
       ) : null}
@@ -129,13 +122,44 @@ export default function AssignmentScreen(): JSX.Element {
           ?.slice()
           .reverse()
           .map((event, index, all) => (
-            <HistoryItem key={event.id} event={event} actor={event.actorLabel ? t(event.actorLabel) : nameOf(event.actorId)} last={index === all.length - 1} />
+            <HistoryItem key={event.id} event={event} actor={
+                // The server calls every non-admin «Lead», the mentor's own hand-ins included.
+                isExecutor && event.actorLabel && event.eventType.endsWith('SubmissionUploaded')
+                  ? t('Вы')
+                  : event.actorLabel
+                    ? t(ACTOR_ROLE[event.actorLabel] ?? event.actorLabel)
+                    : nameOf(event.actorId)
+              } last={index === all.length - 1} />
           ))}
       </View>
     </ScrollView>
     </KeyboardAvoidingView>
   );
 }
+
+/** The way into the team a task belongs to, for whoever is looking at it from outside. */
+function SwitchToTeam({ categoryId, assignmentId }: { categoryId: string; assignmentId: string }): JSX.Element | null {
+  const { t } = useT();
+  const c = useColors();
+  const account = useAccount();
+  const { switchTeam } = useSession();
+  const team = account.teams?.find((candidate) => candidate.categoryId === categoryId);
+  if (!team) return null;
+  return (
+    <Card style={{ gap: Space.md }}>
+      <Text style={{ color: c.textSecondary, fontSize: 15, lineHeight: 22 }}>
+        {t('Это ваше задание. Чтобы сдать работу, перейдите в команду')} «{team.name}».
+      </Text>
+      <Button
+        label={t('Перейти в команду')}
+        onPress={() => switchTeam(categoryId, { pathname: '/assignment/[id]', params: { id: assignmentId } })}
+      />
+    </Card>
+  );
+}
+
+/** A mentor sees the role of whoever acted, as the server names it. */
+const ACTOR_ROLE: Record<string, string> = { Lead: 'Тимлид', Admin: 'Администратор' };
 
 function HistoryItem({ event, actor, last }: { event: TaskEvent; actor: string | null; last: boolean }): JSX.Element {
   const c = useColors();
