@@ -13,6 +13,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Infrastructure.Analytics;
 using MentorTaskFlow.Infrastructure.Options;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -359,11 +360,8 @@ public sealed class CrmReportService(
     private async Task NotifyLeadsAsync(CrmGroupReport report, CancellationToken cancellationToken)
     {
         var leads = await dbContext.Users.IgnoreQueryFilters()
-            .Where(u => u.OrganizationId == report.OrganizationId
-                        && u.CategoryId == report.CategoryId
-                        && u.Role == UserRole.Lead
-                        && u.IsActive
-                        && u.Id != report.AuthorId)
+            .Where(u => u.OrganizationId == report.OrganizationId && u.Id != report.AuthorId)
+            .LeadingTeam(dbContext, report.CategoryId)
             .Select(u => new { u.Id, u.FullName })
             .ToListAsync(cancellationToken);
 

@@ -2,6 +2,7 @@ using MentorTaskFlow.Domain.Assignments;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorTaskFlow.Infrastructure.Scheduling;
@@ -54,9 +55,8 @@ public sealed class MentorSelector(MentorTaskFlowDbContext dbContext)
             .AsNoTracking()
             .Where(u => u.OrganizationId == organizationId
                         && u.BranchId == branchId
-                        && u.CategoryId == categoryId
-                        && u.Role == UserRole.Mentor
-                        && u.IsActive);
+                        && u.IsActive)
+            .TeachingIn(dbContext, categoryId);
 
         var assignments = dbContext.Assignments.IgnoreQueryFilters().AsNoTracking();
 

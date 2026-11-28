@@ -9,6 +9,7 @@ using MentorTaskFlow.Domain.Submissions;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -141,6 +142,10 @@ public sealed class AdminDashboardService(
             .Where(u => u.IsActive)
             .ToListAsync(cancellationToken);
 
+        // Who teaches and who leads is a matter of teams: a person may be a mentor in one and a
+        // participant in another.
+        var roster = await TeamRoster.LoadAsync(dbContext, users, cancellationToken);
+
         var branches = await dbContext.Branches
             .IgnoreQueryFilters()
             .AsNoTracking()
@@ -171,20 +176,20 @@ public sealed class AdminDashboardService(
 
         var periodAssignments = allAssignments.Where(a => a.UpdatedAt >= backwardStart).ToList();
 
-        var kpis = ComputeKpis(users, allAssignments, backwardStart);
+        var kpis = ComputeKpis(users, roster, allAssignments, backwardStart);
         var activitySeries = BuildActivitySeries(period, periodDays, now, allAssignments, submissions);
-        var roleDistribution = ComputeRoleDistribution(users);
+        var roleDistribution = ComputeRoleDistribution(users, roster);
         var branchHealth = isAllBranches
-            ? branches.Select(b => ComputeBranchHealthRow(b, allAssignments, users, categories)).ToList()
+            ? branches.Select(b => ComputeBranchHealthRow(b, allAssignments, users, roster, categories)).ToList()
             : null;
         var categoryHealth = categories
-            .Select(c => ComputeCategoryHealthRow(c, branches, users, allAssignments, periodAssignments, lateAssignmentIds))
+            .Select(c => ComputeCategoryHealthRow(c, branches, users, roster, allAssignments, periodAssignments, lateAssignmentIds))
             .ToList();
         var (recentAudit, systemEvents) = await BuildAuditProjectionsAsync(cancellationToken);
         var systemHealth = await BuildSystemHealthAsync(systemEvents, now, cancellationToken);
         var bestBranchInsight = ComputeBestBranchInsight(
-            isAllBranches, branchId, branches, allAssignments, users, backwardStart, lateAssignmentIds);
-        var topMentors = ComputeTopMentors(users, periodAssignments, categories, limit: 5);
+            isAllBranches, branchId, branches, allAssignments, users, roster, backwardStart, lateAssignmentIds);
+        var topMentors = ComputeTopMentors(users, roster, periodAssignments, categories, limit: 5);
         var upcomingDeadlines = ComputeUpcomingDeadlines(allAssignments, users, now, forwardEnd, limit: 5);
         var recentAssignmentActivity =
             ComputeRecentAssignmentActivity(periodAssignments, users, categories, limit: 6);
@@ -223,16 +228,17 @@ public sealed class AdminDashboardService(
     /// </remarks>
     private static DashboardKpisDto ComputeKpis(
         IReadOnlyList<User> users,
+        TeamRoster roster,
         IReadOnlyList<Assignment> assignments,
         DateTimeOffset periodStart)
     {
         var totalUsers = users.Count;
-        var activeMentors = users.Count(u => u.Role == UserRole.Mentor && u.IsActive);
+        var activeMentors = users.Count(u => roster.Teaches(u.Id) && u.IsActive);
         var activeAssignments = assignments.Count(a => ActiveStatuses.Contains(a.Status));
         var pendingReview = assignments.Count(a => PendingReviewStatuses.Contains(a.Status));
 
         var usersAtStart = users.Count(u => u.CreatedAt <= periodStart);
-        var mentorsAtStart = users.Count(u => u.Role == UserRole.Mentor && u.IsActive && u.CreatedAt <= periodStart);
+        var mentorsAtStart = users.Count(u => roster.Teaches(u.Id) && u.IsActive && u.CreatedAt <= periodStart);
         var assignmentsAtStart = assignments.Count(a => ActiveStatuses.Contains(a.Status) && a.CreatedAt <= periodStart);
         var pendingAtStart = assignments.Count(a => PendingReviewStatuses.Contains(a.Status) && a.CreatedAt <= periodStart);
 
@@ -343,7 +349,7 @@ public sealed class AdminDashboardService(
     /// and an Invited-but-not-yet-accepted row is not a completed headcount yet (bug report 2026-09-25:
     /// the widget must read as "the team", not "every row in the users table").
     /// </summary>
-    private static RoleDistributionDto ComputeRoleDistribution(IReadOnlyList<User> users)
+    private static RoleDistributionDto ComputeRoleDistribution(IReadOnlyList<User> users, TeamRoster roster)
     {
         var team = users
             .Where(u => u.PasswordHash is not null)
@@ -353,7 +359,7 @@ public sealed class AdminDashboardService(
         return new RoleDistributionDto(
             team.Count(u => u.Role == UserRole.Admin),
             team.Count(u => u.Role == UserRole.Lead),
-            team.Count(u => u.Role == UserRole.Mentor));
+            team.Count(u => u.Role == UserRole.Mentor && roster.Teaches(u.Id)));
     }
 
     // -----------------------------------------------------------------
@@ -364,6 +370,7 @@ public sealed class AdminDashboardService(
         Branch branch,
         IReadOnlyList<Assignment> allAssignments,
         IReadOnlyList<User> users,
+        TeamRoster roster,
         IReadOnlyList<Category> categories)
     {
         var branchAssignments = allAssignments.Where(a => a.BranchId == branch.Id).ToList();
@@ -373,7 +380,7 @@ public sealed class AdminDashboardService(
         var workingTotal = branchAssignments.Count(a => !NonWorkingStatuses.Contains(a.Status));
         var healthPct = workingTotal == 0 ? 100 : (int)Math.Round(100 - (overdue / (double)workingTotal * 100));
 
-        var mentorsCount = users.Count(u => u.BranchId == branch.Id && u.Role == UserRole.Mentor && u.IsActive);
+        var mentorsCount = users.Count(u => u.BranchId == branch.Id && roster.Teaches(u.Id) && u.IsActive);
         var hasActiveAdmin = users.Any(u =>
             u.BranchId == branch.Id && u.Role == UserRole.Admin && u.AdminScope == AdminScope.Branch && u.IsActive);
 
@@ -455,13 +462,14 @@ public sealed class AdminDashboardService(
         Category category,
         IReadOnlyList<Branch> branches,
         IReadOnlyList<User> users,
+        TeamRoster roster,
         IReadOnlyList<Assignment> allAssignments,
         IReadOnlyList<Assignment> periodAssignments,
         IReadOnlySet<Guid> lateAssignmentIds)
     {
         var categoryPeriodAssignments = periodAssignments.Where(a => a.CategoryId == category.Id).ToList();
-        var lead = users.FirstOrDefault(u => u.CategoryId == category.Id && u.Role == UserRole.Lead && u.IsActive);
-        var mentorsCount = users.Count(u => u.CategoryId == category.Id && u.Role == UserRole.Mentor && u.IsActive);
+        var lead = users.FirstOrDefault(u => u.IsActive && roster.Leads(u.Id, category.Id));
+        var mentorsCount = users.Count(u => u.IsActive && roster.TeachesIn(u.Id, category.Id));
         var active = categoryPeriodAssignments.Count(a => ActiveStatuses.Contains(a.Status));
         var pending = categoryPeriodAssignments.Count(a => PendingReviewStatuses.Contains(a.Status));
         var overdue = categoryPeriodAssignments.Count(a => a.Status == AssignmentStatus.Overdue);
@@ -515,7 +523,8 @@ public sealed class AdminDashboardService(
         IReadOnlyList<Assignment> allAssignments,
         DateTimeOffset backwardStart,
         IReadOnlySet<Guid> lateAssignmentIds,
-        IReadOnlyList<User> usersForMentorCount)
+        IReadOnlyList<User> usersForMentorCount,
+        TeamRoster roster)
     {
         var periodAssignments = allAssignments
             .Where(a => a.BranchId == branch.Id && a.UpdatedAt >= backwardStart)
@@ -527,7 +536,7 @@ public sealed class AdminDashboardService(
             branch.Name,
             periodAssignments.Count(a => ActiveStatuses.Contains(a.Status)),
             metrics.ApprovedCount,
-            usersForMentorCount.Count(u => u.BranchId == branch.Id && u.Role == UserRole.Mentor && u.IsActive),
+            usersForMentorCount.Count(u => u.BranchId == branch.Id && roster.Teaches(u.Id) && u.IsActive),
             WeightedPerformanceScore(metrics),
             metrics.OnTimeRatePct);
     }
@@ -543,6 +552,7 @@ public sealed class AdminDashboardService(
         IReadOnlyList<Branch> branches,
         IReadOnlyList<Assignment> allAssignments,
         IReadOnlyList<User> users,
+        TeamRoster roster,
         DateTimeOffset backwardStart,
         IReadOnlySet<Guid> lateAssignmentIds)
     {
@@ -551,7 +561,7 @@ public sealed class AdminDashboardService(
         if (isAllBranches)
         {
             var summaries = branches
-                .Select(b => BuildBranchInsightSummary(b, allAssignments, backwardStart, lateAssignmentIds, users))
+                .Select(b => BuildBranchInsightSummary(b, allAssignments, backwardStart, lateAssignmentIds, users, roster))
                 .ToList();
 
             var best = summaries.Aggregate((leader, candidate) =>
@@ -580,7 +590,7 @@ public sealed class AdminDashboardService(
         }
 
         var branch = branches.FirstOrDefault(b => b.Id == scopeBranchId) ?? branches[0];
-        var summary = BuildBranchInsightSummary(branch, allAssignments, backwardStart, lateAssignmentIds, users);
+        var summary = BuildBranchInsightSummary(branch, allAssignments, backwardStart, lateAssignmentIds, users, roster);
 
         return new BestBranchInsightDto(
             "single-branch", summary.BranchId, summary.BranchName, summary.ActiveAssignments,
@@ -592,9 +602,13 @@ public sealed class AdminDashboardService(
     // -----------------------------------------------------------------
 
     private static IReadOnlyList<TopMentorRowDto> ComputeTopMentors(
-        IReadOnlyList<User> users, IReadOnlyList<Assignment> periodAssignments, IReadOnlyList<Category> categories, int limit)
+        IReadOnlyList<User> users,
+        TeamRoster roster,
+        IReadOnlyList<Assignment> periodAssignments,
+        IReadOnlyList<Category> categories,
+        int limit)
     {
-        var mentors = users.Where(u => u.Role == UserRole.Mentor && u.IsActive);
+        var mentors = users.Where(u => roster.Teaches(u.Id) && u.IsActive);
 
         return mentors
             .Select(mentor =>
@@ -603,9 +617,8 @@ public sealed class AdminDashboardService(
                 return new TopMentorRowDto(
                     mentor.Id,
                     mentor.FullName,
-                    mentor.CategoryId is { } categoryId
-                        ? categories.FirstOrDefault(c => c.Id == categoryId)?.Name
-                        : null,
+                    categories.FirstOrDefault(c =>
+                        c.Id == roster.Of(mentor.Id).First(p => p.Role is TeamRole.Mentor).CategoryId)?.Name,
                     own.Count(a => a.Status == AssignmentStatus.Approved),
                     own.Count(a => ActiveStatuses.Contains(a.Status)));
             })

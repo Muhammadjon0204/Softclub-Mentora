@@ -2,6 +2,7 @@ using MentorTaskFlow.Application.Common.Tenancy;
 using MentorTaskFlow.Domain.Assignments;
 using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorTaskFlow.Infrastructure.Assignments;
@@ -71,7 +72,7 @@ public static class AssignmentOwnership
         return await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(u => u.CategoryId == categoryId && u.Role == UserRole.Lead && u.IsActive)
+            .LeadingTeam(dbContext, categoryId)
             .Select(u => (Guid?)u.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }

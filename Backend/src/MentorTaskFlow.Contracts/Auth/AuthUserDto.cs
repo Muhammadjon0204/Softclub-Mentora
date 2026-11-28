@@ -35,7 +35,24 @@ public sealed record AuthUserDto(
     BranchSummaryDto? Branch,
     CategorySummaryDto? Category,
     string? AvatarUrl = null,
-    IReadOnlyList<string>? Permissions = null);
+    IReadOnlyList<string>? Permissions = null,
+    IReadOnlyList<TeamSummaryDto>? Teams = null);
+
+/// <summary>
+/// A team the person can act in, sent back as <c>X-MTF-Team-Id</c> to work there.
+/// </summary>
+/// <remarks>
+/// <c>role</c> is what they are in that team — <c>Lead</c>, <c>Mentor</c> or <c>Member</c> — and
+/// <c>permissions</c> what that role may do. <c>isMain</c> marks the team their account opens in, where
+/// no header is needed.
+/// </remarks>
+public sealed record TeamSummaryDto(
+    Guid CategoryId,
+    string Name,
+    string TimeZoneId,
+    string Role,
+    bool IsMain,
+    IReadOnlyList<string> Permissions);
 
 /// <summary>Response of <c>POST /auth/login</c> — the profile plus the access token (<c>AUTH-039</c>).</summary>
 /// <remarks>

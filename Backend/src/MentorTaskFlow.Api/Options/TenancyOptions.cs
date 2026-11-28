@@ -12,6 +12,9 @@ public sealed class TenancyOptions
     public bool AllowAllBranchesRead { get; init; } = true;
 
     /// <summary>Response header carrying the branch actually applied (<c>API-027</c>).</summary>
+    /// <summary>Which of their teams the caller is acting in (<c>TeamContextMiddleware</c>).</summary>
+    public const string TeamHeaderName = "X-MTF-Team-Id";
+
     public const string EffectiveBranchHeaderName = "X-MTF-Effective-Branch-Id";
 
     /// <summary>Value of <see cref="EffectiveBranchHeaderName"/> in the all-branches read context.</summary>

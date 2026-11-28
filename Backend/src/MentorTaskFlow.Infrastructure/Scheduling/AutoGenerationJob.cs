@@ -8,6 +8,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Observability;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -272,7 +273,7 @@ public sealed class AutoGenerationJob(
         var leadId = await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(u => u.CategoryId == target.CategoryId && u.Role == UserRole.Lead && u.IsActive)
+            .LeadingTeam(dbContext, target.CategoryId)
             .Select(u => (Guid?)u.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -325,16 +326,25 @@ public sealed class AutoGenerationJob(
 
         // TEN-044: the Lead of this category, the administrator of this branch, and the organization
         // administrators — and nobody from another branch (TEN-045).
-        var recipients = await dbContext.Users
+        var admins = await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
             .Where(u => u.OrganizationId == target.OrganizationId && u.IsActive)
-            .Where(u => (u.Role == UserRole.Lead && u.CategoryId == target.CategoryId)
-                        || (u.Role == UserRole.Admin
-                            && (u.AdminScope == AdminScope.Organization
-                                || u.BranchId == target.BranchId)))
+            .Where(u => u.Role == UserRole.Admin
+                        && (u.AdminScope == AdminScope.Organization || u.BranchId == target.BranchId))
             .Select(u => u.Id)
             .ToListAsync(cancellationToken);
+
+        var leads = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.OrganizationId == target.OrganizationId)
+            .LeadingTeam(dbContext, target.CategoryId)
+            .Select(u => u.Id)
+            .ToListAsync(cancellationToken);
+
+        // Union: an administrator may lead the team as well and is told once.
+        var recipients = admins.Union(leads).ToList();
 
         foreach (var recipientId in recipients)
         {

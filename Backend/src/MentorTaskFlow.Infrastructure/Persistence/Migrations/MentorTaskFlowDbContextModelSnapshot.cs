@@ -1885,6 +1885,75 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("MentorTaskFlow.Domain.Users.TeamMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AddedById")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("category_id");
+
+                    b.Property<uint>("ConcurrencyToken")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_team_memberships");
+
+                    b.HasIndex("AddedById")
+                        .HasDatabaseName("ix_team_memberships_added_by_id");
+
+                    b.HasIndex("UserId", "CategoryId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_team_memberships_user_category");
+
+                    b.HasIndex("CategoryId", "OrganizationId", "BranchId")
+                        .HasDatabaseName("ix_team_memberships_category_id_organization_id_branch_id");
+
+                    b.HasIndex("OrganizationId", "BranchId", "CategoryId")
+                        .HasDatabaseName("ix_team_memberships_organization_branch_category");
+
+                    b.ToTable("team_memberships", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_team_memberships_role_allowed", "role IN ('Lead','Mentor','Member')");
+                        });
+                });
+
             modelBuilder.Entity("MentorTaskFlow.Domain.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2537,6 +2606,31 @@ namespace MentorTaskFlow.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_branches_organization");
+                });
+
+            modelBuilder.Entity("MentorTaskFlow.Domain.Users.TeamMembership", b =>
+                {
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_memberships_added_by");
+
+                    b.HasOne("MentorTaskFlow.Domain.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_memberships_user");
+
+                    b.HasOne("MentorTaskFlow.Domain.Categories.Category", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId", "OrganizationId", "BranchId")
+                        .HasPrincipalKey("Id", "OrganizationId", "BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_memberships_category_scope");
                 });
 
             modelBuilder.Entity("MentorTaskFlow.Domain.Users.User", b =>

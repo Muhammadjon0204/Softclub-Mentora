@@ -358,6 +358,8 @@ app.UseCors(CorsOptions.PolicyName);
 // Authentication lands in Phase 2. Until then the middleware below sees no principal and leaves the
 // tenant filter fail-closed, which is the correct behaviour for an API with no data endpoints yet.
 app.UseAuthentication();
+// Between the two: a team chosen by header changes who the caller is, and policies must see that.
+app.UseMiddleware<MentorTaskFlow.Api.Middleware.TeamContextMiddleware>();
 app.UseAuthorization();
 
 // SEC-007. AddMentorTaskFlowRateLimiting registers the policies, but an [EnableRateLimiting]

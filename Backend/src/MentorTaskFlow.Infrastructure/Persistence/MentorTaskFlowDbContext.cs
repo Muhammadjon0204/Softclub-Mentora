@@ -80,6 +80,8 @@ public class MentorTaskFlowDbContext(
 
     public DbSet<Proposal> Proposals => Set<Proposal>();
 
+    public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
+
     // Organization-level configuration: no branch to filter by, and reached with the organization
     // pinned explicitly, because a person's permissions are also read during sign-in.
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
@@ -168,6 +170,12 @@ public class MentorTaskFlowDbContext(
                 && (FilterBranchId == null || e.BranchId == FilterBranchId)));
 
         modelBuilder.Entity<Review>().HasQueryFilter(e =>
+            FilterSuppressed
+            || (FilterOrganizationId != null
+                && e.OrganizationId == FilterOrganizationId
+                && (FilterBranchId == null || e.BranchId == FilterBranchId)));
+
+        modelBuilder.Entity<TeamMembership>().HasQueryFilter(e =>
             FilterSuppressed
             || (FilterOrganizationId != null
                 && e.OrganizationId == FilterOrganizationId

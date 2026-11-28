@@ -60,7 +60,7 @@ public sealed class UserService(
 
         if (query.CategoryId is { } categoryId)
         {
-            source = source.Where(u => u.CategoryId == categoryId);
+            source = source.InTeam(dbContext, categoryId);
         }
 
         if (query.IsActive is { } isActive)
@@ -84,8 +84,14 @@ public sealed class UserService(
             ? await LoadBranchSummariesAsync(rows.Select(r => r.User.BranchId), cancellationToken)
             : [];
 
+        var teams = await LoadTeamsAsync(rows.Select(r => r.User).ToList(), actor, cancellationToken);
+
         var items = rows
-            .Select(row => ToDto(row.User, ConcurrencyTokenAccessor.EncodeFrom(row.Xmin), BranchOf(branches, row.User)))
+            .Select(row => ToDto(
+                row.User,
+                ConcurrencyTokenAccessor.EncodeFrom(row.Xmin),
+                BranchOf(branches, row.User),
+                teams.GetValueOrDefault(row.User.Id)))
             .ToList();
 
         return new PagedResult<UserDto>(items, page, pageSize, totalCount);
@@ -109,7 +115,9 @@ public sealed class UserService(
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException();
 
-        return ToDto(row.User, ConcurrencyTokenAccessor.EncodeFrom(row.Xmin), null);
+        var teams = await LoadTeamsAsync([row.User], actor, cancellationToken);
+
+        return ToDto(row.User, ConcurrencyTokenAccessor.EncodeFrom(row.Xmin), null, teams.GetValueOrDefault(row.User.Id));
     }
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken)
@@ -122,10 +130,17 @@ public sealed class UserService(
         }
 
         var adminScope = ParseAdminScope(request, targetRole);
+        var asMember = ParseAsMember(request, targetRole);
         await EnsureMayCreateAsync(actor, targetRole, adminScope, cancellationToken);
 
         var user = await BuildNewUserAsync(actor, request, targetRole, adminScope, cancellationToken);
         dbContext.Users.Add(user);
+
+        if (asMember)
+        {
+            dbContext.TeamMemberships.Add(TeamMembership.Create(
+                user, user.CategoryId!.Value, user.BranchId!.Value, TeamRole.Member, actor.UserId, clock.UtcNow));
+        }
 
         await IssueInvitationAsync(user, cancellationToken);
 
@@ -144,12 +159,13 @@ public sealed class UserService(
             {
                 role = user.Role.ToString(),
                 adminScope = user.AdminScope?.ToString(),
+                teamRole = asMember ? nameof(TeamRole.Member) : null,
             }),
         });
 
         await SaveTranslatingConstraintsAsync(cancellationToken);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     public async Task<UserDto> PatchAsync(Guid userId, PatchUserRequest request, CancellationToken cancellationToken)
@@ -170,7 +186,7 @@ public sealed class UserService(
 
         await dbContext.SaveWithConcurrencyCheckAsync(user, cancellationToken);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     public async Task<UserDto> ActivateAsync(Guid userId, UserActionRequest request, CancellationToken cancellationToken)
@@ -195,7 +211,7 @@ public sealed class UserService(
         // both pass a service check.
         await SaveTranslatingConstraintsAsync(cancellationToken, user);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     public async Task<UserDto> DeactivateAsync(Guid userId, UserActionRequest request, CancellationToken cancellationToken)
@@ -228,7 +244,7 @@ public sealed class UserService(
         await dbContext.SaveWithConcurrencyCheckAsync(user, cancellationToken);
         tokenVersionValidator.Invalidate(user.Id);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     public async Task<UserDto> ChangeRoleAsync(Guid userId, ChangeRoleRequest request, CancellationToken cancellationToken)
@@ -264,7 +280,10 @@ public sealed class UserService(
         var previousScope = user.AdminScope;
         var now = clock.UtcNow;
 
+        var previousCategoryId = user.CategoryId;
+
         user.ChangeRole(targetRole, adminScope, branchId, categoryId, now);
+        await ReconcileMembershipsAsync(user, previousCategoryId, now, cancellationToken);
 
         // AUTH-034: any change of access level invalidates issued tokens at once. Without this the
         // person would keep acting under the old scope for up to the token's lifetime.
@@ -298,7 +317,7 @@ public sealed class UserService(
         await SaveTranslatingConstraintsAsync(cancellationToken, user);
         tokenVersionValidator.Invalidate(user.Id);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     // -----------------------------------------------------------------
@@ -348,12 +367,21 @@ public sealed class UserService(
         // branches is change-branch, which is authorised differently.
         await EnsureCategoryBelongsToBranchAsync(request.NewCategoryId, branchId, cancellationToken);
 
-        await EnsureNotBlockedAsync(user, ErrorCodes.CategoryChangeBlocked, cancellationToken);
+        // Only the team being left matters: work in the person's other teams stays where it is.
+        await EnsureNotBlockedAsync(user, ErrorCodes.CategoryChangeBlocked, user.CategoryId, cancellationToken);
+
+        // Moving the main team onto one they lead would silently take the leadership away.
+        if (await dbContext.RoleInTeamAsync(user.Id, request.NewCategoryId, cancellationToken) is TeamRole.Lead)
+        {
+            throw Blocked(ErrorCodes.CategoryChangeBlocked, TransferBlockReasons.ActiveLead,
+                "Пользователь руководит этой командой. Сначала снимите с него роль тимлида в ней.");
+        }
 
         var previousCategoryId = user.CategoryId;
         var now = clock.UtcNow;
 
         user.ChangeCategory(request.NewCategoryId, now);
+        await ReconcileMembershipsAsync(user, previousCategoryId, now, cancellationToken);
 
         dbContext.UserCategoryHistory.Add(UserCategoryHistory.Record(
             user.Id,
@@ -390,7 +418,7 @@ public sealed class UserService(
 
         tokenVersionValidator.Invalidate(user.Id);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     public Task<UserDto> ChangeBranchAsync(Guid userId, ChangeBranchRequest request, CancellationToken cancellationToken)
@@ -451,7 +479,7 @@ public sealed class UserService(
             await EnsureCategoryBelongsToBranchAsync(categoryId, request.NewBranchId, cancellationToken);
         }
 
-        await EnsureNotBlockedAsync(user, ErrorCodes.BranchChangeBlocked, cancellationToken);
+        await EnsureNotBlockedAsync(user, ErrorCodes.BranchChangeBlocked, leavingCategoryId: null, cancellationToken);
 
         var previousBranchId = user.BranchId;
         var previousCategoryId = user.CategoryId;
@@ -459,6 +487,7 @@ public sealed class UserService(
         var now = clock.UtcNow;
 
         user.ChangeBranch(request.NewBranchId, newCategoryId, now);
+        await ReconcileMembershipsAsync(user, previousCategoryId, now, cancellationToken);
 
         dbContext.UserBranchHistory.Add(UserBranchHistory.Record(
             user.OrganizationId,
@@ -521,7 +550,7 @@ public sealed class UserService(
 
         tokenVersionValidator.Invalidate(user.Id);
 
-        return ToDto(user, dbContext.Read(user), null);
+        return await MutationResultAsync(user, cancellationToken);
     }
 
     /// <summary>
@@ -609,18 +638,19 @@ public sealed class UserService(
     /// the Lead check catches. It is not empty, though, and the condition is added with those phases.
     /// </para>
     /// </remarks>
-    private async Task EnsureNotBlockedAsync(User user, string code, CancellationToken cancellationToken)
+    /// <param name="leavingCategoryId">
+    /// The one team being left, or null when the person leaves all of them — a transfer to another
+    /// branch.
+    /// </param>
+    private async Task EnsureNotBlockedAsync(User user, string code, Guid? leavingCategoryId, CancellationToken cancellationToken)
     {
-        if (user is { Role: UserRole.Lead, IsActive: true })
+        var leavingALedTeam = leavingCategoryId is null && user.IsActive && await dbContext.TeamMemberships
+            .IgnoreQueryFilters()
+            .AnyAsync(m => m.UserId == user.Id && m.Role == TeamRole.Lead, cancellationToken);
+
+        if (user is { Role: UserRole.Lead, IsActive: true } || leavingALedTeam)
         {
-            throw new ConflictException(
-                code,
-                "Пользователь является активным тимлидом категории.",
-                new Dictionary<string, object?>
-                {
-                    ["reason"] = TransferBlockReasons.ActiveLead,
-                    ["blockingAssignmentIds"] = Array.Empty<Guid>(),
-                });
+            throw Blocked(code, TransferBlockReasons.ActiveLead, "Пользователь является активным тимлидом категории.");
         }
 
         // IgnoreQueryFilters on purpose: the check must see every unfinished task of this user,
@@ -631,6 +661,7 @@ public sealed class UserService(
             .AsNoTracking()
             .Where(a => a.AssignedToId == user.Id
                         && a.OrganizationId == user.OrganizationId
+                        && (leavingCategoryId == null || a.CategoryId == leavingCategoryId)
                         && a.Status != AssignmentStatus.Approved
                         && a.Status != AssignmentStatus.Cancelled)
             .OrderBy(a => a.CreatedAt)
@@ -647,6 +678,51 @@ public sealed class UserService(
                     ["reason"] = TransferBlockReasons.ActiveAssignments,
                     ["blockingAssignmentIds"] = blocking,
                 });
+        }
+    }
+
+    private static ConflictException Blocked(string code, string reason, string detail) => new(
+        code,
+        detail,
+        new Dictionary<string, object?>
+        {
+            ["reason"] = reason,
+            ["blockingAssignmentIds"] = Array.Empty<Guid>(),
+        });
+
+    /// <summary>
+    /// Brings the person's other teams in line with their account after it changed: a transfer to
+    /// another branch leaves them all, a move of the main team leaves the old one, and the account's
+    /// own role replaces any membership of the new one — except «участник», which renames a mentor.
+    /// </summary>
+    private async Task ReconcileMembershipsAsync(
+        User user,
+        Guid? previousCategoryId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var memberships = await dbContext.TeamMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.UserId == user.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var membership in memberships)
+        {
+            var leftBehind = membership.BranchId != user.BranchId
+                || (previousCategoryId != user.CategoryId && membership.CategoryId == previousCategoryId);
+
+            var replacedByAccount = membership.CategoryId == user.CategoryId
+                && !(user.Role is UserRole.Mentor && membership.Role is TeamRole.Member);
+
+            if (leftBehind || replacedByAccount)
+            {
+                dbContext.TeamMemberships.Remove(membership);
+            }
+            else if (user.Role is UserRole.Admin && membership.Role is TeamRole.Mentor)
+            {
+                // An administrator leads a team or takes part in it; they are not its mentor.
+                membership.ChangeRole(user, TeamRole.Member, now);
+            }
         }
     }
 
@@ -895,6 +971,15 @@ public sealed class UserService(
         return ParseRequiredAdminScope(request.AdminScope);
     }
 
+    /// <summary>Whether a new mentor account joins its team as «участник».</summary>
+    private static bool ParseAsMember(CreateUserRequest request, UserRole targetRole) => request.TeamRole switch
+    {
+        null => false,
+        nameof(TeamRole.Mentor) when targetRole is UserRole.Mentor => false,
+        nameof(TeamRole.Member) when targetRole is UserRole.Mentor => true,
+        _ => throw new ValidationAppException("teamRole", "Роль в команде — Mentor или Member, и только для роли Mentor."),
+    };
+
     private static AdminScope ParseRequiredAdminScope(string? value) =>
         Enum.TryParse<AdminScope>(value, ignoreCase: false, out var parsed)
             ? parsed
@@ -1033,23 +1118,37 @@ public sealed class UserService(
     {
         var localDate = clock.UtcNow.UtcDateTime.ToString("yyyy-MM-dd");
 
-        if (user.Role is UserRole.Lead && user.CategoryId is { } categoryId)
+        var ledTeams = await dbContext.TeamMemberships
+            .IgnoreQueryFilters()
+            .Where(m => m.UserId == user.Id && m.Role == TeamRole.Lead)
+            .Select(m => m.CategoryId)
+            .ToListAsync(cancellationToken);
+
+        if (user is { Role: UserRole.Lead, CategoryId: { } mainTeam })
+        {
+            ledTeams.Add(mainTeam);
+        }
+
+        foreach (var categoryId in ledTeams.Distinct())
         {
             var hasAnotherLead = await dbContext.Users
                 .IgnoreQueryFilters()
-                .AnyAsync(
-                    u => u.CategoryId == categoryId && u.Role == UserRole.Lead && u.IsActive && u.Id != user.Id,
-                    cancellationToken);
+                .Where(u => u.Id != user.Id)
+                .LeadingTeam(dbContext, categoryId)
+                .AnyAsync(cancellationToken);
 
             if (!hasAnotherLead)
             {
                 // The date alone: the event type, the organization, the branch and the subject are
-                // already segments of the key, so one alert per category per day follows without
-                // repeating any of them (NTF-015).
+                // already segments of the key, so one alert per team per day follows without
+                // repeating any of them (NTF-015). A second team is keyed by itself, or the first
+                // team's alert would swallow it — and the key has no room for both identifiers.
                 await EnqueueToAdminsAsync(
                     user,
+                    categoryId == user.CategoryId ? user.Id : categoryId,
                     NotificationEventTypes.CategoryWithoutLead,
                     localDate,
+                    categoryId,
                     cancellationToken);
             }
         }
@@ -1070,8 +1169,10 @@ public sealed class UserService(
             {
                 await EnqueueToAdminsAsync(
                     user,
+                    user.Id,
                     NotificationEventTypes.BranchWithoutAdmin,
                     localDate,
+                    categoryId: null,
                     cancellationToken);
             }
         }
@@ -1079,8 +1180,10 @@ public sealed class UserService(
 
     private async Task EnqueueToAdminsAsync(
         User subject,
+        Guid entityId,
         string eventType,
         string discriminator,
+        Guid? categoryId,
         CancellationToken cancellationToken)
     {
         // BranchWithoutAdmin is organization-level and therefore addressed to the organization
@@ -1103,9 +1206,9 @@ public sealed class UserService(
                 {
                     RecipientUserId = recipientId,
                     EventType = eventType,
-                    EntityId = subject.Id,
+                    EntityId = entityId,
                     Discriminator = $"{discriminator}:{recipientId:N}",
-                    CategoryId = organizationLevel ? null : subject.CategoryId,
+                    CategoryId = organizationLevel ? null : categoryId,
                     Payload = JsonSerializer.SerializeToDocument(new { subjectFullName = subject.FullName }),
                 },
                 subject.OrganizationId,
@@ -1121,7 +1224,7 @@ public sealed class UserService(
     private ICurrentUserContext RequireActor() => currentUser.Current ?? throw new UnauthorizedException();
 
     /// <summary>Narrows a query to what the actor may see (<c>USER-010</c>).</summary>
-    private static IQueryable<User> ApplyVisibility(IQueryable<User> source, ICurrentUserContext actor) => actor switch
+    private IQueryable<User> ApplyVisibility(IQueryable<User> source, ICurrentUserContext actor) => actor switch
     {
         { Role: UserRole.Admin, AdminScope: AdminScope.Organization } => source,
 
@@ -1129,7 +1232,7 @@ public sealed class UserService(
         // them — TEN-003 keeps the composition of the organization out of reach.
         { Role: UserRole.Admin, AdminScope: AdminScope.Branch } => source.Where(u => u.BranchId == actor.BranchId),
 
-        { Role: UserRole.Lead } => source.Where(u => u.CategoryId == actor.CategoryId),
+        { Role: UserRole.Lead } => source.InTeam(dbContext, actor.CategoryId!.Value),
         _ => source.Where(_ => false),
     };
 
@@ -1262,7 +1365,49 @@ public sealed class UserService(
         }
     }
 
-    private static UserDto ToDto(User user, string concurrencyToken, BranchSummaryDto? branch) => new(
+    private async Task<UserDto> MutationResultAsync(User user, CancellationToken cancellationToken)
+    {
+        var teams = await LoadTeamsAsync([user], RequireActor(), cancellationToken);
+
+        return ToDto(user, dbContext.Read(user), null, teams.GetValueOrDefault(user.Id));
+    }
+
+    /// <summary>The teams of each person, the main one first; a Lead is told of their own only.</summary>
+    private async Task<Dictionary<Guid, IReadOnlyList<UserTeamDto>>> LoadTeamsAsync(
+        IReadOnlyCollection<User> users,
+        ICurrentUserContext actor,
+        CancellationToken cancellationToken)
+    {
+        var roster = await TeamRoster.LoadAsync(dbContext, users, cancellationToken);
+
+        var places = users.ToDictionary(
+            u => u.Id,
+            u => roster.Of(u.Id)
+                .Where(p => actor.Role is not UserRole.Lead || p.CategoryId == actor.CategoryId)
+                .ToList());
+
+        var ids = places.Values.SelectMany(p => p).Select(p => p.CategoryId).Distinct().ToArray();
+
+        var names = await dbContext.Categories
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+
+        return places.ToDictionary(
+            p => p.Key,
+            IReadOnlyList<UserTeamDto> (p) => p.Value
+                .Select(t => new UserTeamDto(t.CategoryId, names.GetValueOrDefault(t.CategoryId, string.Empty), t.Role.ToString(), t.IsMain))
+                .OrderByDescending(t => t.IsMain)
+                .ThenBy(t => t.Name, StringComparer.Ordinal)
+                .ToList());
+    }
+
+    private static UserDto ToDto(
+        User user,
+        string concurrencyToken,
+        BranchSummaryDto? branch,
+        IReadOnlyList<UserTeamDto>? teams) => new(
         user.Id,
         user.FullName,
         user.Email,
@@ -1277,7 +1422,8 @@ public sealed class UserService(
         user.CreatedAt,
         concurrencyToken,
         branch,
-        AvatarService.UrlFor(user.AvatarKey));
+        AvatarService.UrlFor(user.AvatarKey),
+        teams);
 
     /// <summary>Carries the shadow <c>xmin</c> out of a no-tracking query alongside its entity.</summary>
     private sealed record UserRow(User User, uint Xmin);

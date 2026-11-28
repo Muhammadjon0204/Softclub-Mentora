@@ -47,6 +47,9 @@ public static class AuditActions
     public const string CategoryActivate = "category.activate";
     public const string CategoryDeactivate = "category.deactivate";
     public const string CategorySettingsUpdate = "category.settings_update";
+    public const string CategoryMemberAdd = "category.member_add";
+    public const string CategoryMemberUpdate = "category.member_update";
+    public const string CategoryMemberRemove = "category.member_remove";
 
     public const string TopicCreate = "topic.create";
     public const string TopicUpdate = "topic.update";

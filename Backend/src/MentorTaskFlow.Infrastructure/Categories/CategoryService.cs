@@ -11,6 +11,7 @@ using MentorTaskFlow.Domain.Tenancy;
 using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
 using MentorTaskFlow.Infrastructure.Persistence.Configurations;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -187,11 +188,9 @@ public sealed class CategoryService(
         {
             var hasActiveUsers = await dbContext.Users
                 .IgnoreQueryFilters()
-                .AnyAsync(
-                    u => u.CategoryId == category.Id
-                         && u.OrganizationId == category.OrganizationId
-                         && u.IsActive,
-                    cancellationToken);
+                .Where(u => u.OrganizationId == category.OrganizationId && u.IsActive)
+                .InTeam(dbContext, category.Id)
+                .AnyAsync(cancellationToken);
 
             if (hasActiveUsers)
             {

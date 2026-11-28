@@ -5,7 +5,9 @@ using MentorTaskFlow.Application.Common.Abstractions;
 using MentorTaskFlow.Domain.Categories;
 using MentorTaskFlow.Domain.Notifications;
 using MentorTaskFlow.Domain.Tenancy;
+using MentorTaskFlow.Domain.Users;
 using MentorTaskFlow.Infrastructure.Persistence;
+using MentorTaskFlow.Infrastructure.Users;
 using Microsoft.EntityFrameworkCore;
 
 namespace MentorTaskFlow.Infrastructure.Notifications;
@@ -79,12 +81,12 @@ internal static class NotificationPayloadEnricher
         // The change tracker first: a suggestion is enqueued in the same unit of work that creates its
         // assignment, so the row is not in the database yet.
         var assignment = dbContext.Assignments.Local.FirstOrDefault(a => a.Id == entry.EntityId) is { } local
-            ? new { local.AssignedToId, local.CategoryId }
+            ? new { local.AssignedToId, local.AssignedById, local.CategoryId }
             : await dbContext.Assignments
                 .IgnoreQueryFilters()
                 .AsNoTracking()
                 .Where(a => a.Id == entry.EntityId)
-                .Select(a => new { a.AssignedToId, a.CategoryId })
+                .Select(a => new { a.AssignedToId, a.AssignedById, a.CategoryId })
                 .FirstOrDefaultAsync(cancellationToken);
 
         if (assignment is null)
@@ -92,22 +94,27 @@ internal static class NotificationPayloadEnricher
             return entry.Payload;
         }
 
-        var people = await dbContext.Users
+        var isExecutor = entry.RecipientUserId == assignment.AssignedToId;
+        var seat = await SeatAsync(
+            dbContext,
+            entry.RecipientUserId,
+            assignment.CategoryId,
+            isExecutor,
+            isIssuer: entry.RecipientUserId == assignment.AssignedById,
+            cancellationToken);
+
+        var assigneeName = await dbContext.Users
             .IgnoreQueryFilters()
             .AsNoTracking()
-            .Where(u => u.Id == entry.RecipientUserId || u.Id == assignment.AssignedToId)
-            .Select(u => new { u.Id, u.Role, u.FullName })
-            .ToListAsync(cancellationToken);
-
-        var recipientRole = people.FirstOrDefault(p => p.Id == entry.RecipientUserId)?.Role;
-        var assigneeName = people.FirstOrDefault(p => p.Id == assignment.AssignedToId)?.FullName;
+            .Where(u => u.Id == assignment.AssignedToId)
+            .Select(u => u.FullName)
+            .FirstOrDefaultAsync(cancellationToken);
         var timeZone = await TimeZoneOfAsync(dbContext, assignment.CategoryId, cancellationToken);
 
         var payload = JsonNode.Parse(entry.Payload.RootElement.GetRawText())?.AsObject() ?? [];
 
         payload["assignmentId"] = entry.EntityId.ToString();
-        payload["actionPath"] = ActionPath(
-            entry.EventType, recipientRole, entry.EntityId, entry.RecipientUserId == assignment.AssignedToId);
+        payload["actionPath"] = InTeam(ActionPath(entry.EventType, seat.Role, entry.EntityId, isExecutor), seat);
 
         if (payload["currentDueAt"] is JsonValue dueValue && dueValue.TryGetValue<DateTimeOffset>(out var dueAt))
         {
@@ -116,7 +123,7 @@ internal static class NotificationPayloadEnricher
 
         // The person the task belongs to, named for whoever supervises it — never for the mentor, who
         // would only be reading their own name.
-        if (recipientRole is UserRole.Lead or UserRole.Admin && assigneeName is not null)
+        if (seat.Role is UserRole.Lead or UserRole.Admin && assigneeName is not null)
         {
             payload["mentorFullName"] = assigneeName;
         }
@@ -139,27 +146,82 @@ internal static class NotificationPayloadEnricher
         _ => $"/admin/assignments?assignmentId={assignmentId}",
     };
 
+    /// <summary>
+    /// In what capacity the recipient is told about work of this team, and — when that is not what
+    /// their account opens with — which team the page has to switch to.
+    /// </summary>
+    private sealed record Seat(UserRole? Role, Guid? SwitchTo);
+
+    private static async Task<Seat> SeatAsync(
+        MentorTaskFlowDbContext dbContext,
+        Guid recipientId,
+        Guid categoryId,
+        bool isExecutor,
+        bool isIssuer,
+        CancellationToken cancellationToken)
+    {
+        var account = await dbContext.Users
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => u.Id == recipientId)
+            .Select(u => new { u.Role, u.CategoryId })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (account is null)
+        {
+            return new Seat(null, null);
+        }
+
+        var teamRole = await dbContext.RoleInTeamAsync(recipientId, categoryId, cancellationToken);
+        var isAdmin = account.Role is UserRole.Admin;
+
+        // An administrator acts from their own pages, unless this concerns them as a team person: the
+        // executor of the task, or its lead for work they did not hand out themselves.
+        var asTeamPerson = teamRole is not null
+            && (!isAdmin || isExecutor || (teamRole is TeamRole.Lead && !isIssuer));
+
+        if (!asTeamPerson)
+        {
+            return new Seat(account.Role, null);
+        }
+
+        return new Seat(
+            teamRole is TeamRole.Lead ? UserRole.Lead : UserRole.Mentor,
+            !isAdmin && account.CategoryId == categoryId ? null : categoryId);
+    }
+
+    private static string InTeam(string path, Seat seat) =>
+        seat.SwitchTo is { } team ? $"{path}&team={team}" : path;
+
     /// <summary>The link for this recipient, and the deadline in the category's zone for an approval.</summary>
     private static async Task<JsonDocument> EnrichProposalAsync(
         MentorTaskFlowDbContext dbContext,
         OutboxEntry entry,
         CancellationToken cancellationToken)
     {
-        var recipientRole = await dbContext.Users
-            .IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => u.Id == entry.RecipientUserId)
-            .Select(u => (UserRole?)u.Role)
-            .FirstOrDefaultAsync(cancellationToken);
+        var authorId = dbContext.Proposals.Local.FirstOrDefault(p => p.Id == entry.EntityId)?.AuthorId
+            ?? await dbContext.Proposals
+                .IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(p => p.Id == entry.EntityId)
+                .Select(p => (Guid?)p.AuthorId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+        var seat = entry.CategoryId is { } team
+            ? await SeatAsync(
+                dbContext, entry.RecipientUserId, team, entry.RecipientUserId == authorId, isIssuer: false, cancellationToken)
+            : new Seat(null, null);
 
         var payload = JsonNode.Parse(entry.Payload.RootElement.GetRawText())?.AsObject() ?? [];
 
-        payload["actionPath"] = recipientRole switch
-        {
-            UserRole.Mentor => $"/mentor/proposals?proposalId={entry.EntityId}",
-            UserRole.Lead => $"/lead/proposals?proposalId={entry.EntityId}",
-            _ => $"/admin/proposals?proposalId={entry.EntityId}",
-        };
+        payload["actionPath"] = InTeam(
+            seat.Role switch
+            {
+                UserRole.Mentor => $"/mentor/proposals?proposalId={entry.EntityId}",
+                UserRole.Lead => $"/lead/proposals?proposalId={entry.EntityId}",
+                _ => $"/admin/proposals?proposalId={entry.EntityId}",
+            },
+            seat);
 
         if (entry.CategoryId is { } categoryId
             && payload["currentDueAt"] is JsonValue dueValue
